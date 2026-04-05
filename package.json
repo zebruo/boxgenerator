@@ -1,0 +1,62 @@
+{
+  "name": "box-generator",
+  "version": "1.0.0",
+  "description": "Générateur de boîtes et plateaux avec export G-code CNC",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.boxgenerator.app",
+    "productName": "BoxGenerator",
+    "asar": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "node_modules/@fortawesome/fontawesome-free/css/all.min.css",
+      "node_modules/@fortawesome/fontawesome-free/webfonts/**/*",
+      "node_modules/i18next/dist/esm/**/*",
+      "node_modules/i18next/package.json",
+      "!node_modules/@fortawesome/fontawesome-free/svgs/**",
+      "!node_modules/@fortawesome/fontawesome-free/svgs-full/**",
+      "!node_modules/@fortawesome/fontawesome-free/sprites-full/**",
+      "!node_modules/@fortawesome/fontawesome-free/js/**",
+      "!node_modules/@fortawesome/fontawesome-free/less/**",
+      "!node_modules/@fortawesome/fontawesome-free/scss/**",
+      "!node_modules/@fortawesome/fontawesome-free/sprites/**",
+      "!node_modules/@fortawesome/fontawesome-free/metadata/**",
+      "!node_modules/@fortawesome/fontawesome-free/css/!(all.min.css)",
+      "!node_modules/i18next/dist/cjs/**",
+      "!node_modules/i18next/dist/umd/**",
+      "!node_modules/i18next/i18next.js",
+      "!node_modules/i18next/i18next.min.js",
+      "!node_modules/i18next/index.d.mts",
+      "!node_modules/i18next/.nvmrc",
+      "!node_modules/three/src/**",
+      "!node_modules/three/build/three.cjs",
+      "!node_modules/three/build/three.webgpu.js",
+      "!node_modules/three/build/three.webgpu.min.js",
+      "!node_modules/three/build/three.tsl.js",
+      "!node_modules/three/build/three.tsl.min.js",
+      "!node_modules/@babel/runtime/helpers/esm/**"
+    ],
+    "win": {
+      "target": "dir",
+      "icon": "renderer/icon.ico"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.2.0",
+    "i18next": "^25.10.4",
+    "three": "^0.183.1"
+  }
+}

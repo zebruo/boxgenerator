@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Box Generator - CNC</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="../node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+
+</head>
+
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <span class="logo-icon">⬡</span>
+        <span class="logo-text">Box Generator</span>
+        <span class="logo-sub">CNC Edition</span>
+      </div>
+      <div class="header-actions">
+        <button id="btn-save-session" class="btn-icon-header" data-i18n-title="ui.btn_save_session"><i class="fa-regular fa-floppy-disk"></i></button>
+        <button id="btn-load-session" class="btn-icon-header" data-i18n-title="ui.btn_load_session"><i class="fa-regular fa-folder-open"></i></button>
+        <div class="header-sep"></div>
+        <button id="btn-export-svg" class="btn-icon-header" data-i18n-title="ui.btn_svg"><i class="fa-solid fa-bezier-curve"></i> <span data-i18n="ui.btn_svg_short">SVG</span></button>
+        <button id="btn-export-gcode" class="btn-icon-header" data-i18n-title="ui.btn_export"><i class="fa-regular fa-file-code"></i> <span data-i18n="ui.btn_export_short">G-code</span></button>
+        <div class="settings-wrapper">
+          <button id="btn-settings" class="btn-icon-header btn-settings" data-i18n-title="settings.title"><i class="fa-solid fa-gear"></i></button>
+          <div id="settings-panel" class="settings-panel hidden">
+            <div class="settings-row">
+              <span data-i18n="settings.theme">Thème</span>
+              <label class="theme-switch">
+                <span>🌙</span>
+                <input type="checkbox" id="theme-toggle">
+                <span class="theme-track"></span>
+                <span>☀</span>
+              </label>
+            </div>
+            <div class="settings-sep"></div>
+            <div class="settings-row">
+              <span data-i18n="settings.language">Langue</span>
+              <select id="lang-switcher" class="settings-lang-select">
+                <option value="fr">FR</option>
+                <option value="en">EN</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <button id="btn-gcode-help" class="btn-icon-header btn-help" data-i18n-title="ui.btn_help"><i class="fa-regular fa-circle-question"></i></button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <!-- Panel gauche: Paramètres -->
+      <aside class="panel-left">
+
+        <!-- Section: Type de modèle -->
+        <section class="panel-section">
+          <h3 class="section-title" data-i18n="ui.box_model">Modèle de boîte</h3>
+          <div class="box-type-grid">
+            <button class="box-type-btn active" data-type="open-tray" title="Boîte ouverte">
+              <svg viewBox="0 0 40 30" width="40" height="30">
+                <rect x="2" y="18" width="36" height="10" fill="none" stroke="currentColor" stroke-width="2" />
+                <line x1="2" y1="18" x2="8" y2="5" stroke="currentColor" stroke-width="2" />
+                <line x1="38" y1="18" x2="32" y2="5" stroke="currentColor" stroke-width="2" />
+                <line x1="8" y1="5" x2="32" y2="5" stroke="currentColor" stroke-width="2" />
+
+                <line x1="8" y1="5" x2="8" y2="15" stroke="currentColor" stroke-width="1.5" />
+                <line x1="32" y1="5" x2="32" y2="15" stroke="currentColor" stroke-width="1.5" />
+                <line x1="8" y1="15" x2="32" y2="15" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+              <span data-i18n="box.open_tray_short">Ouverte</span>
+            </button>
+            <button class="box-type-btn" data-type="finger-joint" title="Boîte encoches">
+              <svg viewBox="0 0 40 30" width="40" height="30">
+                <path d="M 3.4,28 V 2 h 6.6 v 5.2 H 16.6 V 2 h 6.8 v 5.2 H 30 V 2 h 6.6 V 28 Z" fill="none"
+                  stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span data-i18n="box.finger_joint_short">Encoches</span>
+            </button>
+            <button class="box-type-btn" data-type="lid-box" title="Boîte avec couvercle">
+              <svg viewBox="0 0 40 30" width="40" height="30">
+                <rect x="2" y="15" width="36" height="13" fill="none" stroke="currentColor" stroke-width="2" />
+                <rect x="1" y="8" width="38" height="7" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span data-i18n="box.lid_box_short">Couvercle</span>
+            </button>
+            <button class="box-type-btn" data-type="stackable" title="Boîte empilable">
+              <svg viewBox="0 0 40 30" width="40" height="30">
+                <rect x="3" y="2" width="34" height="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <rect x="5" y="12" width="30" height="1" fill="none" stroke="currentColor" stroke-width="2" />
+                <rect x="3" y="17" width="34" height="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <rect x="5" y="27" width="30" height="1" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+              <span data-i18n="box.stackable_short">Empilable</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Section: Forme du contour -->
+        <section class="panel-section">
+          <h3 class="section-title" data-i18n="ui.contour_shape">Forme du contour</h3>
+          <div class="shape-grid">
+            <button class="shape-btn active" data-shape="rectangle" title="Rectangle">
+              <svg viewBox="0 0 32 32" width="28" height="28">
+                <rect x="2" y="6" width="28" height="20" fill="none" stroke="currentColor" stroke-width="2" rx="1" />
+              </svg>
+            </button>
+            <button class="shape-btn" data-shape="circle" title="Cercle">
+              <svg viewBox="0 0 32 32" width="28" height="28">
+                <circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </button>
+            <button class="shape-btn" data-shape="oval" title="Ovale">
+              <svg viewBox="0 0 32 32" width="28" height="28">
+                <ellipse cx="16" cy="16" rx="14" ry="9" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </button>
+            <button class="shape-btn" data-shape="hexagon" title="Hexagone">
+              <svg viewBox="0 0 32 32" width="28" height="28">
+                <polygon points="16,2 28,9 28,23 16,30 4,23 4,9" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </button>
+            <button class="shape-btn" data-shape="polygon" title="Polygone">
+              <svg viewBox="0 0 32 32" width="28" height="28">
+                <polygon points="16,2 30,11 25,28 7,28 2,11" fill="none" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </button>
+            <button class="shape-btn" data-shape="bean" title="Haricot">
+              <svg viewBox="0 0 32 32" width="28" height="28">
+                <path
+                  d="M 29.68,12.93 C 29.98,2.28 16.08,2 15.12,10.7 C 14.43,17.05 9.11,13.7 5.68,18.1 C 2,22.83 5.11,30 12.34,30 C 20.88,29.81 29.45,20.73 29.68,12.93 Z"
+                  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        </section>
+
+        <!-- Section: Paramètres dimensionnels -->
+        <section class="panel-section">
+          <h3 class="section-title"><span data-i18n="ui.dimensions">Dimensions</span> <span class="unit-label">mm</span></h3>
+          <div id="params-container" class="params-list"></div>
+        </section>
+
+        <!-- Section: Paramètres matière -->
+        <section class="panel-section">
+          <h3 class="section-title" data-i18n="ui.material_tool">Matière & Outil</h3>
+          <div class="params-list">
+            <div class="param-row" data-tip="tip.stock">
+              <label data-i18n="ui.stock">Brut</label>
+              <input type="number" id="param-thickness" value="6" min="0.5" max="500" step="0.5" readonly
+                tabindex="-1">
+              <span class="param-unit">mm</span>
+            </div>
+            <div class="param-row" data-tip="tip.tool_diameter">
+              <label data-i18n="ui.tool_diameter">Diam. fraise</label>
+              <input type="number" id="param-tool-diameter" value="3.175" min="0.5" max="25" step="any">
+              <span class="param-unit">mm</span>
+            </div>
+            <div class="param-row" data-tip="tip.depth_per_pass">
+              <label data-i18n="ui.depth_per_pass">Prof. /passe</label>
+              <input type="number" id="param-passes" value="1.5" min="0.1" max="50" step="any">
+              <span class="param-unit">mm</span>
+            </div>
+            <div class="param-row" data-tip="tip.feed_xy">
+              <label data-i18n="ui.feed_xy">Vitesse XY</label>
+              <input type="number" id="param-feedrate" value="800" min="100" max="10000" step="100">
+              <span class="param-unit">mm/min</span>
+            </div>
+            <div class="param-row" data-tip="tip.feed_z">
+              <label data-i18n="ui.feed_z">Vitesse Z</label>
+              <input type="number" id="param-plunge" value="300" min="50" max="2000" step="50">
+              <span class="param-unit">mm/min</span>
+            </div>
+            <div class="param-row" data-tip="tip.spindle">
+              <label data-i18n="ui.spindle">Broche</label>
+              <input type="number" id="param-spindle" value="12000" min="1000" max="30000" step="1000">
+              <span class="param-unit">tr/min</span>
+            </div>
+            <div class="param-row" data-tip="tip.safe_z">
+              <label data-i18n="ui.safe_z">Survol Z</label>
+              <input type="number" id="param-safe-z" value="5" min="1" max="50" step="1">
+              <span class="param-unit">mm</span>
+            </div>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- Zone centrale: Prévisualisation -->
+      <main class="panel-center">
+        <div class="preview-toolbar">
+          <div class="view-controls">
+            <button class="view-btn active" data-view="3d" data-i18n="ui.btn_3d" data-i18n-title="tip.btn_3d" title="Prévisualisation 3D">3D</button>
+            <button class="view-btn" data-view="tech" data-i18n="ui.btn_2d" data-i18n-title="tip.btn_2d" title="Vues techniques 2D avec cotes">Vues 2D</button>
+          </div>
+          <!-- Contrôles 3D : Z0 + brut (masqués en mode Vues 2D) -->
+          <div id="toolbar-3d" class="toolbar-3d-extra">
+            <span class="ctrl-sep">|</span>
+            <span class="ctrl-label-sm">Z0</span>
+            <div class="z0-level" data-i18n-title="tip.z0_level" title="Niveau Z0 : bas ou haut de la boîte">
+              <button class="z0-lvl-btn active" data-level="top" data-i18n-title="tip.z0_top" title="Haut de la boîte">▲</button>
+              <button class="z0-lvl-btn" data-level="bottom" data-i18n-title="tip.z0_bottom" title="Bas de la boîte">▼</button>
+            </div>
+            <div class="z0-grid" data-i18n-title="tip.z0_grid" title="Position de l'origine Z0 sur le brut">
+              <button class="z0-btn" data-pos="back-left" data-i18n-title="tip.z0_back_left" title="Arrière gauche">↖</button>
+              <button class="z0-btn" data-pos="back-right" data-i18n-title="tip.z0_back_right" title="Arrière droit">↗</button>
+              <button class="z0-btn active" data-pos="center" data-i18n-title="tip.z0_center" title="Centre">⊕</button>
+              <button class="z0-btn" data-pos="front-left" data-i18n-title="tip.z0_front_left" title="Avant gauche">↙</button>
+              <button class="z0-btn" data-pos="front-right" data-i18n-title="tip.z0_front_right" title="Avant droit">↘</button>
+            </div>
+            <span class="ctrl-sep">|</span>
+            <span class="ctrl-label-sm" data-i18n="ui.stock_offset">Brut +</span>
+            <input type="number" id="stock-offset" value="0" min="0" max="200" step="1"
+              data-i18n-title="tip.stock_offset" title="Offset du brut par rapport à la boîte">
+            <span class="ctrl-label-sm">mm</span>
+            <div class="z0-level" data-i18n-title="tip.stock_offset_lvl" title="Appliquer l'offset en haut ou en bas de la boîte">
+              <button class="stock-side-btn active" data-side="top" data-i18n-title="tip.stock_top" title="Offset au-dessus">▲</button>
+              <button class="stock-side-btn" data-side="bottom" data-i18n-title="tip.stock_bottom" title="Offset en dessous">▼</button>
+            </div>
+            <span class="ctrl-sep">|</span>
+            <label class="ctrl-label-sm xray-label" data-i18n-title="tip.xray" title="Voir à travers les parois (X-Ray)">
+              <input type="checkbox" id="xray-toggle"> X-Ray
+            </label>
+          </div>
+        </div>
+        <div class="preview-area">
+          <canvas id="canvas-2d" class="preview-canvas"></canvas>
+          <canvas id="canvas-3d" class="preview-canvas hidden"></canvas>
+          <div id="box-name-overlay" class="box-name-overlay hidden"></div>
+        </div>
+        <div class="preview-info">
+          <span id="info-dims">—</span>
+          <span id="info-area">—</span>
+          <span id="info-sheet" class="hidden">—</span>
+        </div>
+      </main>
+
+      <!-- Panel droit: G-code -->
+      <aside class="panel-right">
+        <div class="gcode-header">
+          <span class="section-title" data-i18n="ui.gcode_panel">G-code</span>
+          <button id="btn-generate" class="btn btn-accent" data-i18n="ui.btn_generate">Générer</button>
+        </div>
+        <div class="gcode-stats" id="gcode-stats"></div>
+        <pre id="gcode-output"
+          class="gcode-viewer"><span class="gcode-placeholder" data-i18n="ui.gcode_placeholder">Cliquer sur "Générer" pour produire le G-code CNC…</span></pre>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+
+</html>

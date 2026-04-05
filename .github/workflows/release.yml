@@ -1,0 +1,70 @@
+name: Build and Release BoxGenerator
+
+# Déclenché automatiquement quand un tag v* est poussé (ex: v1.0.1)
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write   # Nécessaire pour créer la release GitHub
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Build + package Windows
+        run: npm run dist
+
+      - name: Installer Inno Setup
+        run: choco install innosetup --yes
+
+      - name: Lire la version depuis package.json
+        id: pkg
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json | ConvertFrom-Json).version
+          echo "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Compiler le setup Inno Setup
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=${{ steps.pkg.outputs.version }} installer\BoxGenerator.iss
+
+      - name: Créer le zip portable
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\win-unpacked `
+            -DestinationPath "dist\BoxGenerator-${{ steps.pkg.outputs.version }}-portable.zip"
+
+      - name: Publier la release GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          name: BoxGenerator v${{ steps.pkg.outputs.version }}
+          body: |
+            ## BoxGenerator v${{ steps.pkg.outputs.version }}
+
+            Générateur de boîtes paramétriques avec export G-code CNC.
+
+            ### Téléchargements
+            - **BoxGenerator-Setup-${{ steps.pkg.outputs.version }}.exe** — Installation classique (Menu Démarrer, désinstalleur automatique)
+            - **BoxGenerator-${{ steps.pkg.outputs.version }}-portable.zip** — Version portable, aucune installation requise
+
+            ### Compatibilité
+            Windows 10 / 11 — Compatible Grbl, Mach3, LinuxCNC
+          files: |
+            installer/output/BoxGenerator-Setup-${{ steps.pkg.outputs.version }}.exe
+            dist/BoxGenerator-${{ steps.pkg.outputs.version }}-portable.zip
