@@ -24,6 +24,9 @@ desktop.ini
 *.log
 npm-debug.log*
 
+# Notes locales
+notes/
+
 # Backup files
 *.bak
 *_bak/
