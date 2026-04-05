@@ -16,7 +16,6 @@ DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 OutputDir=output
 OutputBaseFilename=BoxGenerator-Setup-{#AppVersion}
-SetupIconFile=..\renderer\icon.ico
 UninstallDisplayIcon={app}\{#AppExeName}
 UninstallDisplayName={#AppName}
 Compression=lzma

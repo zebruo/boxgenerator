@@ -44,8 +44,7 @@
       "!node_modules/@babel/runtime/helpers/esm/**"
     ],
     "win": {
-      "target": "dir",
-      "icon": "renderer/icon.ico"
+      "target": "dir"
     }
   },
   "devDependencies": {
