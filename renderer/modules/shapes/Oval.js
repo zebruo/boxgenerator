@@ -12,9 +12,14 @@ export class Oval extends ShapeBase {
     ];
   }
 
-  getContourPoints(segments = 64) {
+  getContourPoints(deflection = 0.01) {
     const rx = this.params.length / 2;
     const ry = this.params.width / 2;
+    // Rayon de courbure minimal de l'ellipse = (petit axe)² / grand axe
+    // C'est là où la courbure est la plus forte → le plus de segments nécessaires
+    const rMin     = Math.min(rx, ry) ** 2 / Math.max(rx, ry);
+    const theta    = 2 * Math.acos(1 - deflection / rMin);
+    const segments = Math.max(32, Math.ceil(2 * Math.PI / theta));
     const pts = [];
     for (let i = 0; i < segments; i++) {
       const a = (2 * Math.PI * i) / segments;
