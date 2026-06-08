@@ -1,5 +1,6 @@
 import { GCodeGenerator } from '../gcode/GCodeGenerator.js';
 import { pocketConcentric } from '../gcode/PocketConcentric.js';
+import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { t } from '../i18n.js';
 
 /**
@@ -18,6 +19,8 @@ export class OpenTray {
   generateGCode(shape, params, machineParams) {
     const gen = new GCodeGenerator(machineParams);
     const { height = 30, wallThickness = 6, bottomThickness } = params;
+    const partitions   = params.partitions   ?? 0;
+    const partitionDir = (params.partitionDir === 'horizontal') ? 'horizontal' : 'vertical';
     const bFl = bottomThickness ?? wallThickness;  // épaisseur du fond (défaut = épaisseur paroi)
     const bb = shape.getBoundingBox();
     const doPocket = machineParams.pocketConc
@@ -36,7 +39,16 @@ export class OpenTray {
     if (innerW > 0 && innerH > 0) {
       const savedThickness = gen.machine.materialThickness;
       gen.machine.materialThickness = height - bFl;
-      doPocket(gen.insetContour(pts, wallThickness), t('gcode.op_cavity'));
+      if (partitions > 0) {
+        const cells = buildPartitionContours(bb.width, bb.height, wallThickness, partitions, partitionDir, machineParams.toolDiameter);
+        if (cells) {
+          cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`));
+        } else {
+          doPocket(gen.insetContour(pts, wallThickness), t('gcode.op_cavity'));
+        }
+      } else {
+        doPocket(gen.insetContour(pts, wallThickness), t('gcode.op_cavity'));
+      }
       gen.machine.materialThickness = savedThickness;
     }
 
@@ -109,7 +121,15 @@ export class OpenTray {
     return [
       { id: 'height',          label: 'param.height',           min: 5,  max: 500, step: 1,   unit: 'mm', value: 40 },
       { id: 'wallThickness',   label: 'param.wall_thickness',   min: 1,  max: 50,  step: 0.5, unit: 'mm', value: 6 },
-      { id: 'bottomThickness', label: 'param.bottom_thickness', min: 1,  max: 50,  step: 0.5, unit: 'mm', value: 6 }
+      { id: 'bottomThickness', label: 'param.bottom_thickness', min: 1,  max: 50,  step: 0.5, unit: 'mm', value: 6 },
+      { id: 'partitions',   label: 'param.partitions',    min: 0, max: 5, step: 1, unit: '', value: 0 },
+      {
+        id: 'partitionDir', label: 'param.partition_dir', type: 'select', unit: '',
+        options: [
+          { value: 'vertical',   label: 'option.partition_vertical' },
+          { value: 'horizontal', label: 'option.partition_horizontal' }
+        ]
+      }
     ];
   }
 }

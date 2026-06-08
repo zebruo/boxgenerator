@@ -229,7 +229,7 @@ function bindEvents() {
 
   // Machine params — live update
   ['param-thickness','param-tool-diameter','param-passes','param-feedrate','param-plunge','param-spindle','param-safe-z'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => { updateRabbetToolWarning(); updatePreview(); });
+    document.getElementById(id).addEventListener('input', () => { updateRabbetToolWarning(); updatePartitionWarning(); updatePreview(); });
   });
 
   // Resize
@@ -293,10 +293,16 @@ function renderShapeParams() {
       `;
       row.style.gridTemplateColumns = '1fr';
       row.querySelector('select').addEventListener('change', e => {
-        state.boxParams[d.id] = parseInt(e.target.value);
+        const raw = e.target.value;
+        state.boxParams[d.id] = isNaN(raw) || raw === '' ? raw : parseInt(raw);
         updateRabbetToolWarning();
         updatePreview();
       });
+      if (d.id === 'partitionDir' && state.shapeKey !== 'rectangle') {
+        row.querySelector('select').disabled = true;
+        row.style.opacity = '0.4';
+        row.style.pointerEvents = 'none';
+      }
     } else {
       // ── Param numérique ────────────────────────────────────────────────────
       const currentVal = state.shape.params[d.id] ?? state.boxParams[d.id] ?? d.value ?? d.min;
@@ -311,6 +317,12 @@ function renderShapeParams() {
       `;
       if (d.readonly) { row.querySelector('input').tabIndex = -1; }
       if (d.id === 'cornerRadius' && state.boxTypeKey === 'finger-joint') {
+        const inp = row.querySelector('input');
+        inp.disabled = true;
+        row.style.opacity = '0.4';
+        row.style.pointerEvents = 'none';
+      }
+      if (d.id === 'partitions' && state.shapeKey !== 'rectangle') {
         const inp = row.querySelector('input');
         inp.disabled = true;
         row.style.opacity = '0.4';
@@ -334,6 +346,7 @@ function renderShapeParams() {
         updateBeanRatio();
         updatePinDepthWarning();
         updateRabbetToolWarning();
+        updatePartitionWarning();
         updateFingerJointWarnings();
         updatePreview();
       });
@@ -350,6 +363,7 @@ function renderShapeParams() {
   updateBeanRatio();
   updatePinDepthWarning();
   updateRabbetToolWarning();
+  updatePartitionWarning();
   updateFingerJointWarnings();
 }
 
@@ -382,6 +396,28 @@ function updateShapeInputWarnings() {
       el.title = '';
     }
   }
+}
+
+function updatePartitionWarning() {
+  const el = document.querySelector('[data-param="partitions"]');
+  if (!el) return;
+  const partitions = parseInt(el.value) || 0;
+  if (partitions === 0) { el.classList.remove('input-warn'); el.title = ''; return; }
+  const partitionDir  = (state.boxParams.partitionDir === 'horizontal') ? 'horizontal' : 'vertical';
+  const wallThickness = state.boxParams.wallThickness ?? 6;
+  const td  = parseFloat(document.getElementById('param-tool-diameter').value) || 6;
+  const bb  = state.shape?.getBoundingBox();
+  if (!bb) return;
+  const cols  = partitionDir === 'vertical'   ? partitions + 1 : 1;
+  const rows  = partitionDir === 'horizontal' ? partitions + 1 : 1;
+  const cellW = (bb.width  - 2 * wallThickness - (cols - 1) * wallThickness) / cols;
+  const cellH = (bb.height - 2 * wallThickness - (rows - 1) * wallThickness) / rows;
+  const minCell = 3 * td;
+  const warn = cellW < minCell || cellH < minCell;
+  el.classList.toggle('input-warn', warn);
+  el.title = warn
+    ? `⚠ Compartiment trop petit (${Math.min(cellW, cellH).toFixed(0)}mm) — min. ${minCell.toFixed(0)}mm (3×Ø ${td}mm)`
+    : '';
 }
 
 function updateRabbetToolWarning() {

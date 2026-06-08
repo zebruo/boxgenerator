@@ -1,5 +1,6 @@
 import { GCodeGenerator } from '../gcode/GCodeGenerator.js';
 import { pocketConcentric } from '../gcode/PocketConcentric.js';
+import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { t } from '../i18n.js';
 
 /**
@@ -29,13 +30,23 @@ export class LidBox {
       },
       { id: 'bottomThickness',    label: 'param.bottom_body', min: 1, max: 30,  step: 0.5, unit: 'mm', value: 6 },
       { id: 'lidBottomThickness', label: 'param.bottom_lid',  min: 1, max: 30,  step: 0.5, unit: 'mm', value: 6 },
-      { id: 'clearance',          label: 'param.clearance',   min: 0, max: 2,   step: 0.1, unit: 'mm', value: 0.3 }
+      { id: 'clearance',          label: 'param.clearance',   min: 0, max: 2,   step: 0.1, unit: 'mm', value: 0.4 },
+      { id: 'partitions',   label: 'param.partitions',    min: 0, max: 5, step: 1, unit: '', value: 0 },
+      {
+        id: 'partitionDir', label: 'param.partition_dir', type: 'select', unit: '',
+        options: [
+          { value: 'vertical',   label: 'option.partition_vertical' },
+          { value: 'horizontal', label: 'option.partition_horizontal' }
+        ]
+      }
     ];
   }
 
   generateGCode(shape, params, machineParams) {
     const gen = new GCodeGenerator(machineParams);
-    const { height = 40, lidHeight = 15, wallThickness = 6, rabbet = 3, rabbetSide = 0, clearance = 0.3 } = params;
+    const { height = 40, lidHeight = 15, wallThickness = 6, rabbet = 3, rabbetSide = 0, clearance = 0.4 } = params;
+    const partitions   = params.partitions   ?? 0;
+    const partitionDir = (params.partitionDir === 'horizontal') ? 'horizontal' : 'vertical';
     const rabbetDepth = params.rabbetDepth ?? 4;
     const bb   = shape.getBoundingBox();
     const W    = bb.width, D = bb.height;
@@ -98,7 +109,16 @@ export class LidBox {
     const cavW = W - 2 * wallThickness, cavH = D - 2 * wallThickness;
     if (cavW > 0 && cavH > 0) {
       gen.machine.materialThickness = height - bFl;
-      doPocket(gen.insetContour(bodyPts, wallThickness), t('gcode.op_body_cavity'), cavDepthStart);
+      if (partitions > 0) {
+        const cells = buildPartitionContours(W, D, wallThickness, partitions, partitionDir, machineParams.toolDiameter);
+        if (cells) {
+          cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`, cavDepthStart));
+        } else {
+          doPocket(gen.insetContour(bodyPts, wallThickness), t('gcode.op_body_cavity'), cavDepthStart);
+        }
+      } else {
+        doPocket(gen.insetContour(bodyPts, wallThickness), t('gcode.op_body_cavity'), cavDepthStart);
+      }
     }
 
     gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)

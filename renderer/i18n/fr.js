@@ -54,6 +54,8 @@ export const fr = {
     rabbet_depth:        'Profondeur feuillure',
     rabbet_side:         'Type de feuillure',
     clearance:           "Jeu d'assemblage",
+    partitions:          'Cloisons',
+    partition_dir:       'Direction',
     finger_width:        'Larg. encoche',
     mat_thickness:       'Épaiss. matière',
     with_lid:            'Avec couvercle',
@@ -65,8 +67,10 @@ export const fr = {
 
   // ── Options select ──────────────────────────────────────────────────────
   option: {
-    rabbet_interior: 'Rainure intérieure — couvercle ajusté',
-    rabbet_exterior: 'Rainure extérieure — couvercle plein',
+    rabbet_interior:       'Rainure intérieure — couvercle ajusté',
+    rabbet_exterior:       'Rainure extérieure — couvercle plein',
+    partition_vertical:    'Cloisons | perpendiculaires à X',
+    partition_horizontal:  'Cloisons — perpendiculaires à Y',
   },
 
   // ── Interface principale ────────────────────────────────────────────────
@@ -125,7 +129,8 @@ export const fr = {
     op_outer_wall:      'Paroi extérieure',
     op_body_rabbet:     'Corps — feuillure',
     op_body_rabbet_ext: 'Corps — feuillure extérieure',
-    op_body_cavity:     'Corps — cavité intérieure',
+    op_body_cavity:       'Corps — cavité intérieure',
+    op_body_compartment:  'Corps — compartiment',
     op_body_contour:    'Corps — contour extérieur',
     op_lid_cavity:      'Couvercle — cavité intérieure',
     op_lid_contour:     'Couvercle — contour extérieur',

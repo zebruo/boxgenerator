@@ -54,6 +54,8 @@ export const en = {
     rabbet_depth:        'Rabbet depth',
     rabbet_side:         'Rabbet type',
     clearance:           'Fit clearance',
+    partitions:          'Partitions',
+    partition_dir:       'Direction',
     finger_width:        'Finger width',
     mat_thickness:       'Material thick.',
     with_lid:            'With lid',
@@ -65,8 +67,10 @@ export const en = {
 
   // ── Select options ──────────────────────────────────────────────────────
   option: {
-    rabbet_interior: 'Interior rabbet — fitted lid',
-    rabbet_exterior: 'Exterior rabbet — full lid',
+    rabbet_interior:       'Interior rabbet — fitted lid',
+    rabbet_exterior:       'Exterior rabbet — full lid',
+    partition_vertical:    'Walls | perpendicular to X',
+    partition_horizontal:  'Walls — perpendicular to Y',
   },
 
   // ── Main UI ─────────────────────────────────────────────────────────────
@@ -125,7 +129,8 @@ export const en = {
     op_outer_wall:      'Outer wall',
     op_body_rabbet:     'Body — rabbet',
     op_body_rabbet_ext: 'Body — outer rabbet',
-    op_body_cavity:     'Body — inner cavity',
+    op_body_cavity:       'Body — inner cavity',
+    op_body_compartment:  'Body — compartment',
     op_body_contour:    'Body — outer contour',
     op_lid_cavity:      'Lid — inner cavity',
     op_lid_contour:     'Lid — outer contour',

@@ -469,15 +469,30 @@ export class GCodeGenerator {
     const tabHeight = hasTabs ? (tabOpts.height ?? 1.5) : 0;
     const tabZ      = -(depth - tabHeight);
 
-    // Point de départ fixe : 3 heures — l'outil ne quitte jamais ce XY entre les passes
+    const leadInR  = entryOpts.leadIn  ?? false;
+    const leadOutR = entryOpts.leadOut ?? false;
+
+    // Point de départ : 3 heures (angle 0)
     const startX = cx + r_off;
     const startY = cy;
     const oc     = Math.min(this.machine.toolDiameter * 0.5, r_off * 0.08);
 
-    this.comment(`─── ${label} (${side}, G3 arcs${hasTabs ? `, ${tabCount} tabs ${tabWidth}×${tabHeight}mm` : ''}) ───`);
+    this.comment(`─── ${label} (${side}, G3 arcs${hasTabs ? `, ${tabCount} tabs ${tabWidth}×${tabHeight}mm` : ''}${leadInR ? `, lead-in R${leadInR}mm` : ''}) ───`);
 
     const ox = this.machine.originX, oy = this.machine.originY;
     const f  = this.machine.feedrate;
+
+    // Points virtuels pour tangente CCW au point 3h (angle 0) = direction (0, +1)
+    const entryPts = [
+      { x: startX, y: startY },
+      { x: cx + r_off * Math.cos(0.001), y: cy + r_off * Math.sin(0.001) }
+    ];
+    const exitPts = [
+      { x: startX, y: startY },
+      { x: cx + r_off * Math.cos(-0.001), y: cy + r_off * Math.sin(-0.001) }
+    ];
+    const leadIn  = leadInR  ? this._leadArc(entryPts, leadInR, 'in') : null;
+    const leadOut = leadOutR ? this._leadOutArc(exitPts, leadOutR)    : null;
 
     // Émet un arc G3 de l'angle fromA vers l'angle toA sur le cercle d'outil
     const emitArc = (fromA, toA) => {
@@ -510,22 +525,38 @@ export class GCodeGenerator {
       if (angle < 2 * Math.PI - 1e-6) tabSegs.push({ type: 'cut', from: angle, to: 2 * Math.PI });
     }
 
-    // Positionnement initial unique
+    // Positionnement initial
     this.rapidZ(this.machine.safeZ);
-    this.rapidTo(startX, startY);
+    this.rapidTo(leadIn ? leadIn.approachPt.x : startX, leadIn ? leadIn.approachPt.y : startY);
 
     for (let pass = 1; pass <= passes; pass++) {
       const z      = -(stepZ * pass);
       const isLast = pass === passes;
       this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${isLast && hasTabs ? ' [tabs actifs]' : ''}`);
 
-      this.plungeTo(z);
+      if (leadIn) {
+        // Avec lead-in : retract + reposition pour chaque passe (style FreeCAD)
+        if (pass > 1) {
+          this.rapidZ(this.machine.safeZ);
+          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
+        }
+        this.plungeTo(z);
+        for (const p of leadIn.arcPts) this.lineTo(p.x, p.y);
+      } else {
+        this.plungeTo(z);
+      }
 
       if (!isLast || !hasTabs) {
         // Cercle complet : 2 demi-arcs G3 (CCW) avec valeurs I/J exactes
         this.emit(`G3 X${(cx - r_off + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off).toFixed(3)} J0.000 F${f}`);
         this.emit(`G3 X${(startX + ox).toFixed(3)} Y${(startY + oy).toFixed(3)} I${(r_off).toFixed(3)} J0.000 F${f}`);
-        if (isLast) this.lineTo(startX, startY + oc);
+        if (isLast) {
+          if (leadOut) {
+            for (const p of leadOut.arcPts) this.lineTo(p.x, p.y);
+          } else {
+            this.lineTo(startX, startY + oc);
+          }
+        }
       } else {
         // Dernière passe avec tabs : arcs G3 segmentés + relevés
         for (const seg of tabSegs) {
@@ -537,7 +568,11 @@ export class GCodeGenerator {
             this.plungeTo(z);
           }
         }
-        this.lineTo(startX, startY + oc);
+        if (leadOut) {
+          for (const p of leadOut.arcPts) this.lineTo(p.x, p.y);
+        } else {
+          this.lineTo(startX, startY + oc);
+        }
       }
     }
 
