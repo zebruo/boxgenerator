@@ -149,7 +149,26 @@ export function showHelpModal(machine = {}) {
       <!-- ── Lead-in / Lead-out ─────────────────────────── -->
       <section class="help-section">
         <h4>Lead-in / Lead-out</h4>
-        <p>Arc tangentiel d'entrée et de sortie sur le contour. L'outil rejoint la trajectoire par un arc de cercle plutôt que par une plongée directe, éliminant la marque d'arrêt en surface. Recommandé pour toutes les passes de finition.</p>
+        <p>Arc tangentiel d'entrée <em>et</em> de sortie sur le contour extérieur.</p>
+        <dl class="help-dl">
+          <dt>Case décochée (défaut)</dt>
+          <dd>Un <strong>overcut automatique</strong> de ½ ⌀outil prolonge le contour légèrement au-delà du point de départ — l'outil ne s'arrête jamais exactement au même endroit, ce qui élimine la marque de jonction. Suffisant pour le bois et le MDF.</dd>
+          <dt>Case cochée</dt>
+          <dd>L'outil approche le contour par un <strong>arc de 90°</strong> tangent au premier segment (lead-in), puis en repart symétriquement par un arc de sortie (lead-out). Aucune plongée directe sur la paroi, aucun arrêt sur le contour. Recommandé pour l'aluminium, l'acrylique et les passes de finition sur bois dur.</dd>
+          <dt>Rayon</dt>
+          <dd>Par défaut 0,8 × ⌀outil (${defLeadR} mm). L'arc doit tenir dans l'espace libre autour de la forme — réduire si la fraise est trop proche d'une paroi.</dd>
+        </dl>
+      </section>
+
+      <!-- ── Stratégie poche ───────────────────────────── -->
+      <section class="help-section">
+        <h4>Stratégie poche</h4>
+        <dl class="help-dl">
+          <dt>Concentrique (défaut)</dt>
+          <dd>L'outil part du centre et trace des anneaux concentriques vers la paroi. La paroi est atteinte lors du dernier anneau, qui constitue la passe de finition. Résultat propre pour les formes convexes (rectangle, cercle, ovale, hexagone). Un overcut de ½ ⌀outil sur le dernier anneau élimine la marque de fermeture sur la paroi.</dd>
+          <dt>Raster (zig-zag)</dt>
+          <dd>Balayage horizontal ligne par ligne. Universel — fonctionne pour toutes les formes y compris les profils concaves (haricot, C, U). Peut laisser de légères stries sur les parois ; à utiliser quand la forme est trop concave pour la stratégie concentrique.</dd>
+        </dl>
       </section>
 
       <!-- ── Tabs ────────────────────────────────────────── -->

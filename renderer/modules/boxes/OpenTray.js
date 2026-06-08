@@ -41,8 +41,14 @@ export class OpenTray {
     }
 
     // 2. Découpe du contour extérieur (parois)
-    if (tabOpts) gen.cutContourWithTabs(pts, 'outside', tabOpts, entryOpts, t('gcode.op_outer_wall'));
-    else         gen.cutContour(pts, 'outside', entryOpts, t('gcode.op_outer_wall'));
+    const arcDef = shape.getArcDef ? shape.getArcDef() : null;
+    if (arcDef) {
+      gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_outer_wall'), tabOpts || null);
+    } else if (tabOpts) {
+      gen.cutContourWithTabs(pts, 'outside', tabOpts, entryOpts, t('gcode.op_outer_wall'));
+    } else {
+      gen.cutContour(pts, 'outside', entryOpts, t('gcode.op_outer_wall'));
+    }
 
     gen.footer();
     return gen.getCode();

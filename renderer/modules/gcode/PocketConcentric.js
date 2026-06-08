@@ -51,7 +51,9 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
     if (depthStart > 0) gen.emit(`G0 Z${(-depthStart + gen.machine.zOffset).toFixed(3)}`);
     gen.plungeTo(z);
 
-    // Anneaux par interpolation scale 0→1 autour du centroïde
+    // Anneaux par interpolation scale 0→1 autour du centroïde.
+    // Chaque anneau est fermé (transition radiale courte vers l'anneau suivant).
+    // Dernier anneau : overcut ~½ ⌀outil pour effacer la marque de jonction sur la paroi.
     for (let ri = 1; ri <= nRings; ri++) {
       const scale = ri / nRings;
       const ring  = toolPts.map(p => ({
@@ -59,10 +61,16 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
         y: cy + (p.y - cy) * scale,
       }));
 
-      // Transition G1 directe (spirale continue, pas de relevé)
       gen.lineTo(ring[0].x, ring[0].y);
       for (let i = 1; i < ring.length; i++) gen.lineTo(ring[i].x, ring[i].y);
       gen.lineTo(ring[0].x, ring[0].y); // fermeture
+
+      if (ri === nRings && ring.length >= 2) {
+        const dx = ring[1].x - ring[0].x, dy = ring[1].y - ring[0].y;
+        const segLen = Math.hypot(dx, dy) || 1;
+        const oc = Math.min(td * 0.5, segLen * 0.4);
+        gen.lineTo(ring[0].x + (dx / segLen) * oc, ring[0].y + (dy / segLen) * oc);
+      }
     }
 
     gen.rapidZ(m.safeZ);

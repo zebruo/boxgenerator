@@ -71,17 +71,17 @@ export class GCodeGenerator {
     const effDia  = holeDia ?? toolDia;
 
     const useHelix = holeDia && (holeDia - toolDia) > 0.5; // hélice seulement si écart > 0.5mm
-    const strategy = useHelix ? 'hélice' : 'plongée';
+    const strategy = useHelix ? 'hélice' : 'G83 peck';
     this.comment(`─── ${label} (${strategy}, Ø${(holeDia ?? this.machine.toolDiameter).toFixed(2)}mm, prof. ${depth}mm) ───`);
     this.rapidZ(this.machine.safeZ);
 
     if (!useHelix) {
-      // Plongée directe
+      // Cycle de perçage G83 (peck drilling) — délègue la gestion des passes au contrôleur
+      const ox = this.machine.originX, oy = this.machine.originY, zo = this.machine.zOffset;
       this.rapidTo(x, y);
-      for (let i = 1; i <= passes; i++) {
-        this.plungeTo(-(stepZ * i));
-        this.rapidZ(this.machine.safeZ);
-      }
+      this.emit(`G83 X${(x + ox).toFixed(3)} Y${(y + oy).toFixed(3)} Z${(-depth + zo).toFixed(3)} R${(this.machine.safeZ + zo).toFixed(3)} Q${dpp.toFixed(3)} F${this.machine.plungeRate}`);
+      this.emit('G80');
+      this.rapidZ(this.machine.safeZ);
     } else {
       // Interpolation hélicoïdale (G2) — trou > outil
       const R  = (effDia - toolDia) / 2;
@@ -154,10 +154,13 @@ export class GCodeGenerator {
     const x1 = pts[0].x + ux * rLen;
     const y1 = pts[0].y + uy * rLen;
 
+    // Feedrate blendé pour le mouvement diagonal (formule FreeCAD) :
+    // pitch=0 → descente pure → plungeRate ; pitch=1 → horizontal → feedrate
+    const pitch     = 2 * Math.atan2(rLen, Math.abs(targetZ)) / Math.PI;
+    const blendedF  = Math.round(this.machine.plungeRate + pitch * (this.machine.feedrate - this.machine.plungeRate));
+
     this.comment('Ramp-in linéaire');
-    // Aller : descend de 0 à targetZ sur rLen mm
-    this.emit(`G1 X${(x1 + this.machine.originX).toFixed(3)} Y${(y1 + this.machine.originY).toFixed(3)} Z${(targetZ + this.machine.zOffset).toFixed(3)} F${this.machine.plungeRate}`);
-    // Retour : reste à targetZ
+    this.emit(`G1 X${(x1 + this.machine.originX).toFixed(3)} Y${(y1 + this.machine.originY).toFixed(3)} Z${(targetZ + this.machine.zOffset).toFixed(3)} F${blendedF}`);
     this.lineTo(pts[0].x, pts[0].y);
   }
 
@@ -209,8 +212,8 @@ export class GCodeGenerator {
     const tLen = Math.hypot(dx, dy) || 1;
     const tx = dx / tLen, ty = dy / tLen;
 
-    // Normale (perpendiculaire, côté gauche = vers l'intérieur pour contour CCW)
-    const nx = -ty, ny = tx;
+    // Normale droite (ty, -tx) = vers l'extérieur pour contour CW-écran (outside)
+    const nx = ty, ny = -tx;
 
     // Centre de l'arc = curr + normale × radius
     const cx = curr.x + nx * radius;
@@ -243,6 +246,51 @@ export class GCodeGenerator {
     return { approachPt, arcPts };
   }
 
+  /**
+   * Arc de sortie tangentiel (lead-out) depuis pts[0] après fermeture du contour.
+   * Symétrique du lead-in : l'outil quitte pts[0] dans la direction d'arrivée
+   * (pts[n-1] → pts[0]) en s'éloignant du contour par un arc de 90°.
+   *
+   * @param {{x,y}[]} pts    - contour offsetté (pts[0] = point de fermeture)
+   * @param {number}  radius - rayon de l'arc (mm)
+   * @returns {{exitPt:{x,y}, arcPts:{x,y}[]}}
+   */
+  _leadOutArc(pts, radius) {
+    const n    = pts.length;
+    const curr = pts[0];
+    const prev = pts[n - 1];
+
+    // Direction d'arrivée à pts[0]
+    const dx   = curr.x - prev.x, dy = curr.y - prev.y;
+    const tLen = Math.hypot(dx, dy) || 1;
+    const tx   = dx / tLen, ty = dy / tLen;
+
+    // Normale droite (ty, -tx) = vers l'extérieur, même côté que lead-in
+    const nx = ty, ny = -tx;
+
+    // Centre de l'arc
+    const arcCx = curr.x + nx * radius;
+    const arcCy = curr.y + ny * radius;
+
+    // Point de sortie (90° en avant de curr autour du centre)
+    const exitPt = { x: arcCx + tx * radius, y: arcCy + ty * radius };
+
+    // Arc de curr → exitPt, même sens CW que lead-in
+    const SEGS = 12;
+    const a0   = Math.atan2(curr.y - arcCy, curr.x - arcCx);
+    const a1   = Math.atan2(exitPt.y - arcCy, exitPt.x - arcCx);
+    let dA     = a1 - a0;
+    if (dA > 0) dA -= 2 * Math.PI;  // force CW
+
+    const arcPts = [];
+    for (let i = 1; i <= SEGS; i++) {
+      const a = a0 + dA * (i / SEGS);
+      arcPts.push({ x: arcCx + radius * Math.cos(a), y: arcCy + radius * Math.sin(a) });
+    }
+
+    return { exitPt, arcPts };
+  }
+
   // ─── Opérations de haut niveau ───────────────────────────────────────────
 
   /**
@@ -273,7 +321,7 @@ export class GCodeGenerator {
     const helixR     = entryOpts.helixR     ?? this.machine.toolDiameter * 0.5;
     const helixTurns = entryOpts.helixTurns ?? 1;
     const leadInR    = entryOpts.leadIn     ?? false;
-    const leadOutR   = entryOpts.leadOut    ?? leadInR;
+    const leadOutR   = entryOpts.leadOut    ?? false;  // lead-out désactivé : overcut suffit
 
     const offset = this._toolOffset(side);
     const pts    = offset !== 0 ? this._offsetContour(points, side) : points;
@@ -290,8 +338,8 @@ export class GCodeGenerator {
     this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}) ───`);
 
     // Lead-in : calcul du point d'approche si activé
-    let leadIn  = leadInR  ? this._leadArc(pts, leadInR,  'in')  : null;
-    let leadOut = leadOutR ? this._leadArc(pts, leadOutR, 'out') : null;
+    let leadIn  = leadInR  ? this._leadArc(pts, leadInR, 'in') : null;
+    let leadOut = leadOutR ? this._leadOutArc(pts, leadOutR)   : null;
 
     for (let pass = 1; pass <= passes; pass++) {
       const z = -(stepZ * pass);
@@ -308,7 +356,7 @@ export class GCodeGenerator {
         // Déplacement au point d'entrée (+ lead-in éventuel)
         if (leadIn) {
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          leadIn.arcPts.forEach(p => this.lineTo(p.x, p.y));
+          this.lineTo(cPts[0].x, cPts[0].y);
         } else {
           this.rapidTo(cPts[0].x, cPts[0].y);
         }
@@ -319,7 +367,7 @@ export class GCodeGenerator {
         this._rampIn(cPts, z, rampLen);
         if (leadIn) {
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          leadIn.arcPts.forEach(p => this.lineTo(p.x, p.y));
+          this.lineTo(cPts[0].x, cPts[0].y);
         }
 
       } else {
@@ -327,7 +375,7 @@ export class GCodeGenerator {
         if (leadIn) {
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
           this.plungeTo(z);
-          leadIn.arcPts.forEach(p => this.lineTo(p.x, p.y));
+          this.lineTo(cPts[0].x, cPts[0].y);
         } else {
           this.rapidTo(cPts[0].x, cPts[0].y);
           this.plungeTo(z);
@@ -338,9 +386,12 @@ export class GCodeGenerator {
       for (let i = 1; i < cPts.length; i++) this.lineTo(cPts[i].x, cPts[i].y);
       this.lineTo(cPts[0].x, cPts[0].y);
 
-      // ── Lead-out ────────────────────────────────────────────────────────
-      if (leadOut) {
-        leadOut.arcPts.forEach(p => this.lineTo(p.x, p.y));
+      // Overcut : continue ~½ ⌀outil au-delà du point d'entrée pour effacer la marque jonction
+      if (cPts.length >= 2) {
+        const dx = cPts[1].x - cPts[0].x, dy = cPts[1].y - cPts[0].y;
+        const segLen = Math.hypot(dx, dy) || 1;
+        const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
+        this.lineTo(cPts[0].x + (dx / segLen) * oc, cPts[0].y + (dy / segLen) * oc);
       }
     }
 
@@ -378,6 +429,115 @@ export class GCodeGenerator {
         this.plungeTo(z);
         for (let i = 1; i < pts.length; i++) this.lineTo(pts[i].x, pts[i].y);
         this.lineTo(pts[0].x, pts[0].y);
+      }
+    }
+
+    this.rapidZ(this.machine.safeZ);
+    this.comment('');
+  }
+
+  /**
+   * Fraise un cercle avec de vrais arcs G3 (pas de segments G1).
+   * Transitions entre passes par plongée directe au même XY (stratégie FreeCAD).
+   * Supporte les tabs sur la dernière passe via des arcs G3 segmentés.
+   *
+   * @param {number} cx, cy   - centre du cercle (coords forme locale)
+   * @param {number} r        - rayon du cercle (mm)
+   * @param {string} side     - 'outside' | 'inside' | 'center'
+   * @param {Object} entryOpts
+   * @param {string} label
+   * @param {Object|null} tabOpts - { count, width, height } ou null
+   */
+  cutCircleContour(cx, cy, r, side, entryOpts = {}, label = 'Contour', tabOpts = null) {
+    const toolR = this.machine.toolDiameter / 2;
+    const r_off = side === 'outside' ? r + toolR
+                : side === 'inside'  ? r - toolR
+                : r;
+
+    if (r_off <= toolR * 0.5) {
+      this.comment(`ATTENTION: cercle trop petit pour l'outil (Ø${this.machine.toolDiameter}mm)`);
+      return;
+    }
+
+    const depth  = this.machine.materialThickness;
+    const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
+    const stepZ  = depth / passes;
+
+    const hasTabs   = !!tabOpts;
+    const tabCount  = hasTabs ? (tabOpts.count  ?? 4)   : 0;
+    const tabWidth  = hasTabs ? (tabOpts.width  ?? 4)   : 0;
+    const tabHeight = hasTabs ? (tabOpts.height ?? 1.5) : 0;
+    const tabZ      = -(depth - tabHeight);
+
+    // Point de départ fixe : 3 heures — l'outil ne quitte jamais ce XY entre les passes
+    const startX = cx + r_off;
+    const startY = cy;
+    const oc     = Math.min(this.machine.toolDiameter * 0.5, r_off * 0.08);
+
+    this.comment(`─── ${label} (${side}, G3 arcs${hasTabs ? `, ${tabCount} tabs ${tabWidth}×${tabHeight}mm` : ''}) ───`);
+
+    const ox = this.machine.originX, oy = this.machine.originY;
+    const f  = this.machine.feedrate;
+
+    // Émet un arc G3 de l'angle fromA vers l'angle toA sur le cercle d'outil
+    const emitArc = (fromA, toA) => {
+      const x1 = cx + r_off * Math.cos(fromA);
+      const y1 = cy + r_off * Math.sin(fromA);
+      const x2 = cx + r_off * Math.cos(toA);
+      const y2 = cy + r_off * Math.sin(toA);
+      this.emit(`G3 X${(x2 + ox).toFixed(3)} Y${(y2 + oy).toFixed(3)} I${(cx - x1).toFixed(3)} J${(cy - y1).toFixed(3)} F${f}`);
+    };
+
+    // Construction des segments pour la dernière passe avec tabs.
+    // Tabs centrés à (2π/N)*(t+0.5) pour éviter le point de départ (angle 0).
+    let tabSegs = null;
+    if (hasTabs) {
+      const tabHalfAng = tabWidth / (2 * r_off);
+      const boundaries = [];
+      for (let t = 0; t < tabCount; t++) {
+        const center = (2 * Math.PI / tabCount) * (t + 0.5);
+        boundaries.push({ start: center - tabHalfAng, end: center + tabHalfAng });
+      }
+      boundaries.sort((a, b) => a.start - b.start);
+
+      tabSegs = [];
+      let angle = 0;
+      for (const tab of boundaries) {
+        if (tab.start > angle + 1e-6) tabSegs.push({ type: 'cut', from: angle, to: tab.start });
+        tabSegs.push({ type: 'tab', from: tab.start, to: tab.end });
+        angle = tab.end;
+      }
+      if (angle < 2 * Math.PI - 1e-6) tabSegs.push({ type: 'cut', from: angle, to: 2 * Math.PI });
+    }
+
+    // Positionnement initial unique
+    this.rapidZ(this.machine.safeZ);
+    this.rapidTo(startX, startY);
+
+    for (let pass = 1; pass <= passes; pass++) {
+      const z      = -(stepZ * pass);
+      const isLast = pass === passes;
+      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${isLast && hasTabs ? ' [tabs actifs]' : ''}`);
+
+      this.plungeTo(z);
+
+      if (!isLast || !hasTabs) {
+        // Cercle complet : 2 demi-arcs G3 (CCW) avec valeurs I/J exactes
+        this.emit(`G3 X${(cx - r_off + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off).toFixed(3)} J0.000 F${f}`);
+        this.emit(`G3 X${(startX + ox).toFixed(3)} Y${(startY + oy).toFixed(3)} I${(r_off).toFixed(3)} J0.000 F${f}`);
+        if (isLast) this.lineTo(startX, startY + oc);
+      } else {
+        // Dernière passe avec tabs : arcs G3 segmentés + relevés
+        for (const seg of tabSegs) {
+          if (seg.type === 'cut') {
+            emitArc(seg.from, seg.to);
+          } else {
+            this.rapidZ(tabZ);
+            emitArc(seg.from, seg.to);
+            this.plungeTo(z);
+          }
+        }
+        this.lineTo(startX, startY + oc);
       }
     }
 
@@ -514,8 +674,16 @@ export class GCodeGenerator {
     const rampLen    = entryOpts.rampLen    ?? this.machine.toolDiameter;
     const helixR     = entryOpts.helixR     ?? this.machine.toolDiameter * 0.5;
     const helixTurns = entryOpts.helixTurns ?? 1;
+    const leadInR    = entryOpts.leadIn     ?? false;
+    const leadOutR   = entryOpts.leadOut    ?? false;  // lead-out désactivé : overcut suffit
 
-    this.comment(`─── ${label} (${side}, ${safeTabCenters.length} tabs ${tabWidth}×${tabHeight}mm${skippedTabs ? `, ${skippedTabs} évité(s) sur angles` : ''}) ───`);
+    const leadIn  = leadInR  ? this._leadArc(pts, leadInR, 'in') : null;
+
+    const entryLabel = entry === 'ramp'  ? `, ramp ${rampLen}mm`
+                     : entry === 'helix' ? `, helix R${helixR}mm×${helixTurns}t`
+                     : '';
+    const leadLabel  = leadInR ? `, lead-in R${leadInR}mm` : '';
+    this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}, ${safeTabCenters.length} tabs ${tabWidth}×${tabHeight}mm${skippedTabs ? `, ${skippedTabs} évité(s) sur angles` : ''}) ───`);
 
     for (let pass = 1; pass <= passes; pass++) {
       const z        = -(stepZ * pass);
@@ -530,19 +698,40 @@ export class GCodeGenerator {
         const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
         this.rapidTo(cx + helixR, cy);
         this._helixIn(cx, cy, helixR, z, helixTurns);
-        this.rapidTo(pts[0].x, pts[0].y);
+        if (leadIn) {
+          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
+          this.lineTo(pts[0].x, pts[0].y);
+        } else {
+          this.rapidTo(pts[0].x, pts[0].y);
+        }
       } else if (entry === 'ramp') {
         this.rapidTo(pts[0].x, pts[0].y);
         this._rampIn(pts, z, rampLen);
+        if (leadIn) {
+          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
+          this.lineTo(pts[0].x, pts[0].y);
+        }
       } else {
-        this.rapidTo(pts[0].x, pts[0].y);
-        this.plungeTo(z);
+        if (leadIn) {
+          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
+          this.plungeTo(z);
+          this.lineTo(pts[0].x, pts[0].y);
+        } else {
+          this.rapidTo(pts[0].x, pts[0].y);
+          this.plungeTo(z);
+        }
       }
 
       if (!lastPass) {
         // Passes intermédiaires : contour normal
         for (let i = 1; i < n; i++) this.lineTo(pts[i].x, pts[i].y);
         this.lineTo(pts[0].x, pts[0].y);
+        if (n >= 2) {
+          const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+          const segLen = Math.hypot(dx, dy) || 1;
+          const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
+          this.lineTo(pts[0].x + (dx / segLen) * oc, pts[0].y + (dy / segLen) * oc);
+        }
       } else {
         // Dernière passe : tabs positionnés sur le chemin curviligne global.
         // Fonctionne pour toute forme, y compris les cercles/ovales dont les
@@ -586,7 +775,13 @@ export class GCodeGenerator {
           this.lineTo(b.x, b.y);
           cumDist += len;
         }
-        this.lineTo(pts[0].x, pts[0].y); // fermeture du contour
+        // La boucle zEvents ferme déjà à pts[0] sur le dernier segment — pas de closure explicite
+        if (n >= 2) {
+          const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+          const segLen = Math.hypot(dx, dy) || 1;
+          const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
+          this.lineTo(pts[0].x + (dx / segLen) * oc, pts[0].y + (dy / segLen) * oc);
+        }
       }
     }
 

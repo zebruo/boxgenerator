@@ -171,7 +171,7 @@ export const fr = {
     tip_ramp_len:    'Longueur rampe = 2 × Ø outil ({{val}}mm) par défaut.\nAugmenter pour les matériaux durs ou les passes profondes.',
     tip_helix_r:     'Rayon hélice = 0.6 × Ø outil = {{val}}mm par défaut.\nTrop grand : risque de collision avec la paroi. Trop petit : vibrations.',
     tip_helix_turns: 'Nombre de tours de l\'hélice.\nPlus de tours = descente plus douce, mais chemin plus long.\n1 tour suffit pour la plupart des matériaux bois.',
-    tip_leadin:      'Lead-in / Lead-out : arc tangentiel d\'entrée et de sortie.\nL\'outil s\'inscrit sur le contour via un arc de cercle, évitant la marque d\'arrêt.\nEssentiellement utile pour les usinages de finition.',
+    tip_leadin:      'Lead-in / Lead-out : arc tangentiel d\'entrée et de sortie.\nL\'outil s\'inscrit sur le contour via un arc de cercle et en repart symétriquement, évitant toute marque de plongée ou d\'arrêt.\nEssentiellement utile pour les usinages de finition (aluminium, acrylique).',
     tip_leadin_r:    'Rayon arc lead-in/out = 0.8 × Ø outil = {{val}}mm par défaut.\nL\'arc doit tenir dans l\'espace libre autour du contour.',
     tip_concentric:  'Chemin concentrique (anneau par anneau).\n✔ Recommandé pour les formes convexes (rectangle, cercle, ovale, hexagone).\n✔ Meilleure finition des parois de poche.\n✗ À éviter pour les formes très concaves.',
     tip_raster:      'Balayage horizontal zig-zag, ligne par ligne.\n✔ Universel : fonctionne pour toutes les formes.\n✔ Idéal pour les formes concaves (C, U, L).\n✗ Peut laisser de légères stries sur les parois de poche.',

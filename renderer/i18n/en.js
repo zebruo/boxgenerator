@@ -171,7 +171,7 @@ export const en = {
     tip_ramp_len:    'Ramp length = 2 × tool Ø ({{val}}mm) by default.\nIncrease for hard materials or deep passes.',
     tip_helix_r:     'Helix radius = 0.6 × tool Ø = {{val}}mm by default.\nToo large: wall collision risk. Too small: vibrations.',
     tip_helix_turns: 'Number of helix turns.\nMore turns = smoother descent, longer path.\n1 turn is sufficient for most wood materials.',
-    tip_leadin:      'Lead-in / Lead-out: tangential entry and exit arc.\nThe tool engages the contour via a circular arc, avoiding dwell marks.\nMost useful for finishing passes.',
+    tip_leadin:      'Lead-in / Lead-out: tangential entry and exit arc.\nThe tool engages and leaves the contour via a circular arc, avoiding plunge and dwell marks.\nMost useful for finishing passes (aluminium, acrylic).',
     tip_leadin_r:    'Lead-in/out arc radius = 0.8 × tool Ø = {{val}}mm by default.\nThe arc must fit in the clearance space around the contour.',
     tip_concentric:  'Concentric path (ring by ring).\n✔ Recommended for convex shapes (rectangle, circle, oval, hexagon).\n✔ Better pocket wall finish.\n✗ Avoid for deeply concave shapes.',
     tip_raster:      'Horizontal zig-zag raster, line by line.\n✔ Universal: works for all shapes.\n✔ Ideal for concave shapes (C, U, L).\n✗ May leave slight marks on pocket walls.',

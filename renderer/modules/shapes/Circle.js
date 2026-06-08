@@ -25,4 +25,10 @@ export class Circle extends ShapeBase {
     const r = this.params.diameter / 2;
     return `M${2 * r},${r} A${r},${r} 0 1 1 ${2 * r - 0.001},${r} Z`;
   }
+
+  /** Définition d'arc pour la génération G2/G3 — évite les approximations G1. */
+  getArcDef() {
+    const r = this.params.diameter / 2;
+    return { cx: r, cy: r, r };
+  }
 }

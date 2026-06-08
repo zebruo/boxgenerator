@@ -54,6 +54,7 @@ export class LidBox {
     const tabOpts   = machineParams.tabOpts;
     const entryOpts = machineParams.entryOpts ?? {};
     const bodyPts   = shape.getContourPoints();
+    const arcDef    = shape.getArcDef ? shape.getArcDef() : null;
     // Miroir horizontal appliqué APRÈS calcul d'inset : mirror(inset(P)) et non inset(mirror(P)).
     // Les deux ne sont pas équivalents pour les formes asymétriques (bisectrice différente).
     // Après retournement physique du couvercle, le contour miroir s'aligne exactement avec le corps.
@@ -101,8 +102,13 @@ export class LidBox {
     }
 
     gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
-    if (tabOpts) gen.cutContourWithTabs(bodyPts, 'outside', tabOpts, entryOpts, t('gcode.op_body_contour'));
-    else         gen.cutContour(bodyPts, 'outside', entryOpts, t('gcode.op_body_contour'));
+    if (arcDef) {
+      gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_body_contour'), tabOpts || null);
+    } else if (tabOpts) {
+      gen.cutContourWithTabs(bodyPts, 'outside', tabOpts, entryOpts, t('gcode.op_body_contour'));
+    } else {
+      gen.cutContour(bodyPts, 'outside', entryOpts, t('gcode.op_body_contour'));
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // COUVERCLE
@@ -139,8 +145,13 @@ export class LidBox {
       }
       // 2. Contour extérieur (dernière opération)
       gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
-      if (tabOpts) gen.cutContourWithTabs(lidPts, 'outside', tabOpts, entryOpts, t('gcode.op_lid_contour'));
-      else         gen.cutContour(lidPts, 'outside', entryOpts, t('gcode.op_lid_contour'));
+      if (arcDef) {
+        gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r - inset0, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts || null);
+      } else if (tabOpts) {
+        gen.cutContourWithTabs(lidPts, 'outside', tabOpts, entryOpts, t('gcode.op_lid_contour'));
+      } else {
+        gen.cutContour(lidPts, 'outside', entryOpts, t('gcode.op_lid_contour'));
+      }
     } else {
       // Couvercle plein nominal : taille = corps, lèvre r s'emboîte dans rainure r+jeu
       gen.comment(`Couvercle plein: taille nominale (lèvre ${rabbet}mm, rainure ${rabbet}+${clearance}mm)`);
@@ -159,8 +170,13 @@ export class LidBox {
       }
       // 3. Contour extérieur (dernière opération)
       gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
-      if (tabOpts) gen.cutContourWithTabs(lidPts1, 'outside', tabOpts, entryOpts, t('gcode.op_lid_contour'));
-      else         gen.cutContour(lidPts1, 'outside', entryOpts, t('gcode.op_lid_contour'));
+      if (arcDef) {
+        gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts || null);
+      } else if (tabOpts) {
+        gen.cutContourWithTabs(lidPts1, 'outside', tabOpts, entryOpts, t('gcode.op_lid_contour'));
+      } else {
+        gen.cutContour(lidPts1, 'outside', entryOpts, t('gcode.op_lid_contour'));
+      }
     }
     gen.machine.originX = savedOriginX;
     gen.machine.originY = savedOriginY;
