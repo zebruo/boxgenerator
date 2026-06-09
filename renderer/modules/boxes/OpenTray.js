@@ -23,8 +23,9 @@ export class OpenTray {
     const partitionDir = (params.partitionDir === 'horizontal') ? 'horizontal' : 'vertical';
     const bFl = bottomThickness ?? wallThickness;  // épaisseur du fond (défaut = épaisseur paroi)
     const bb = shape.getBoundingBox();
+    const fa = machineParams.finishAllowance ?? 0;
     const doPocket = machineParams.pocketConc
-      ? (pts, lbl) => pocketConcentric(gen, pts, lbl)
+      ? (pts, lbl) => pocketConcentric(gen, pts, lbl, 0, fa)
       : (pts, lbl) => gen.pocketShape(pts, lbl);
 
     gen.header(`Plateau ouvert — ${bb.width.toFixed(0)}×${bb.height.toFixed(0)}×${height.toFixed(0)}mm`);

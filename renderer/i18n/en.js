@@ -126,7 +126,7 @@ export const en = {
   // ── G-code operation labels ─────────────────────────────────────────────
   gcode: {
     op_cavity:          'Inner cavity',
-    op_outer_wall:      'Outer wall',
+    op_outer_wall:      'Outer contour',
     op_body_rabbet:     'Body — rabbet',
     op_body_rabbet_ext: 'Body — outer rabbet',
     op_body_cavity:       'Body — inner cavity',
@@ -177,6 +177,9 @@ export const en = {
     tip_helix_r:     'Helix radius = 0.6 × tool Ø = {{val}}mm by default.\nToo large: wall collision risk. Too small: vibrations.',
     tip_helix_turns: 'Number of helix turns.\nMore turns = smoother descent, longer path.\n1 turn is sufficient for most wood materials.',
     tip_leadin:      'Lead-in / Lead-out: tangential entry and exit arc.\nThe tool engages and leaves the contour via a circular arc, avoiding plunge and dwell marks.\nMost useful for finishing passes (aluminium, acrylic).',
+    finish_pass:     'Wall finish pass',
+    skin:            'Allowance',
+    tip_finish:      'Wall finishing pass (contours + pockets).\nRoughing passes leave a skin of N mm on the walls.\nOne final pass at full depth removes it cleanly, eliminating corner dwell marks.\nTypical value: 0.2–0.3 mm.',
     tip_leadin_r:    'Lead-in/out arc radius = 0.8 × tool Ø = {{val}}mm by default.\nThe arc must fit in the clearance space around the contour.',
     tip_concentric:  'Concentric path (ring by ring).\n✔ Recommended for convex shapes (rectangle, circle, oval, hexagon).\n✔ Better pocket wall finish.\n✗ Avoid for deeply concave shapes.',
     tip_raster:      'Horizontal zig-zag raster, line by line.\n✔ Universal: works for all shapes.\n✔ Ideal for concave shapes (C, U, L).\n✗ May leave slight marks on pocket walls.',

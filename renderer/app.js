@@ -843,6 +843,17 @@ function showExportModal(sections, machine = {}) {
           <span class="tab-f-unit">mm</span>
         </span>
       </div>
+      <div class="entry-row" style="margin-top:6px">
+        <label class="entry-lead-row" data-tip="${t('modal.tip_finish')}">
+          <input type="checkbox" id="modal-finish-on">
+          <span class="tab-f-lbl">${t('modal.finish_pass')}</span>
+        </label>
+        <span class="entry-lead-fields" id="modal-finish-fields" style="opacity:.4;pointer-events:none">
+          <span class="tab-f-lbl">${t('modal.skin')}</span>
+          <input type="number" id="modal-finish-allowance" class="tab-input" value="0.2" min="0.05" max="1" step="0.05">
+          <span class="tab-f-unit">mm</span>
+        </span>
+      </div>
     </div>
     <div class="tabs-section">
       <label class="tabs-toggle-row">
@@ -937,13 +948,15 @@ function showExportModal(sections, machine = {}) {
       helixTurns: parseInt(modal.querySelector('#modal-helix-turns').value),
       leadIn:     modal.querySelector('#modal-leadin-on').checked
                     ? parseFloat(modal.querySelector('#modal-leadin-r').value) : false,
+      finishAllowance: modal.querySelector('#modal-finish-on').checked
+                    ? parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
     };
     const machine = getMachineParams();
     const z0      = getZ0Settings();
     const origin  = computeOrigin(z0, machine);
     const fc = state.boxType.generateGCode(
       state.shape, state.boxParams,
-      { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcStats.checked }
+      { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcStats.checked, finishAllowance: entryOpts.finishAllowance }
     );
     const fSections = parseGCodeSections(fc);
     const sel = new Set();
@@ -998,7 +1011,18 @@ function showExportModal(sections, machine = {}) {
   leadInCb.addEventListener('change', () => {
     leadInFields.style.opacity      = leadInCb.checked ? '1'    : '.4';
     leadInFields.style.pointerEvents = leadInCb.checked ? 'auto' : 'none';
+    updateModalStats();
   });
+
+  // ── Finish allowance toggle ───────────────────────────────────────────────
+  const finishOnCb     = modal.querySelector('#modal-finish-on');
+  const finishFields   = modal.querySelector('#modal-finish-fields');
+  finishOnCb.addEventListener('change', () => {
+    finishFields.style.opacity      = finishOnCb.checked ? '1'    : '.4';
+    finishFields.style.pointerEvents = finishOnCb.checked ? 'auto' : 'none';
+    updateModalStats();
+  });
+  modal.querySelector('#modal-finish-allowance').addEventListener('input', updateModalStats);
 
   const tabsOnCb   = modal.querySelector('#modal-tabs-on');
   const tabsFields = modal.querySelector('#modal-tabs-fields');
@@ -1037,12 +1061,14 @@ function showExportModal(sections, machine = {}) {
     if (selected.size === 0) { showNotif(t('notif.no_ops')); return; }
 
     // Paramètres entrée outil
+    const finishCb = modal.querySelector('#modal-finish-on');
     const entryOpts = {
       entry:      selectedEntry,
       rampLen:    parseFloat(modal.querySelector('#modal-ramp-len').value),
       helixR:     parseFloat(modal.querySelector('#modal-helix-r').value),
       helixTurns: parseInt(modal.querySelector('#modal-helix-turns').value),
       leadIn:     leadInCb.checked ? parseFloat(modal.querySelector('#modal-leadin-r').value) : false,
+      finishAllowance: finishCb.checked ? parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
     };
 
     // Paramètres tabs depuis la modale
@@ -1057,7 +1083,7 @@ function showExportModal(sections, machine = {}) {
     const z0      = getZ0Settings();
     const origin  = computeOrigin(z0, machine);
     const finalCode = state.boxType.generateGCode(
-      state.shape, state.boxParams, { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked }
+      state.shape, state.boxParams, { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
     );
     const finalSections = parseGCodeSections(finalCode);
 
@@ -1125,7 +1151,7 @@ function showExportModal(sections, machine = {}) {
         const lidOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
         const lidCode = state.boxType.generateGCode(
           state.shape, state.boxParams,
-          { ...machine, ...lidOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, lidAtOrigin: true }
+          { ...machine, ...lidOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance, lidAtOrigin: true }
         );
         sectionsForExport = parseGCodeSections(lidCode);
       } else if (!lidSelected) {
@@ -1133,7 +1159,7 @@ function showExportModal(sections, machine = {}) {
         const bodyOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
         const bodyCode = state.boxType.generateGCode(
           state.shape, state.boxParams,
-          { ...machine, ...bodyOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked }
+          { ...machine, ...bodyOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
         );
         sectionsForExport = parseGCodeSections(bodyCode);
       }

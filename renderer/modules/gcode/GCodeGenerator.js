@@ -321,11 +321,16 @@ export class GCodeGenerator {
     const helixR     = entryOpts.helixR     ?? this.machine.toolDiameter * 0.5;
     const helixTurns = entryOpts.helixTurns ?? 1;
     const leadInR    = entryOpts.leadIn     ?? false;
-    const leadOutR   = entryOpts.leadOut    ?? false;  // lead-out désactivé : overcut suffit
+    const leadOutR   = entryOpts.leadOut    ?? false;
+    const fa         = entryOpts.finishAllowance ?? 0;
 
-    const offset = this._toolOffset(side);
-    const pts    = offset !== 0 ? this._offsetContour(points, side) : points;
-    const cPts   = entryOpts.dogbone ? this._insertDogbones(pts) : pts;
+    // Contour exact (passe de finition) et contour de décharge (ébauche)
+    const r    = this.machine.toolDiameter / 2;
+    const sign = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
+    const ptsExact = sign !== 0 ? this._offsetContourDist(points, sign * r) : points;
+    const ptsRough = (fa > 0 && sign !== 0) ? this._offsetContourDist(points, sign * (r + fa)) : ptsExact;
+    const cPts     = entryOpts.dogbone ? this._insertDogbones(ptsRough) : ptsRough;
+    const cPtsFin  = (fa > 0 && sign !== 0) ? (entryOpts.dogbone ? this._insertDogbones(ptsExact) : ptsExact) : null;
 
     const depth  = this.machine.materialThickness;
     const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
@@ -335,11 +340,11 @@ export class GCodeGenerator {
                      : entry === 'helix' ? `, helix R${helixR}mm×${helixTurns}t`
                      : '';
     const leadLabel  = leadInR ? `, lead-in R${leadInR}mm` : '';
-    this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}) ───`);
+    const faLabel    = fa > 0  ? `, finition +${fa}mm`     : '';
+    this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}${faLabel}) ───`);
 
-    // Lead-in : calcul du point d'approche si activé
-    let leadIn  = leadInR  ? this._leadArc(pts, leadInR, 'in') : null;
-    let leadOut = leadOutR ? this._leadOutArc(pts, leadOutR)   : null;
+    let leadIn  = leadInR  ? this._leadArc(ptsRough, leadInR, 'in') : null;
+    let leadOut = leadOutR ? this._leadOutArc(ptsRough, leadOutR)   : null;
 
     for (let pass = 1; pass <= passes; pass++) {
       const z = -(stepZ * pass);
@@ -347,13 +352,10 @@ export class GCodeGenerator {
       this.rapidZ(this.machine.safeZ);
 
       if (entry === 'helix') {
-        // ── Entrée hélicoïdale ──────────────────────────────────────────────
-        // Centre de l'hélice = centroïde du contour
-        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+        const cx = ptsRough.reduce((s, p) => s + p.x, 0) / ptsRough.length;
+        const cy = ptsRough.reduce((s, p) => s + p.y, 0) / ptsRough.length;
         this.rapidTo(cx + helixR, cy);
         this._helixIn(cx, cy, helixR, z, helixTurns);
-        // Déplacement au point d'entrée (+ lead-in éventuel)
         if (leadIn) {
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
           this.lineTo(cPts[0].x, cPts[0].y);
@@ -362,7 +364,6 @@ export class GCodeGenerator {
         }
 
       } else if (entry === 'ramp') {
-        // ── Entrée en rampe ─────────────────────────────────────────────────
         this.rapidTo(cPts[0].x, cPts[0].y);
         this._rampIn(cPts, z, rampLen);
         if (leadIn) {
@@ -371,7 +372,6 @@ export class GCodeGenerator {
         }
 
       } else {
-        // ── Plongée directe (defaut) ─────────────────────────────────────────
         if (leadIn) {
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
           this.plungeTo(z);
@@ -382,16 +382,41 @@ export class GCodeGenerator {
         }
       }
 
-      // ── Contour ─────────────────────────────────────────────────────────
       for (let i = 1; i < cPts.length; i++) this.lineTo(cPts[i].x, cPts[i].y);
       this.lineTo(cPts[0].x, cPts[0].y);
 
-      // Overcut : continue ~½ ⌀outil au-delà du point d'entrée pour effacer la marque jonction
       if (cPts.length >= 2) {
         const dx = cPts[1].x - cPts[0].x, dy = cPts[1].y - cPts[0].y;
         const segLen = Math.hypot(dx, dy) || 1;
         const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
         this.lineTo(cPts[0].x + (dx / segLen) * oc, cPts[0].y + (dy / segLen) * oc);
+      }
+    }
+
+    // ── Passe de finition paroi ──────────────────────────────────────────────
+    if (cPtsFin) {
+      const leadInFin  = leadInR  ? this._leadArc(ptsExact, leadInR, 'in') : null;
+      const leadOutFin = leadOutR ? this._leadOutArc(ptsExact, leadOutR)   : null;
+      const z = -depth;
+      this.comment(`Passe finition paroi — Z=${z.toFixed(3)}`);
+      this.rapidZ(this.machine.safeZ);
+      if (leadInFin) {
+        this.rapidTo(leadInFin.approachPt.x, leadInFin.approachPt.y);
+        this.plungeTo(z);
+        for (const p of leadInFin.arcPts) this.lineTo(p.x, p.y);
+      } else {
+        this.rapidTo(cPtsFin[0].x, cPtsFin[0].y);
+        this.plungeTo(z);
+      }
+      for (let i = 1; i < cPtsFin.length; i++) this.lineTo(cPtsFin[i].x, cPtsFin[i].y);
+      this.lineTo(cPtsFin[0].x, cPtsFin[0].y);
+      if (leadOutFin) {
+        for (const p of leadOutFin.arcPts) this.lineTo(p.x, p.y);
+      } else if (cPtsFin.length >= 2) {
+        const dx = cPtsFin[1].x - cPtsFin[0].x, dy = cPtsFin[1].y - cPtsFin[0].y;
+        const segLen = Math.hypot(dx, dy) || 1;
+        const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
+        this.lineTo(cPtsFin[0].x + (dx / segLen) * oc, cPtsFin[0].y + (dy / segLen) * oc);
       }
     }
 
@@ -459,6 +484,12 @@ export class GCodeGenerator {
       return;
     }
 
+    const fa       = entryOpts.finishAllowance ?? 0;
+    const r_off_exact = r_off;
+    const r_off_work  = (fa > 0 && side !== 'center')
+      ? (side === 'outside' ? r_off + fa : Math.max(toolR * 0.5, r_off - fa))
+      : r_off;
+
     const depth  = this.machine.materialThickness;
     const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
     const stepZ  = depth / passes;
@@ -472,42 +503,42 @@ export class GCodeGenerator {
     const leadInR  = entryOpts.leadIn  ?? false;
     const leadOutR = entryOpts.leadOut ?? false;
 
-    // Point de départ : 3 heures (angle 0)
-    const startX = cx + r_off;
+    // Point de départ : 3 heures (angle 0) — utilise le rayon de travail
+    const startX = cx + r_off_work;
     const startY = cy;
-    const oc     = Math.min(this.machine.toolDiameter * 0.5, r_off * 0.08);
+    const oc     = Math.min(this.machine.toolDiameter * 0.5, r_off_work * 0.08);
 
-    this.comment(`─── ${label} (${side}, G3 arcs${hasTabs ? `, ${tabCount} tabs ${tabWidth}×${tabHeight}mm` : ''}${leadInR ? `, lead-in R${leadInR}mm` : ''}) ───`);
+    const faLabel = fa > 0 ? `, finition +${fa}mm` : '';
+    this.comment(`─── ${label} (${side}, G3 arcs${hasTabs ? `, ${tabCount} tabs ${tabWidth}×${tabHeight}mm` : ''}${leadInR ? `, lead-in R${leadInR}mm` : ''}${faLabel}) ───`);
 
     const ox = this.machine.originX, oy = this.machine.originY;
     const f  = this.machine.feedrate;
 
-    // Points virtuels pour tangente CCW au point 3h (angle 0) = direction (0, +1)
+    // Points virtuels pour tangente CCW au point 3h — basés sur r_off_work
     const entryPts = [
       { x: startX, y: startY },
-      { x: cx + r_off * Math.cos(0.001), y: cy + r_off * Math.sin(0.001) }
+      { x: cx + r_off_work * Math.cos(0.001), y: cy + r_off_work * Math.sin(0.001) }
     ];
     const exitPts = [
       { x: startX, y: startY },
-      { x: cx + r_off * Math.cos(-0.001), y: cy + r_off * Math.sin(-0.001) }
+      { x: cx + r_off_work * Math.cos(-0.001), y: cy + r_off_work * Math.sin(-0.001) }
     ];
     const leadIn  = leadInR  ? this._leadArc(entryPts, leadInR, 'in') : null;
     const leadOut = leadOutR ? this._leadOutArc(exitPts, leadOutR)    : null;
 
-    // Émet un arc G3 de l'angle fromA vers l'angle toA sur le cercle d'outil
+    // Émet un arc G3 sur le cercle de travail (r_off_work)
     const emitArc = (fromA, toA) => {
-      const x1 = cx + r_off * Math.cos(fromA);
-      const y1 = cy + r_off * Math.sin(fromA);
-      const x2 = cx + r_off * Math.cos(toA);
-      const y2 = cy + r_off * Math.sin(toA);
+      const x1 = cx + r_off_work * Math.cos(fromA);
+      const y1 = cy + r_off_work * Math.sin(fromA);
+      const x2 = cx + r_off_work * Math.cos(toA);
+      const y2 = cy + r_off_work * Math.sin(toA);
       this.emit(`G3 X${(x2 + ox).toFixed(3)} Y${(y2 + oy).toFixed(3)} I${(cx - x1).toFixed(3)} J${(cy - y1).toFixed(3)} F${f}`);
     };
 
-    // Construction des segments pour la dernière passe avec tabs.
-    // Tabs centrés à (2π/N)*(t+0.5) pour éviter le point de départ (angle 0).
+    // Construction des segments pour la dernière passe avec tabs
     let tabSegs = null;
     if (hasTabs) {
-      const tabHalfAng = tabWidth / (2 * r_off);
+      const tabHalfAng = tabWidth / (2 * r_off_work);
       const boundaries = [];
       for (let t = 0; t < tabCount; t++) {
         const center = (2 * Math.PI / tabCount) * (t + 0.5);
@@ -535,7 +566,6 @@ export class GCodeGenerator {
       this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${isLast && hasTabs ? ' [tabs actifs]' : ''}`);
 
       if (leadIn) {
-        // Avec lead-in : retract + reposition pour chaque passe (style FreeCAD)
         if (pass > 1) {
           this.rapidZ(this.machine.safeZ);
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
@@ -547,10 +577,9 @@ export class GCodeGenerator {
       }
 
       if (!isLast || !hasTabs) {
-        // Cercle complet : 2 demi-arcs G3 (CCW) avec valeurs I/J exactes
-        this.emit(`G3 X${(cx - r_off + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off).toFixed(3)} J0.000 F${f}`);
-        this.emit(`G3 X${(startX + ox).toFixed(3)} Y${(startY + oy).toFixed(3)} I${(r_off).toFixed(3)} J0.000 F${f}`);
-        if (isLast) {
+        this.emit(`G3 X${(cx - r_off_work + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off_work).toFixed(3)} J0.000 F${f}`);
+        this.emit(`G3 X${(startX + ox).toFixed(3)} Y${(startY + oy).toFixed(3)} I${(r_off_work).toFixed(3)} J0.000 F${f}`);
+        if (isLast && !fa) {
           if (leadOut) {
             for (const p of leadOut.arcPts) this.lineTo(p.x, p.y);
           } else {
@@ -558,7 +587,6 @@ export class GCodeGenerator {
           }
         }
       } else {
-        // Dernière passe avec tabs : arcs G3 segmentés + relevés
         for (const seg of tabSegs) {
           if (seg.type === 'cut') {
             emitArc(seg.from, seg.to);
@@ -568,11 +596,48 @@ export class GCodeGenerator {
             this.plungeTo(z);
           }
         }
-        if (leadOut) {
-          for (const p of leadOut.arcPts) this.lineTo(p.x, p.y);
-        } else {
-          this.lineTo(startX, startY + oc);
+        if (!fa) {
+          if (leadOut) {
+            for (const p of leadOut.arcPts) this.lineTo(p.x, p.y);
+          } else {
+            this.lineTo(startX, startY + oc);
+          }
         }
+      }
+    }
+
+    // ── Passe de finition paroi ──────────────────────────────────────────────
+    if (fa > 0) {
+      const startXFin = cx + r_off_exact;
+      const startYFin = cy;
+      const ocFin     = Math.min(this.machine.toolDiameter * 0.5, r_off_exact * 0.08);
+      const entryPtsFin = [
+        { x: startXFin, y: startYFin },
+        { x: cx + r_off_exact * Math.cos(0.001), y: cy + r_off_exact * Math.sin(0.001) }
+      ];
+      const exitPtsFin = [
+        { x: startXFin, y: startYFin },
+        { x: cx + r_off_exact * Math.cos(-0.001), y: cy + r_off_exact * Math.sin(-0.001) }
+      ];
+      const leadInFin  = leadInR  ? this._leadArc(entryPtsFin, leadInR, 'in') : null;
+      const leadOutFin = leadOutR ? this._leadOutArc(exitPtsFin, leadOutR)    : null;
+      const z = -depth;
+      this.comment(`Passe finition paroi — Z=${z.toFixed(3)}`);
+      this.rapidZ(this.machine.safeZ);
+      if (leadInFin) {
+        this.rapidTo(leadInFin.approachPt.x, leadInFin.approachPt.y);
+        this.plungeTo(z);
+        for (const p of leadInFin.arcPts) this.lineTo(p.x, p.y);
+      } else {
+        this.rapidTo(startXFin, startYFin);
+        this.plungeTo(z);
+      }
+      this.emit(`G3 X${(cx - r_off_exact + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off_exact).toFixed(3)} J0.000 F${f}`);
+      this.emit(`G3 X${(startXFin + ox).toFixed(3)} Y${(startYFin + oy).toFixed(3)} I${(r_off_exact).toFixed(3)} J0.000 F${f}`);
+      if (leadOutFin) {
+        for (const p of leadOutFin.arcPts) this.lineTo(p.x, p.y);
+      } else {
+        this.lineTo(startXFin, startYFin + ocFin);
       }
     }
 
@@ -606,9 +671,13 @@ export class GCodeGenerator {
     const tabWidth  = tabOpts.width  ?? 4;
     const tabHeight = tabOpts.height ?? 1.5;
 
-    const offset  = this._toolOffset(side);
-    const rawPts  = offset !== 0 ? this._offsetContour(points, side) : points;
-    const pts     = entryOpts.dogbone ? this._insertDogbones(rawPts) : rawPts;
+    const fa       = entryOpts.finishAllowance ?? 0;
+    const toolR    = this.machine.toolDiameter / 2;
+    const sign     = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
+    const ptsExact = sign !== 0 ? this._offsetContourDist(points, sign * toolR) : points;
+    const ptsRough = (fa > 0 && sign !== 0) ? this._offsetContourDist(points, sign * (toolR + fa)) : ptsExact;
+    const pts      = entryOpts.dogbone ? this._insertDogbones(ptsRough) : ptsRough;
+    const ptsFin   = (fa > 0 && sign !== 0) ? (entryOpts.dogbone ? this._insertDogbones(ptsExact) : ptsExact) : null;
 
     const depth  = this.machine.materialThickness;
     const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
@@ -817,6 +886,58 @@ export class GCodeGenerator {
           const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
           this.lineTo(pts[0].x + (dx / segLen) * oc, pts[0].y + (dy / segLen) * oc);
         }
+      }
+    }
+
+    // ── Passe de finition paroi ────────────────────────────────────────────
+    if (ptsFin) {
+      const nFin = ptsFin.length;
+      const finSegLengths = [];
+      let finPerimeter = 0;
+      for (let i = 0; i < nFin; i++) {
+        const a = ptsFin[i], b = ptsFin[(i + 1) % nFin];
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        finSegLengths.push(len);
+        finPerimeter += len;
+      }
+      // Mise à l'échelle des positions de tabs vers le nouveau périmètre
+      const finTabCenters = safeTabCenters.map(c => c * finPerimeter / perimeter);
+
+      const zFin = -depth;
+      const zEvents = [];
+      for (const center of finTabCenters) {
+        zEvents.push({ dist: Math.max(0, center - tabWidth / 2), action: 'up' });
+        zEvents.push({ dist: Math.min(finPerimeter - 1e-6, center + tabWidth / 2), action: 'down' });
+      }
+      zEvents.sort((a, b) => a.dist - b.dist);
+
+      this.comment(`Passe finition paroi — Z=${zFin.toFixed(3)} [tabs actifs]`);
+      this.rapidZ(this.machine.safeZ);
+      this.rapidTo(ptsFin[0].x, ptsFin[0].y);
+      this.plungeTo(zFin);
+
+      let cumDist = 0, evIdx = 0;
+      for (let i = 0; i < nFin; i++) {
+        const a = ptsFin[i], b = ptsFin[(i + 1) % nFin];
+        const len = finSegLengths[i];
+        if (len < 1e-6) { cumDist += len; continue; }
+        const dx = (b.x - a.x) / len, dy = (b.y - a.y) / len;
+        const segEnd = cumDist + len;
+        while (evIdx < zEvents.length && zEvents[evIdx].dist < segEnd) {
+          const ev = zEvents[evIdx++];
+          const t = (ev.dist - cumDist) / len;
+          this.lineTo(a.x + dx * t * len, a.y + dy * t * len);
+          if (ev.action === 'up') this.rapidZ(tabZ);
+          else this.plungeTo(zFin);
+        }
+        this.lineTo(b.x, b.y);
+        cumDist += len;
+      }
+      if (nFin >= 2) {
+        const dx = ptsFin[1].x - ptsFin[0].x, dy = ptsFin[1].y - ptsFin[0].y;
+        const segLen = Math.hypot(dx, dy) || 1;
+        const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
+        this.lineTo(ptsFin[0].x + (dx / segLen) * oc, ptsFin[0].y + (dy / segLen) * oc);
       }
     }
 

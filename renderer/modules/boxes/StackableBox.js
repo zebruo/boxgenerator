@@ -52,8 +52,9 @@ export class StackableBox {
     const tabOpts   = machineParams.tabOpts;
     const entryOpts = machineParams.entryOpts ?? {};
     const savedT    = gen.machine.materialThickness;
+    const fa = machineParams.finishAllowance ?? 0;
     const doPocket  = machineParams.pocketConc
-      ? (p, lbl) => pocketConcentric(gen, p, lbl)
+      ? (p, lbl) => pocketConcentric(gen, p, lbl, 0, fa)
       : (p, lbl) => gen.pocketShape(p, lbl);
 
     // Positions trous de centrage — hors contour, dans le brut

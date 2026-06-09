@@ -149,12 +149,12 @@ export function showHelpModal(machine = {}) {
       <!-- ── Lead-in / Lead-out ─────────────────────────── -->
       <section class="help-section">
         <h4>Lead-in / Lead-out</h4>
-        <p>Arc tangentiel d'entrée <em>et</em> de sortie sur le contour extérieur.</p>
+        <p>Arc tangentiel d'entrée <em>et</em> de sortie sur le contour extérieur. S'applique à <strong>toutes les formes</strong> — rectangles, ovales, polygones et <strong>cercles</strong> (arcs G3 natifs).</p>
         <dl class="help-dl">
           <dt>Case décochée (défaut)</dt>
           <dd>Un <strong>overcut automatique</strong> de ½ ⌀outil prolonge le contour légèrement au-delà du point de départ — l'outil ne s'arrête jamais exactement au même endroit, ce qui élimine la marque de jonction. Suffisant pour le bois et le MDF.</dd>
           <dt>Case cochée</dt>
-          <dd>L'outil approche le contour par un <strong>arc de 90°</strong> tangent au premier segment (lead-in), puis en repart symétriquement par un arc de sortie (lead-out). Aucune plongée directe sur la paroi, aucun arrêt sur le contour. Recommandé pour l'aluminium, l'acrylique et les passes de finition sur bois dur.</dd>
+          <dd>L'outil approche le contour par un <strong>arc de 90°</strong> tangentiel (lead-in), puis en repart symétriquement par un arc de sortie (lead-out). Aucune plongée directe sur la paroi, aucun arrêt sur le contour. L'outil se rétracte et se repositionne au point d'approche entre chaque passe Z. Recommandé pour l'aluminium, l'acrylique et les passes de finition sur bois dur.</dd>
           <dt>Rayon</dt>
           <dd>Par défaut 0,8 × ⌀outil (${defLeadR} mm). L'arc doit tenir dans l'espace libre autour de la forme — réduire si la fraise est trop proche d'une paroi.</dd>
         </dl>
@@ -230,8 +230,9 @@ export function showHelpModal(machine = {}) {
           <p>Fond plein + 4 parois droites, sans couvercle. La pièce est usinée en <strong>une seule opération</strong> depuis le dessus.</p>
           <dl class="help-dl">
             <dt>Cavité</dt><dd>Poche intérieure depuis le dessus jusqu'à l'épaisseur de fond.</dd>
+            <dt>Cloisons</dt><dd>Divise la cavité en <strong>N+1 compartiments</strong> en conservant des cloisons à la même épaisseur que les parois. Direction au choix : <em>perpendiculaires à X</em> (cloisons verticales) ou <em>perpendiculaires à Y</em> (cloisons horizontales). Disponible uniquement pour la forme Rectangle. Un avertissement s'affiche si les compartiments sont trop étroits pour la fraise (min. 3 × ⌀outil).</dd>
             <dt>Contour</dt><dd>Découpe extérieure en pleine épaisseur matière.</dd>
-            <dt>Usage</dt><dd>Rangements, bacs, tiroirs. Compatible toutes formes (rectangle, ovale, hexagone…).</dd>
+            <dt>Usage</dt><dd>Rangements, bacs, tiroirs, organiseurs. Compatible toutes formes (rectangle, ovale, hexagone…).</dd>
           </dl>
         </section>
 
@@ -255,6 +256,7 @@ export function showHelpModal(machine = {}) {
             <dd>La feuillure est creusée sous forme d'<strong>anneau périphérique</strong> en haut du corps. Le couvercle a les mêmes dimensions extérieures que le corps et vient coiffer le sommet. La feuillure couvercle est une poche centrale qui forme la lèvre. La cavité corps repart de Z=0 (l'anneau n'a pas pré-usiné l'intérieur).</dd>
             <dt>Contrainte fraise / feuillure (rainure extérieure uniquement)</dt>
             <dd>L'anneau périphérique est usiné par passes concentriques. Le <strong>diamètre fraise doit être strictement inférieur à (largeur feuillure + jeu)</strong> — un warning s'affiche sur le champ si ce n'est pas le cas. Pour une feuillure de 3 mm + jeu 0,3 mm, utiliser une fraise &lt; 3,3 mm (ex. Ø 3,175 mm).</dd>
+            <dt>Cloisons</dt><dd>Divise la cavité du <strong>corps</strong> en N+1 compartiments. Même épaisseur que les parois. Direction configurable (perpendiculaires à X ou Y). Le couvercle reste ouvert (cavité non cloisonnée). Disponible uniquement pour la forme Rectangle.</dd>
             <dt>Jeu</dt><dd>Décalage entre lèvre et rainure pour un assemblage sans forcer. Valeur typique : 0,2 – 0,5 mm selon la précision machine.</dd>
             <dt>Layout d'export</dt>
             <dd>Corps et couvercle sont placés côte à côte dans le G-code. Le sens est choisi automatiquement pour <strong>minimiser le côté le plus long du brut</strong> : horizontal si W ≤ D, vertical si W &gt; D. Exemple : 140×65 mm → layout vertical, brut 140×150 mm au lieu de 300×65 mm.</dd>
@@ -294,7 +296,7 @@ export function showHelpModal(machine = {}) {
               <tr>
                 <td><strong>Cercle</strong></td>
                 <td>Diamètre</td>
-                <td>Contour 100 % circulaire — pas d'angle mort. Idéal pour toutes fraises.</td>
+                <td>Contour usiné en <strong>vrais arcs G3</strong> (pas de segments G1). Pas d'angle mort, surface cylindrique parfaite. Lead-in/out supporté. Idéal pour toutes fraises.</td>
               </tr>
               <tr>
                 <td><strong>Ovale</strong></td>
