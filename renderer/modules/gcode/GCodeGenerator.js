@@ -385,12 +385,7 @@ export class GCodeGenerator {
       for (let i = 1; i < cPts.length; i++) this.lineTo(cPts[i].x, cPts[i].y);
       this.lineTo(cPts[0].x, cPts[0].y);
 
-      if (cPts.length >= 2) {
-        const dx = cPts[1].x - cPts[0].x, dy = cPts[1].y - cPts[0].y;
-        const segLen = Math.hypot(dx, dy) || 1;
-        const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
-        this.lineTo(cPts[0].x + (dx / segLen) * oc, cPts[0].y + (dy / segLen) * oc);
-      }
+      this._emitOvercut(cPts);
     }
 
     // ── Passe de finition paroi ──────────────────────────────────────────────
@@ -412,11 +407,8 @@ export class GCodeGenerator {
       this.lineTo(cPtsFin[0].x, cPtsFin[0].y);
       if (leadOutFin) {
         for (const p of leadOutFin.arcPts) this.lineTo(p.x, p.y);
-      } else if (cPtsFin.length >= 2) {
-        const dx = cPtsFin[1].x - cPtsFin[0].x, dy = cPtsFin[1].y - cPtsFin[0].y;
-        const segLen = Math.hypot(dx, dy) || 1;
-        const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
-        this.lineTo(cPtsFin[0].x + (dx / segLen) * oc, cPtsFin[0].y + (dy / segLen) * oc);
+      } else {
+        this._emitOvercut(cPtsFin);
       }
     }
 
@@ -432,12 +424,21 @@ export class GCodeGenerator {
    * @param {Object} entryOpts
    * @param {string} label
    */
-  cutContoursInterleaved(contoursPoints, side = 'outside', label = 'Contour') {
-    const offset = this._toolOffset(side);
+  cutContoursInterleaved(contoursPoints, side = 'outside', entryOpts = {}, label = 'Contour') {
+    const fa    = entryOpts.finishAllowance ?? 0;
+    const toolR = this.machine.toolDiameter / 2;
+    const sign  = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
+
     const allPts = contoursPoints
-      .map(pts => offset !== 0 ? this._offsetContour(pts, side) : pts)
-      .filter(pts => pts.length >= 2);
+      .map(pts => sign !== 0 ? this._offsetContourDist(pts, sign * (toolR + fa)) : pts)
+      .filter(pts => pts?.length >= 2);
     if (allPts.length === 0) return;
+
+    const allPtsFin = (fa > 0 && sign !== 0)
+      ? contoursPoints
+          .map(pts => this._offsetContourDist(pts, sign * toolR))
+          .filter(pts => pts?.length >= 2)
+      : null;
 
     const depth  = this.machine.materialThickness;
     const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
@@ -454,6 +455,19 @@ export class GCodeGenerator {
         this.plungeTo(z);
         for (let i = 1; i < pts.length; i++) this.lineTo(pts[i].x, pts[i].y);
         this.lineTo(pts[0].x, pts[0].y);
+      }
+    }
+
+    if (allPtsFin) {
+      const zFin = -depth;
+      this.comment(`Passe finition paroi — Z=${zFin.toFixed(3)}`);
+      for (const pts of allPtsFin) {
+        this.rapidZ(this.machine.safeZ);
+        this.rapidTo(pts[0].x, pts[0].y);
+        this.plungeTo(zFin);
+        for (let i = 1; i < pts.length; i++) this.lineTo(pts[i].x, pts[i].y);
+        this.lineTo(pts[0].x, pts[0].y);
+        this._emitOvercut(pts);
       }
     }
 
@@ -830,12 +844,7 @@ export class GCodeGenerator {
         // Passes intermédiaires : contour normal
         for (let i = 1; i < n; i++) this.lineTo(pts[i].x, pts[i].y);
         this.lineTo(pts[0].x, pts[0].y);
-        if (n >= 2) {
-          const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
-          const segLen = Math.hypot(dx, dy) || 1;
-          const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
-          this.lineTo(pts[0].x + (dx / segLen) * oc, pts[0].y + (dy / segLen) * oc);
-        }
+        this._emitOvercut(pts);
       } else {
         // Dernière passe : tabs positionnés sur le chemin curviligne global.
         // Fonctionne pour toute forme, y compris les cercles/ovales dont les
@@ -880,12 +889,7 @@ export class GCodeGenerator {
           cumDist += len;
         }
         // La boucle zEvents ferme déjà à pts[0] sur le dernier segment — pas de closure explicite
-        if (n >= 2) {
-          const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
-          const segLen = Math.hypot(dx, dy) || 1;
-          const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
-          this.lineTo(pts[0].x + (dx / segLen) * oc, pts[0].y + (dy / segLen) * oc);
-        }
+        this._emitOvercut(pts);
       }
     }
 
@@ -933,12 +937,7 @@ export class GCodeGenerator {
         this.lineTo(b.x, b.y);
         cumDist += len;
       }
-      if (nFin >= 2) {
-        const dx = ptsFin[1].x - ptsFin[0].x, dy = ptsFin[1].y - ptsFin[0].y;
-        const segLen = Math.hypot(dx, dy) || 1;
-        const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
-        this.lineTo(ptsFin[0].x + (dx / segLen) * oc, ptsFin[0].y + (dy / segLen) * oc);
-      }
+      this._emitOvercut(ptsFin);
     }
 
     this.rapidZ(this.machine.safeZ);
@@ -1078,11 +1077,12 @@ export class GCodeGenerator {
 
   // ─── Utilitaires ─────────────────────────────────────────────────────────
 
-  _toolOffset(side) {
-    const r = this.machine.toolDiameter / 2;
-    if (side === 'outside') return  r;
-    if (side === 'inside')  return -r;
-    return 0;
+  _emitOvercut(pts) {
+    if (pts.length < 2) return;
+    const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+    const segLen = Math.hypot(dx, dy) || 1;
+    const oc = Math.min(this.machine.toolDiameter * 0.5, segLen * 0.4);
+    this.lineTo(pts[0].x + (dx / segLen) * oc, pts[0].y + (dy / segLen) * oc);
   }
 
   /**
@@ -1138,16 +1138,6 @@ export class GCodeGenerator {
       }
     }
     return result;
-  }
-
-  /**
-   * Décale un contour fermé vers l'extérieur (outside) ou l'intérieur (inside)
-   * d'un rayon d'outil (compensation d'outil).
-   */
-  _offsetContour(points, side) {
-    const r    = this.machine.toolDiameter / 2;
-    const sign = side === 'outside' ? -1 : 1;  // -r : s'éloigne de la normale intérieure (vers l'ext.)
-    return this._offsetContourDist(points, sign * r);
   }
 
   /**

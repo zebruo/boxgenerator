@@ -108,7 +108,7 @@ export class StackableBox {
     // Passe finale au bord exact du plot
     const finalPts = gen.insetContour(pts, tongueInset);
     if (finalPts.length >= 3) ringContours.push(finalPts);
-    gen.cutContoursInterleaved(ringContours, 'outside', t('gcode.op_rim_mill'));
+    gen.cutContoursInterleaved(ringContours, 'outside', entryOpts, t('gcode.op_rim_mill'));
 
     // 2b. Contour exterieur — EN DERNIER (tabs maintiennent la piece)
     // Épaisseur totale = hauteur corps + hauteur plot (pièce retournée)

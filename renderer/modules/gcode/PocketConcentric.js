@@ -8,6 +8,14 @@
  * Le dernier anneau est offset de -r vers l'intérieur (compensation outil).
  */
 
+function _emitOvercut(gen, pts, td) {
+  if (pts.length < 2) return;
+  const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+  const segLen = Math.hypot(dx, dy) || 1;
+  const oc = Math.min(td * 0.5, segLen * 0.4);
+  gen.lineTo(pts[0].x + (dx / segLen) * oc, pts[0].y + (dy / segLen) * oc);
+}
+
 export function pocketConcentric(gen, points, label = 'Pocket concentrique', depthStart = 0, finishAllowance = 0) {
   if (points.length < 3) return;
 
@@ -21,17 +29,12 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
   const stepZ       = remainDepth / passes;
 
   // Contour outil exact (passe de finition paroi)
-  const toolPts = gen._offsetContourDist(points, r);
-  if (!toolPts || toolPts.length < 3) {
-    gen.pocketShape(points, label);
-    return;
-  }
-
-  // Avec finishAllowance : les anneaux s'arrêtent à r + fa (laissent une peau de fa mm)
+  const toolPts        = gen._offsetContourDist(points, r);
   const toolPtsForRings = finishAllowance > 0
     ? gen._offsetContourDist(points, r + finishAllowance)
     : toolPts;
-  if (!toolPtsForRings || toolPtsForRings.length < 3) {
+
+  if (!toolPts || toolPts.length < 3 || !toolPtsForRings || toolPtsForRings.length < 3) {
     gen.pocketShape(points, label);
     return;
   }
@@ -72,12 +75,7 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
       for (let i = 1; i < ring.length; i++) gen.lineTo(ring[i].x, ring[i].y);
       gen.lineTo(ring[0].x, ring[0].y); // fermeture
 
-      if (ri === nRings && ring.length >= 2) {
-        const dx = ring[1].x - ring[0].x, dy = ring[1].y - ring[0].y;
-        const segLen = Math.hypot(dx, dy) || 1;
-        const oc = Math.min(td * 0.5, segLen * 0.4);
-        gen.lineTo(ring[0].x + (dx / segLen) * oc, ring[0].y + (dy / segLen) * oc);
-      }
+      if (ri === nRings) _emitOvercut(gen, ring, td);
     }
 
     gen.rapidZ(m.safeZ);
@@ -94,12 +92,7 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
     gen.plungeTo(fullZ);
     for (let i = 1; i < toolPts.length; i++) gen.lineTo(toolPts[i].x, toolPts[i].y);
     gen.lineTo(toolPts[0].x, toolPts[0].y);
-    if (toolPts.length >= 2) {
-      const dx = toolPts[1].x - toolPts[0].x, dy = toolPts[1].y - toolPts[0].y;
-      const segLen = Math.hypot(dx, dy) || 1;
-      const oc = Math.min(td * 0.5, segLen * 0.4);
-      gen.lineTo(toolPts[0].x + (dx / segLen) * oc, toolPts[0].y + (dy / segLen) * oc);
-    }
+    _emitOvercut(gen, toolPts, td);
     gen.rapidZ(m.safeZ);
   }
 

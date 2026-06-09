@@ -100,7 +100,7 @@ export class LidBox {
         const c = gen.insetContour(bodyPts, d);
         if (c.length > 2) ringContours.push(c);
       }
-      if (ringContours.length) gen.cutContoursInterleaved(ringContours, 'center', t('gcode.op_body_rabbet_ext'));
+      if (ringContours.length) gen.cutContoursInterleaved(ringContours, 'center', entryOpts, t('gcode.op_body_rabbet_ext'));
     }
 
     // 2. Cavité corps
