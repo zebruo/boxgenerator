@@ -329,9 +329,10 @@ export class GCodeGenerator {
     const sign = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
     const ptsExactRaw = sign !== 0 ? this._offsetContourDist(points, sign * r) : points;
     const ptsRoughRaw = (fa > 0 && sign !== 0) ? this._offsetContourDist(points, sign * (r + fa)) : ptsExactRaw;
-    // Démarrage au milieu du côté le plus long — évite les marques d'entrée en angle
-    const ptsRough = sign !== 0 ? this._reorderEntry(ptsRoughRaw) : ptsRoughRaw;
-    const ptsExact = (fa > 0 && sign !== 0) ? this._reorderEntry(ptsExactRaw) : ptsRough;
+    // Démarrage au milieu du côté le plus long — index calculé sur le rough et réutilisé pour le finish
+    const entryIdx = sign !== 0 ? this._maxSegIdx(ptsRoughRaw) : -1;
+    const ptsRough = entryIdx >= 0 ? this._reorderAt(ptsRoughRaw, entryIdx) : ptsRoughRaw;
+    const ptsExact = (fa > 0 && sign !== 0) ? this._reorderAt(ptsExactRaw, entryIdx) : ptsRough;
     const cPts     = entryOpts.dogbone ? this._insertDogbones(ptsRough) : ptsRough;
     const cPtsFin  = (fa > 0 && sign !== 0) ? (entryOpts.dogbone ? this._insertDogbones(ptsExact) : ptsExact) : null;
 
@@ -693,9 +694,10 @@ export class GCodeGenerator {
     const sign     = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
     const ptsExactRaw = sign !== 0 ? this._offsetContourDist(points, sign * toolR) : points;
     const ptsRoughRaw = (fa > 0 && sign !== 0) ? this._offsetContourDist(points, sign * (toolR + fa)) : ptsExactRaw;
-    // Démarrage au milieu du côté le plus long — évite les marques d'entrée en angle
-    const ptsRough = sign !== 0 ? this._reorderEntry(ptsRoughRaw) : ptsRoughRaw;
-    const ptsExact = (fa > 0 && sign !== 0) ? this._reorderEntry(ptsExactRaw) : ptsRough;
+    // Démarrage au milieu du côté le plus long — index calculé sur le rough et réutilisé pour le finish
+    const entryIdx = sign !== 0 ? this._maxSegIdx(ptsRoughRaw) : -1;
+    const ptsRough = entryIdx >= 0 ? this._reorderAt(ptsRoughRaw, entryIdx) : ptsRoughRaw;
+    const ptsExact = (fa > 0 && sign !== 0) ? this._reorderAt(ptsExactRaw, entryIdx) : ptsRough;
     const pts      = entryOpts.dogbone ? this._insertDogbones(ptsRough) : ptsRough;
     const ptsFin   = (fa > 0 && sign !== 0) ? (entryOpts.dogbone ? this._insertDogbones(ptsExact) : ptsExact) : null;
 
@@ -1083,18 +1085,22 @@ export class GCodeGenerator {
 
   // ─── Utilitaires ─────────────────────────────────────────────────────────
 
-  _reorderEntry(pts) {
-    if (pts.length < 3) return pts;
+  _maxSegIdx(pts) {
     let maxLen = -1, maxIdx = 0;
     const n = pts.length;
     for (let i = 0; i < n; i++) {
-      const a = pts[i], b = pts[(i + 1) % n];
-      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const len = Math.hypot(pts[(i + 1) % n].x - pts[i].x, pts[(i + 1) % n].y - pts[i].y);
       if (len > maxLen) { maxLen = len; maxIdx = i; }
     }
-    const a = pts[maxIdx], b = pts[(maxIdx + 1) % n];
+    return maxIdx;
+  }
+
+  _reorderAt(pts, idx) {
+    if (pts.length < 3) return pts;
+    const i = idx % pts.length;
+    const a = pts[i], b = pts[(i + 1) % pts.length];
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    return [mid, ...pts.slice(maxIdx + 1), ...pts.slice(0, maxIdx + 1)];
+    return [mid, ...pts.slice(i + 1), ...pts.slice(0, i + 1)];
   }
 
   _emitOvercut(pts) {
