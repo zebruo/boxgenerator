@@ -134,7 +134,7 @@ export const fr = {
     op_body_contour:    'Corps — contour extérieur',
     op_lid_cavity:      'Couvercle — cavité intérieure',
     op_lid_contour:     'Couvercle — contour extérieur',
-    op_lid_rabbet_pocket:'Feuillure couvercle — poche (cas extérieur)',
+    op_lid_rabbet_pocket:'Couvercle feuillure — poche (cas extérieur)',
     op_rim_mill:        'Fraisage plot',
     op_outer_contour:   'Contour extérieur',
     op_pin_left:        'Trou centrage gauche Ø{{d}}mm',

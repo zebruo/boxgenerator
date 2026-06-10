@@ -433,16 +433,25 @@ export class GCodeGenerator {
     const toolR = this.machine.toolDiameter / 2;
     const sign  = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
 
-    const allPts = contoursPoints
-      .map(pts => sign !== 0 ? this._offsetContourDist(pts, sign * (toolR + fa)) : pts)
-      .filter(pts => pts?.length >= 2);
-    if (allPts.length === 0) return;
+    const paired = contoursPoints.map(pts => {
+      const rough = sign !== 0 ? this._offsetContourDist(pts, sign * (toolR + fa))
+                  : fa > 0    ? this._offsetContourDist(pts, fa)
+                  : pts;
+      if (!rough?.length || rough.length < 2) return null;
+      const fin = (fa > 0 && sign !== 0) ? this._offsetContourDist(pts, sign * toolR)
+               : (fa > 0 && sign === 0)  ? pts
+               : null;
+      if (fin !== null && (!fin?.length || fin.length < 2)) return null;
+      const entryIdx = this._maxSegIdx(rough);
+      return {
+        rough: this._reorderAt(rough, entryIdx),
+        fin:   fin ? this._reorderAt(fin, entryIdx) : null,
+      };
+    }).filter(Boolean);
+    if (paired.length === 0) return;
 
-    const allPtsFin = (fa > 0 && sign !== 0)
-      ? contoursPoints
-          .map(pts => this._offsetContourDist(pts, sign * toolR))
-          .filter(pts => pts?.length >= 2)
-      : null;
+    const allPts    = paired.map(p => p.rough);
+    const allPtsFin = paired.some(p => p.fin) ? paired.map(p => p.fin).filter(Boolean) : null;
 
     const depth  = this.machine.materialThickness;
     const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));

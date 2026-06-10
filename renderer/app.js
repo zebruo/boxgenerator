@@ -1154,6 +1154,10 @@ function showExportModal(sections, machine = {}) {
           { ...machine, ...lidOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance, lidAtOrigin: true }
         );
         sectionsForExport = parseGCodeSections(lidCode);
+        // Corrige le préambule : ═══ CORPS ═══ → ═══ COUVERCLE ═══
+        if (sectionsForExport.length > 0 && sectionsForExport[0].required)
+          sectionsForExport[0].lines = sectionsForExport[0].lines
+            .map(l => l === '; ═══ CORPS ═══' ? '; ═══ COUVERCLE ═══' : l);
       } else if (!lidSelected) {
         // Corps seul : recentre sur le corps uniquement
         const bodyOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });

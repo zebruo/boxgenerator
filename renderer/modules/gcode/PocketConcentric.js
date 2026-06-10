@@ -25,23 +25,29 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
   const overlap  = 0.4;
   const stepOver = td * (1 - overlap);
   const remainDepth = m.materialThickness - depthStart;
+  if (remainDepth <= 0) return;
   const passes      = Math.max(1, Math.ceil(remainDepth / m.depthPerPass));
   const stepZ       = remainDepth / passes;
 
   // Contour outil exact (passe de finition paroi)
-  const toolPts        = gen._offsetContourDist(points, r);
+  const toolPtsRaw      = gen._offsetContourDist(points, r);
   const toolPtsForRings = finishAllowance > 0
     ? gen._offsetContourDist(points, r + finishAllowance)
-    : toolPts;
+    : toolPtsRaw;
 
-  if (!toolPts || toolPts.length < 3 || !toolPtsForRings || toolPtsForRings.length < 3) {
+  if (!toolPtsRaw || toolPtsRaw.length < 3 || !toolPtsForRings || toolPtsForRings.length < 3) {
     gen.pocketShape(points, label);
     return;
   }
 
   // Centroïde du contour outil
-  const cx = toolPts.reduce((s, p) => s + p.x, 0) / toolPts.length;
-  const cy = toolPts.reduce((s, p) => s + p.y, 0) / toolPts.length;
+  const cx = toolPtsRaw.reduce((s, p) => s + p.x, 0) / toolPtsRaw.length;
+  const cy = toolPtsRaw.reduce((s, p) => s + p.y, 0) / toolPtsRaw.length;
+
+  // Réordonner pour démarrer au milieu du côté le plus long (évite les transitions entre anneaux aux angles)
+  const entryIdx  = gen._maxSegIdx(toolPtsForRings);
+  const orderedRings = gen._reorderAt(toolPtsForRings, entryIdx);
+  const toolPts      = gen._reorderAt(toolPtsRaw, entryIdx);
 
   // Rayon moyen du contour de travail (anneaux)
   const rMax = Math.max(...toolPtsForRings.map(p => Math.hypot(p.x - cx, p.y - cy)));
@@ -66,7 +72,7 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
     // Anneaux par interpolation scale 0→1 autour du centroïde.
     for (let ri = 1; ri <= nRings; ri++) {
       const scale = ri / nRings;
-      const ring  = toolPtsForRings.map(p => ({
+      const ring  = orderedRings.map(p => ({
         x: cx + (p.x - cx) * scale,
         y: cy + (p.y - cy) * scale,
       }));
