@@ -1,1 +1,8 @@
 ROADMAP.md
+node_modules/
+dist/
+fichiers nc/
+*.bak
+notes/
+git-manager/
+FreeCAD-1.1.1/
