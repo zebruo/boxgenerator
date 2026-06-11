@@ -19,6 +19,12 @@ A desktop application for generating parametric boxes and trays with CNC G-code 
 - **Session save/load** (JSON)
 - **FR / EN** interface
 
+## Interface
+
+| Dark mode | Light mode |
+|---|---|
+| ![Dark mode](docs/mode_sombre.png) | ![Light mode](docs/mode_clair.png) |
+
 ## Box types
 
 | Type | Description |

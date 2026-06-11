@@ -19,6 +19,12 @@ Application desktop de génération de boîtes paramétriques avec export G-code
 - **Sauvegarde/chargement de session** (JSON)
 - **Interface FR / EN**
 
+## Interface
+
+| Mode sombre | Mode clair |
+|---|---|
+| ![Mode sombre](docs/mode_sombre.png) | ![Mode clair](docs/mode_clair.png) |
+
 ## Types de boîtes
 
 | Type | Description |
