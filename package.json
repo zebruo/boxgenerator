@@ -1,6 +1,6 @@
 {
   "name": "box-generator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Générateur de boîtes et plateaux avec export G-code CNC",
   "main": "main.js",
   "scripts": {
