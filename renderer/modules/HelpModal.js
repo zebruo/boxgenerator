@@ -8,7 +8,7 @@ export function showHelpModal(machine = {}) {
   const dpp       = machine.depthPerPass ?? 2;
   const defRamp   = +(td * 2).toFixed(1);
   const defHelixR = +(td * 0.6).toFixed(2);
-  const defLeadR  = +(td * 0.8).toFixed(2);
+  const defLeadR  = +(td * 0.4).toFixed(2);
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -156,7 +156,7 @@ export function showHelpModal(machine = {}) {
           <dt>Case cochée</dt>
           <dd>L'outil approche le contour par un <strong>arc de 90°</strong> tangentiel (lead-in), puis en repart symétriquement par un arc de sortie (lead-out). Aucune plongée directe sur la paroi, aucun arrêt sur le contour. L'outil se rétracte et se repositionne au point d'approche entre chaque passe Z. Recommandé pour l'aluminium, l'acrylique et les passes de finition sur bois dur.</dd>
           <dt>Rayon</dt>
-          <dd>Par défaut 0,8 × ⌀outil (${defLeadR} mm). L'arc doit tenir dans l'espace libre autour de la forme — réduire si la fraise est trop proche d'une paroi.</dd>
+          <dd>Par défaut 0,4 × ⌀outil (${defLeadR} mm). L'arc doit tenir dans l'espace libre autour de la forme — réduire si la fraise est trop proche d'une paroi.</dd>
         </dl>
       </section>
 
@@ -208,15 +208,15 @@ export function showHelpModal(machine = {}) {
             </tr>
             <tr>
               <td>Rayon lead-in/out</td>
-              <td class="help-formula">0,8 × ⌀outil</td>
+              <td class="help-formula">0,4 × ⌀outil</td>
               <td class="help-val">${defLeadR} mm</td>
-              <td>Arc suffisamment grand pour être tangentiel mais compact</td>
+              <td>Compact pour petites machines, suffisant pour l'entrée tangentielle</td>
             </tr>
           </tbody>
         </table>
         <p class="help-note">
           Exemple : en passant de ⌀ 3,175 mm → ⌀ 6 mm, la modale s'ouvre avec
-          12 mm / 3,6 mm / 4,8 mm au lieu de 6,35 mm / 1,9 mm / 2,5 mm.
+          12 mm / 3,6 mm / 2,4 mm au lieu de 6,35 mm / 1,9 mm / 1,27 mm.
         </p>
       </section>
 

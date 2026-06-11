@@ -799,7 +799,7 @@ function showExportModal(sections, machine = {}) {
   const td      = machine.toolDiameter      ?? 3.175;
   const defRamp   = Math.max(1, (td * 2).toFixed(1) * 1);      // 2 × ⌀outil
   const defHelixR = Math.max(0.5, (td * 0.6).toFixed(2) * 1);  // 0.6 × ⌀outil
-  const defLeadR  = Math.max(0.5, (td * 0.8).toFixed(2) * 1);  // 0.8 × ⌀outil
+  const defLeadR  = Math.max(0.5, (td * 0.4).toFixed(2) * 1);  // 0.4 × ⌀outil
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -838,7 +838,7 @@ function showExportModal(sections, machine = {}) {
           <span class="tab-f-lbl">${t('modal.leadin')}</span>
         </label>
         <span class="entry-lead-fields" id="modal-leadin-fields" style="opacity:.4;pointer-events:none">
-          <span class="tab-f-lbl" data-tip="${t('modal.tip_leadin_r', { val: (td*0.8).toFixed(2) })}">${t('modal.radius')}</span>
+          <span class="tab-f-lbl" data-tip="${t('modal.tip_leadin_r', { val: (td*0.4).toFixed(2) })}">${t('modal.radius')}</span>
           <input type="number" id="modal-leadin-r" class="tab-input" value="${defLeadR}" min="0.5" max="20" step="0.5">
           <span class="tab-f-unit">mm</span>
         </span>

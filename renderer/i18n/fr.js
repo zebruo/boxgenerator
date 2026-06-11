@@ -180,7 +180,7 @@ export const fr = {
     finish_pass:     'Finition parois',
     skin:            'Surépaisseur',
     tip_finish:      'Passe de finition paroi (contours + poches).\nLes passes de décharge laissent une peau de N mm sur les parois.\nUne passe supplémentaire à la profondeur finale les élimine proprement, en supprimant les marques d\'angle.\nValeur typique : 0.2–0.3 mm.',
-    tip_leadin_r:    'Rayon arc lead-in/out = 0.8 × Ø outil = {{val}}mm par défaut.\nL\'arc doit tenir dans l\'espace libre autour du contour.',
+    tip_leadin_r:    'Rayon arc lead-in/out = 0.4 × Ø outil = {{val}}mm par défaut.\nL\'arc doit tenir dans l\'espace libre autour du contour.',
     tip_concentric:  'Chemin concentrique (anneau par anneau).\n✔ Recommandé pour les formes convexes (rectangle, cercle, ovale, hexagone).\n✔ Meilleure finition des parois de poche.\n✗ À éviter pour les formes très concaves.',
     tip_raster:      'Balayage horizontal zig-zag, ligne par ligne.\n✔ Universel : fonctionne pour toutes les formes.\n✔ Idéal pour les formes concaves (C, U, L).\n✗ Peut laisser de légères stries sur les parois de poche.',
   },

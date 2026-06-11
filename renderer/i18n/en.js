@@ -180,7 +180,7 @@ export const en = {
     finish_pass:     'Wall finish pass',
     skin:            'Allowance',
     tip_finish:      'Wall finishing pass (contours + pockets).\nRoughing passes leave a skin of N mm on the walls.\nOne final pass at full depth removes it cleanly, eliminating corner dwell marks.\nTypical value: 0.2–0.3 mm.',
-    tip_leadin_r:    'Lead-in/out arc radius = 0.8 × tool Ø = {{val}}mm by default.\nThe arc must fit in the clearance space around the contour.',
+    tip_leadin_r:    'Lead-in/out arc radius = 0.4 × tool Ø = {{val}}mm by default.\nThe arc must fit in the clearance space around the contour.',
     tip_concentric:  'Concentric path (ring by ring).\n✔ Recommended for convex shapes (rectangle, circle, oval, hexagon).\n✔ Better pocket wall finish.\n✗ Avoid for deeply concave shapes.',
     tip_raster:      'Horizontal zig-zag raster, line by line.\n✔ Universal: works for all shapes.\n✔ Ideal for concave shapes (C, U, L).\n✗ May leave slight marks on pocket walls.',
   },
