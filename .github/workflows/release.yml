@@ -59,6 +59,10 @@ jobs:
 
             Générateur de boîtes paramétriques avec export G-code CNC.
 
+            ### Nouveautés
+
+            _(à compléter sur GitHub après publication)_
+
             ### Téléchargements
             - **BoxGenerator-Setup-${{ steps.pkg.outputs.version }}.exe** — Installation classique (Menu Démarrer, désinstalleur automatique)
             - **BoxGenerator-${{ steps.pkg.outputs.version }}-portable.zip** — Version portable, aucune installation requise
