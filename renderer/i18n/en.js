@@ -86,6 +86,7 @@ export const en = {
     feed_z:        'Plunge Z',
     spindle:       'Spindle',
     safe_z:        'Safe Z',
+    btn_cutting_params: '⚙ Calculate cutting parameters',
     btn_3d:           '3D',
     btn_2d:           '2D Views',
     stock_offset:     'Stock +',

@@ -12,7 +12,8 @@ import { OpenTray }       from './modules/boxes/OpenTray.js';
 import { FingerJointBox } from './modules/boxes/FingerJointBox.js';
 import { LidBox }         from './modules/boxes/LidBox.js';
 import { StackableBox }   from './modules/boxes/StackableBox.js';
-import { showHelpModal }  from './modules/HelpModal.js';
+import { showHelpModal }         from './modules/HelpModal.js';
+import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
 
 // ─── Tooltip global (réutilisé dans les modales) ────────────────────────────
 let _tipEl  = null;
@@ -197,6 +198,21 @@ function bindEvents() {
 
   // Aide export G-code
   document.getElementById('btn-gcode-help').addEventListener('click', () => showHelpModal(getMachineParams()));
+
+  // Calcul paramètres de coupe
+  document.getElementById('btn-cutting-params').addEventListener('click', () => {
+    const td = parseFloat(document.getElementById('param-tool-diameter').value) || 3.175;
+    showCuttingParamsModal(td, ({ n, vf, vfZ, ap, diameter }) => {
+      document.getElementById('param-tool-diameter').value = diameter;
+      document.getElementById('param-feedrate').value      = vf;
+      document.getElementById('param-plunge').value        = vfZ;
+      document.getElementById('param-spindle').value       = n;
+      document.getElementById('param-passes').value        = ap;
+      ['param-tool-diameter','param-feedrate','param-plunge','param-spindle','param-passes'].forEach(id =>
+        document.getElementById(id).dispatchEvent(new Event('change'))
+      );
+    });
+  });
 
   // Bouton paramètres ⚙ — ouvre/ferme le panel
   const btnSettings  = document.getElementById('btn-settings');

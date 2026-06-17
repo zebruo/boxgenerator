@@ -1,8 +1,18 @@
+# Documentation retirée du dépôt
 ROADMAP.md
+
+# Dépendances et build
 node_modules/
 dist/
+
+# Fichiers machine et temporaires
 fichiers nc/
 *.bak
+
+# Dossiers locaux hors dépôt
 notes/
 git-manager/
 FreeCAD-1.1.1/
+
+# Sources externes intégrées dans les modules JS — non trackées
+ParamCoupe/

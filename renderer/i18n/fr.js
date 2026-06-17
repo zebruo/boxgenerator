@@ -86,6 +86,7 @@ export const fr = {
     feed_z:        'Vitesse Z',
     spindle:       'Broche',
     safe_z:        'Survol Z',
+    btn_cutting_params: '⚙ Calculer les paramètres de coupe',
     btn_3d:           '3D',
     btn_2d:           'Vues 2D',
     stock_offset:     'Brut +',

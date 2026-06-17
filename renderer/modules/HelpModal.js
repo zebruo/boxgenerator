@@ -23,6 +23,8 @@ export function showHelpModal(machine = {}) {
     <div class="help-tabs">
       <button class="help-tab active" data-tab="gcode">Export G-code</button>
       <button class="help-tab" data-tab="boxes">Modèles de boîtes</button>
+      <button class="help-tab" data-tab="formules">Formules</button>
+      <button class="help-tab" data-tab="abaque">Abaque</button>
     </div>
     <div class="help-body">
 
@@ -338,6 +340,185 @@ export function showHelpModal(machine = {}) {
         </section>
 
       </div><!-- /panel boxes -->
+
+      <!-- ══════════════ ONGLET FORMULES ══════════════ -->
+      <div class="help-panel" data-panel="formules">
+
+        <section class="help-section">
+          <h4>Formules — n, Vc, Vf, Fz et ap</h4>
+          <dl class="help-dl">
+
+            <dt>n — Broche (tr/min)</dt>
+            <dd>
+              <div class="help-math">
+                <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                  <mrow><mi>n</mi><mo>=</mo><mfrac><mrow><mn>1000</mn><mo>×</mo><mi>Vc</mi></mrow><mrow><mi>π</mi><mo>×</mo><mi>D</mi></mrow></mfrac></mrow>
+                </math>
+              </div>
+              <ul class="help-list">
+                <li><em>n</em> — vitesse de rotation (tr/min)</li>
+                <li><em>Vc</em> — vitesse de coupe (m/min), fournie par le fabricant selon le matériau</li>
+                <li><em>D</em> — diamètre de l'outil (mm)</li>
+              </ul>
+            </dd>
+
+            <dt>Vc — Vitesse de coupe (m/min)</dt>
+            <dd>
+              Valeur cible selon le matériau (ex. 120 m/min aluminium, 350 m/min MDF). Sur une petite machine, atteindre la Vc recommandée est souvent impossible avec un petit diamètre : une fraise Ø3 mm nécessiterait 37 000 tr/min pour Vc = 350 m/min.
+              <div class="help-math">
+                <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                  <mrow><mi>Vc</mi><mo>=</mo><mfrac><mrow><mi>n</mi><mo>×</mo><mi>π</mi><mo>×</mo><mi>D</mi></mrow><mn>1000</mn></mfrac></mrow>
+                </math>
+              </div>
+            </dd>
+
+            <dt>Vf — Avance XY (mm/min)</dt>
+            <dd>
+              <div class="help-math">
+                <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                  <mrow><mi>Vf</mi><mo>=</mo><mi>n</mi><mo>×</mo><mi>Fz</mi><mo>×</mo><mi>Z</mi></mrow>
+                </math>
+              </div>
+              <ul class="help-list">
+                <li><em>Fz</em> — avance par dent (mm/dent)</li>
+                <li><em>Z</em> — nombre de dents</li>
+              </ul>
+            </dd>
+
+            <dt>Fz — Avance par dent (mm/dent)</dt>
+            <dd>Distance parcourue par tour et par dent. Un Fz trop faible fait frotter l'outil sans couper — usure prématurée. Un Fz trop élevé surcharge et casse la fraise.</dd>
+
+            <dt>ap — Profondeur de passe (mm)</dt>
+            <dd>Matière enlevée en Z à chaque passe. Règle pratique : partir à 50 % de la valeur calculée et augmenter progressivement selon la rigidité machine.</dd>
+
+          </dl>
+        </section>
+
+        <section class="help-section">
+          <h4>Exemples — D = 3 mm, Z = 2, Fz = 0,05 mm/dent, MDF (Vc = 350 m/min), broche max 12 000 tr/min, Vf max 800 mm/min</h4>
+          <p class="help-note">Ces exemples illustrent la distinction entre valeurs <strong>cibles</strong> (calculées sans tenir compte des limites machine) et valeurs <strong>effectives</strong> (après plafonnement).</p>
+          <dl class="help-dl">
+
+            <dt>Ex 1 — Vc effective à n = 12 000 tr/min</dt>
+            <dd>
+              <div class="help-math">
+                <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                  <mrow><mi>Vc</mi><mo>=</mo><mfrac><mrow><mn>12000</mn><mo>×</mo><mi>π</mi><mo>×</mo><mn>3</mn></mrow><mn>1000</mn></mfrac><mo>≈</mo><mn>113,1</mn><mtext> m/min</mtext></mrow>
+                </math>
+              </div>
+              113 m/min alors que la cible MDF est 350 m/min — la broche est le facteur limitant.
+            </dd>
+
+            <dt>Ex 2 — n nécessaire pour Vc = 350 m/min</dt>
+            <dd>
+              <div class="help-math">
+                <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                  <mrow><mi>n</mi><mo>=</mo><mfrac><mrow><mn>1000</mn><mo>×</mo><mn>350</mn></mrow><mrow><mi>π</mi><mo>×</mo><mn>3</mn></mrow></mfrac><mo>≈</mo><mn>37 249</mn><mtext> tr/min</mtext></mrow>
+                </math>
+              </div>
+              37 249 tr/min nécessaires — impossible avec une broche limitée à 12 000 tr/min.
+            </dd>
+
+            <dt>Ex 3 — Vf à n = 12 000 tr/min</dt>
+            <dd>
+              <div class="help-math">
+                <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                  <mrow><mi>Vf</mi><mo>=</mo><mn>12000</mn><mo>×</mo><mn>0,05</mn><mo>×</mo><mn>2</mn><mo>=</mo><mn>1 200</mn><mtext> mm/min</mtext></mrow>
+                </math>
+              </div>
+              1 200 mm/min calculés → plafonnés à 800 mm/min (limite machine).
+            </dd>
+
+            <dt>Ex 4 — Abaisser n ne résout rien</dt>
+            <dd>
+              Réduire n à 8 000 tr/min pour tenir Fz = 0,05 dans la limite Vf = 800 mm/min donnerait :
+              <div class="help-math">
+                <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                  <mrow><mi>Vc</mi><mo>=</mo><mfrac><mrow><mn>8000</mn><mo>×</mo><mi>π</mi><mo>×</mo><mn>3</mn></mrow><mn>1000</mn></mfrac><mo>≈</mo><mn>75,4</mn><mtext> m/min</mtext></mrow>
+                </math>
+              </div>
+              75 m/min est inférieur à la Vc de <em>tous</em> les matériaux du calculateur, y compris l'aluminium (120 m/min). Ce n'est pas une solution — il faut accepter les conditions dégradées ou changer de diamètre.
+            </dd>
+
+          </dl>
+
+          <p>Résumé de la <strong>double limitation</strong> : broche ET avance XY toutes deux plafonnées — Fz réelle tombe à 0,033 mm/dent au lieu de 0,050, l'outil frotte plus qu'il ne coupe.</p>
+          <table class="help-table">
+            <thead>
+              <tr><th></th><th>Cible (sans limite)</th><th>Effectif (machine réelle)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>n (tr/min)</td><td>37 249</td><td>12 000 — broche max</td></tr>
+              <tr><td>Vf (mm/min)</td><td>3 725</td><td>800 — avance XY max</td></tr>
+              <tr><td>Vc (m/min)</td><td>350</td><td>113</td></tr>
+              <tr><td>Fz réelle (mm/dent)</td><td>0,050</td><td>0,033 — dégradée</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+      </div><!-- /panel formules -->
+
+      <!-- ══════════════ ONGLET ABAQUE ══════════════ -->
+      <div class="help-panel" data-panel="abaque">
+
+        <section class="help-section">
+          <h4>Avance par dent — fz (mm/dent)</h4>
+          <div class="help-table-wrap">
+            <table class="help-table">
+              <thead>
+                <tr>
+                  <th>Matière</th><th>vc m/min</th>
+                  <th>≥ 1 mm</th><th>≥ 2 mm</th><th>≥ 3 mm</th>
+                  <th>≥ 4 mm</th><th>≥ 6 mm</th><th>≥ 8 mm</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Bois exotique</td><td>150</td><td>0.003</td><td>0.010</td><td>0.013</td><td>0.015</td><td>0.018</td><td>0.025</td></tr>
+                <tr><td>Bois massif</td><td>200</td><td>0.004</td><td>0.012</td><td>0.016</td><td>0.018</td><td>0.022</td><td>0.031</td></tr>
+                <tr><td>CTP, bois tendres</td><td>250</td><td>0.005</td><td>0.012</td><td>0.016</td><td>0.020</td><td>0.024</td><td>0.033</td></tr>
+                <tr><td>MDF, Valcromat</td><td>350</td><td>0.006</td><td>0.013</td><td>0.018</td><td>0.020</td><td>0.027</td><td>0.040</td></tr>
+                <tr><td>PVC expansé, Forex</td><td>300</td><td>0.008</td><td>0.028</td><td>0.038</td><td>0.048</td><td>0.078</td><td>0.088</td></tr>
+                <tr><td>PMMA, thermoplastiques</td><td>200</td><td>0.006</td><td>0.020</td><td>0.028</td><td>0.035</td><td>0.055</td><td>0.065</td></tr>
+                <tr><td>Aluminium (2017A, 5083)</td><td>120</td><td>0.004</td><td>0.008</td><td>0.013</td><td>0.018</td><td>0.023</td><td>0.028</td></tr>
+                <tr><td>Bronze, cuivre, laiton</td><td>120</td><td>0.003</td><td>0.006</td><td>0.008</td><td>0.013</td><td>0.018</td><td>0.023</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="help-section">
+          <h4>Profondeur de passe — ap = k × D</h4>
+          <div class="help-table-wrap">
+            <table class="help-table">
+              <thead>
+                <tr>
+                  <th>Ø mm</th><th>Bois exotique</th><th>Bois massif</th><th>CTP, tendres</th>
+                  <th>MDF</th><th>PVC, Forex</th><th>PMMA</th><th>Aluminium</th><th>Cuivre/Laiton</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>1</td><td>0.2</td><td>0.2</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.2</td><td>0.1</td></tr>
+                <tr><td>2</td><td>0.2</td><td>0.2</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.2</td><td>0.1</td></tr>
+                <tr><td>2.5</td><td>0.2</td><td>0.2</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.2</td><td>0.1</td></tr>
+                <tr><td>3</td><td>0.3</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.4</td><td>0.1</td></tr>
+                <tr><td>3.175</td><td>0.3</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.4</td><td>0.1</td></tr>
+                <tr><td>4</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.2</td></tr>
+                <tr><td>5</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.25</td></tr>
+                <tr><td>6</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.3</td></tr>
+                <tr><td>8</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.3</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="help-note" style="margin-top:8px">Ex. MDF avec Ø3 mm → k = 0,5 → ap = 3 × 0,5 = 1,5 mm (approche prudente)</p>
+          <p class="help-note">
+            Source : <em>cncfraises.fr</em>, adaptée pour une approche prudente sur machine amateur :<br>
+            · Vitesses réduites — vc et fz légèrement abaissées par rapport aux données d'origine, pour tenir compte de la rigidité limitée des portiques à usage amateur.<br>
+            · ap cohérentes entre diamètres — les coefficients k ont été homogénéisés pour éviter des sauts illogiques d'un pas de diamètre à l'autre.<br>
+            · PMMA ajusté — l'acrylique fond si le fz est trop élevé ; les valeurs ont été réduites pour éviter la fusion et le collage de copeaux sur l'outil.
+          </p>
+        </section>
+
+      </div><!-- /panel abaque -->
 
     </div><!-- /help-body -->
   `;
