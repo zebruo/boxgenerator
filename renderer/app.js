@@ -624,7 +624,8 @@ async function openSimulation() {
 
   const { SimulationView } = await import('./modules/sim/SimulationView.js');
   simView?.close();
-  simView = new SimulationView(document.querySelector('.preview-area'), {
+  // Le panneau recouvre toute la zone centrale (barre 3D / Vues 2D comprise, inactive pendant la simulation)
+  simView = new SimulationView(document.querySelector('.panel-center'), {
     code, stock, toolDiameter: machine.toolDiameter,
     light: document.documentElement.dataset.theme === 'light',
     onClose: () => { simView = null; },

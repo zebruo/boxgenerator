@@ -125,12 +125,6 @@ export class SimulationView {
     el.innerHTML = `
       <div class="sim-toolbar">
         <span class="sim-title">${t('sim.title')}</span>
-        <button class="sim-btn" data-act="start" title="${t('sim.start')}"><i class="fa-solid fa-backward-step"></i></button>
-        <button class="sim-btn" data-act="prev"  title="${t('sim.prev_op')}"><i class="fa-solid fa-backward"></i></button>
-        <button class="sim-btn sim-play" data-act="play" title="${t('sim.play')}"><i class="fa-solid fa-play"></i></button>
-        <button class="sim-btn" data-act="next"  title="${t('sim.next_op')}"><i class="fa-solid fa-forward"></i></button>
-        <button class="sim-btn" data-act="end"   title="${t('sim.end')}"><i class="fa-solid fa-forward-step"></i></button>
-        <input type="range" class="sim-progress" min="0" max="10000" step="1" value="0">
         <label class="sim-lbl">${t('sim.speed')} <select class="sim-speed">${speedOpts}</select></label>
         <label class="sim-lbl">${t('sim.resolution')} <select class="sim-res">${resOpts}</select></label>
         <label class="sim-lbl" title="${t('sim.rapid_tip')}">G0 <input type="number" class="sim-rapid" min="100" max="30000" step="100" value="${this.rapidRate}"> mm/min</label>
@@ -142,8 +136,21 @@ export class SimulationView {
       <div class="sim-stage">
         <canvas class="sim-canvas"></canvas>
         <div class="sim-info">
-          <span class="sim-time"></span>
           <span class="sim-op"></span>
+        </div>
+        <div class="sim-transport">
+          <div class="sim-buttons">
+            <button class="sim-btn" data-act="start" title="${t('sim.start')}"><i class="fa-solid fa-backward-step"></i></button>
+            <button class="sim-btn" data-act="prev"  title="${t('sim.prev_op')}"><i class="fa-solid fa-backward"></i></button>
+            <button class="sim-btn sim-play" data-act="play" title="${t('sim.play')}"><i class="fa-solid fa-play"></i></button>
+            <button class="sim-btn" data-act="next"  title="${t('sim.next_op')}"><i class="fa-solid fa-forward"></i></button>
+            <button class="sim-btn" data-act="end"   title="${t('sim.end')}"><i class="fa-solid fa-forward-step"></i></button>
+          </div>
+          <div class="sim-timeline">
+            <span class="sim-time"></span>
+            <input type="range" class="sim-progress" min="0" max="10000" step="1" value="0">
+            <span class="sim-total"></span>
+          </div>
         </div>
         <div class="sim-legend">
           <span><i style="background:#2f80ed"></i>${t('sim.kind_pocket')}</span>
@@ -157,7 +164,7 @@ export class SimulationView {
     const q = s => el.querySelector(s);
     this.ui = {
       canvas: q('.sim-canvas'), progress: q('.sim-progress'), play: q('.sim-play'),
-      time: q('.sim-time'), op: q('.sim-op'), status: q('.sim-status'),
+      time: q('.sim-time'), total: q('.sim-total'), op: q('.sim-op'), status: q('.sim-status'),
     };
 
     el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => this._action(b.dataset.act)));
@@ -351,8 +358,11 @@ export class SimulationView {
     if (force) this.sim.reset();
     const p = this.sim.seek(this.time);
     if (p) this.toolMesh?.position.set(p.x, p.y, p.z);
-    this.ui.progress.value = this.total ? Math.round(this.time / this.total * 10000) : 0;
-    this.ui.time.textContent = `${formatDuration(this.time)} / ${formatDuration(this.total)}`;
+    const frac = this.total ? this.time / this.total : 0;
+    this.ui.progress.value = Math.round(frac * 10000);
+    this.ui.progress.style.setProperty('--p', `${(frac * 100).toFixed(2)}%`);   // partie remplie de la ligne de temps
+    this.ui.time.textContent  = formatDuration(this.time);
+    this.ui.total.textContent = formatDuration(this.total);
     const mv = this.program.moves[moveIndexAt(this.program.moves, this.time)];
     this.ui.op.textContent = this.program.sections[mv?.sec]?.label ?? '';
   }
