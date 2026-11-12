@@ -1,6 +1,7 @@
 import * as THREE from '../../lib/three.module.js';
 import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
+import { FingerJointBox } from '../boxes/FingerJointBox.js';
 import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 
 // Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
@@ -215,44 +216,48 @@ export class ThreePreview {
     }
   }
 
+  /**
+   * Boîte à encoches assemblée à partir des six panneaux réels (mêmes contours à créneaux
+   * que le G-code). Chaque panneau a les dimensions extérieures de sa face ; ses créneaux
+   * (profondeur = épaisseur) s'imbriquent aux arêtes. Panneau extrudé de t puis placé :
+   *   fond / couvercle : plan XY (z 0 → t / H−t → H)
+   *   avant / arrière  : plan XZ (y 0 → t / D−t → D), bord y=0 du panneau en haut
+   *   gauche / droit   : plan YZ (x 0 → t / W−t → W), bord y=0 du panneau en haut
+   */
   _buildFingerBox(pts, H, boxParams = {}) {
-    const t       = boxParams.thickness ?? 6;
-    const withLid = boxParams.withLid   ?? true;
-    const col     = BOX_COLOR;
+    const t       = boxParams.thickness   ?? 6;
+    const fw      = boxParams.fingerWidth ?? 10;
+    const bl      = boxParams.clearance   ?? 0.1;
+    const withLid = boxParams.withLid     ?? true;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys);
 
-    // Fond
-    this._mesh(
-      new THREE.ExtrudeGeometry(this._shape(pts), { depth: t, bevelEnabled: false }),
-      this._mat(col, { roughness: 0.7 })
-    );
+    const fj   = new FingerJointBox();
+    const pane = rel => this._shape(fj._toPoints(rel));
+    const wood = this._mat(BOX_COLOR, { roughness: 0.7 });
+    // m : matrice local (x, y, z extrudé) → monde ; rotations pures (déterminant +1)
+    const place = (shape, m, mat = wood) => {
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false });
+      geo.applyMatrix4(m);
+      this._mesh(geo, mat);
+    };
+    const M = (...e) => new THREE.Matrix4().set(...e, 0, 0, 0, 1);
 
-    // Parois creuses (outer − inner)
-    const innerPts  = this._offsetPts(pts, -t);
-    const wallShape = this._shape(pts);
-    const hole = new THREE.Path();
-    innerPts.forEach((p, i) => i === 0 ? hole.moveTo(p.x, p.y) : hole.lineTo(p.x, p.y));
-    hole.closePath();
-    wallShape.holes = [hole];
-    const wallMesh = this._mesh(
-      new THREE.ExtrudeGeometry(wallShape, { depth: H - (withLid ? 2 * t : t), bevelEnabled: false }),
-      this._mat(col, { roughness: 0.7 })
-    );
-    wallMesh.position.z = t;
+    const front = pane(withLid ? fj._frontWithTop(W, H, fw, t, bl) : fj._frontWithoutTop(W, H, fw, t, bl));
+    const side  = pane(withLid ? fj._sideWithTop(D, H, fw, t, bl)  : fj._sideWithoutTop(D, H, fw, t, bl));
+    const floor = pane(fj._bottom(W, D, fw, t, bl));
 
-    // Plancher intérieur visible
-    const floorMesh = this._mesh(
-      new THREE.ShapeGeometry(this._shape(innerPts)),
-      this._mat(BOX_COLOR, { roughness: 0.95, side: THREE.FrontSide })
-    );
-    floorMesh.position.z = t + 0.5;
-
-    // Couvercle (semi-transparent pour voir l'intérieur)
+    place(floor, M(1, 0, 0, 0,   0, 1, 0, 0,   0, 0, 1, 0));                 // fond
+    // avant / arrière : (x, y, z) → (x, z [+ D−t], H − y)
+    place(front, M(1, 0, 0, 0,   0, 0, 1, 0,       0, -1, 0, H));
+    place(front, M(1, 0, 0, 0,   0, 0, 1, D - t,   0, -1, 0, H));
+    // gauche / droit : (x, y, z) → (t − z | W − z, x, H − y)
+    place(side,  M(0, 0, -1, t,  1, 0, 0, 0,   0, -1, 0, H));
+    place(side,  M(0, 0, -1, W,  1, 0, 0, 0,   0, -1, 0, H));
+    // couvercle, légèrement transparent pour voir l'intérieur
     if (withLid) {
-      const lidMesh = this._mesh(
-        new THREE.ExtrudeGeometry(this._shape(pts), { depth: t, bevelEnabled: false }),
-        this._mat(col, { roughness: 0.7, transparent: true, opacity: 0.55 })
-      );
-      lidMesh.position.z = H - t;
+      place(pane(fj._bottom(W, D, fw, t, bl)), M(1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, H - t),
+        this._mat(BOX_COLOR, { roughness: 0.7, transparent: true, opacity: 0.55 }));
     }
   }
 
