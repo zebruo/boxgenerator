@@ -302,6 +302,10 @@ export const fr = {
     drawing:      'Dessin',
     drawing_tip:  'Contours théoriques des pièces, pour comparer avec la matière usinée',
     part_only:    'Pièce finie seule',
+    part:         'Pièce',
+    part_tip:     'Corps et couvercle de hauteurs différentes : usinés sur deux bruts, simulés séparément',
+    part_body:    'Corps ({{h}} mm)',
+    part_lid:     'Couvercle ({{h}} mm)',
     part_only_tip:'Fin de la simulation, sans le brut restant, les flancs, la fraise ni les parcours',
   },
 };

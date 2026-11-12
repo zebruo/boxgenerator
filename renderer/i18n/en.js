@@ -302,6 +302,10 @@ export const en = {
     drawing:      'Drawing',
     drawing_tip:  'Theoretical part outlines, to compare with the machined material',
     part_only:    'Finished part only',
+    part:         'Part',
+    part_tip:     'Body and lid of different heights: machined on two stocks, simulated separately',
+    part_body:    'Body ({{h}} mm)',
+    part_lid:     'Lid ({{h}} mm)',
     part_only_tip:'End of simulation, without leftover stock, sides, cutter or toolpaths',
   },
 };

@@ -618,15 +618,49 @@ async function openSimulation() {
     ? state.boxType.getDrawing(state.shape, state.boxParams, machine)
     : [{ pts: state.shape.getContourPoints(), face: 1, outer: true }];
   const drawing = rawDrawing.map(d => ({ ...d, pts: d.pts.map(p => ({ x: p.x + origin.originX, y: p.y + origin.originY })) }));
+  const parts = lidBoxParts(code, drawing, stock, machine, margin);
 
   const { SimulationView } = await import('./modules/sim/SimulationView.js');
   simView?.close();
   // Le panneau recouvre toute la zone centrale (barre 3D / Vues 2D comprise, inactive pendant la simulation)
   simView = new SimulationView(document.querySelector('.panel-center'), {
-    code, stock, drawing, toolDiameter: machine.toolDiameter, rapidRate: machine.rapidRate,
+    code, stock, drawing, parts, toolDiameter: machine.toolDiameter, rapidRate: machine.rapidRate,
     light: document.documentElement.dataset.theme === 'light',
     onClose: () => { simView = null; },
   });
+}
+
+/**
+ * Boîte à couvercle dont corps et couvercle n'ont pas la même hauteur : ils sont usinés sur
+ * deux bruts (voir l'avertissement à l'export). La simulation les montre pièce par pièce,
+ * chacune sur son brut. Renvoie null dans les autres cas (simulation d'un seul programme).
+ */
+function lidBoxParts(code, drawing, stock, machine, margin) {
+  if (state.boxTypeKey !== 'lid-box') return null;
+  const H = state.boxParams.height ?? 40, lidH = state.boxParams.lidHeight ?? 15;
+  if (Math.abs(H - lidH) < 1e-6) return null;
+  const lines = code.split('\n');
+  const iBody = lines.findIndex(l => l.trim() === '; ═══ CORPS ═══');
+  const iLid  = lines.findIndex(l => l.trim() === '; ═══ COUVERCLE ═══');
+  if (iBody < 0 || iLid < 0) return null;
+  const extra = Math.max(0, machine.materialThickness - Math.max(H, lidH));   // surplus de brut
+  const part = (key, label, codeLines, height) => {
+    const draw = drawing.filter(d => d.part === key);
+    const pts = draw.flatMap(d => d.pts);
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    return {
+      label, code: codeLines.join('\n'), drawing: draw,
+      stock: {
+        x0: Math.min(...xs) - margin, x1: Math.max(...xs) + margin,
+        y0: Math.min(...ys) - margin, y1: Math.max(...ys) + margin,
+        top: stock.top, bottom: stock.top - (height + extra),
+      },
+    };
+  };
+  return [
+    part('body', t('sim.part_body', { h: H }),    lines.slice(0, iLid), H),
+    part('lid',  t('sim.part_lid',  { h: lidH }), [...lines.slice(0, iBody), ...lines.slice(iLid)], lidH),
+  ];
 }
 
 // Lit la position et le niveau du gizmo Z0 depuis les boutons actifs

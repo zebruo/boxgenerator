@@ -114,16 +114,20 @@ export class SimulationView {
    * @param {{x0,y0,x1,y1,top,bottom}} o.stock  brut, en coordonnées machine (face 1)
    * @param {{pts:{x,y}[], face:number, outer?:boolean}[]} [o.drawing]  contours théoriques
    *        (repère machine de leur face) ; outer = contour qui détache une pièce
+   * @param {{label, code, stock, drawing}[]} [o.parts]  pièces usinées sur des bruts distincts
+   *        (ex. boîte à couvercle aux hauteurs différentes) : sélecteur « Pièce », chacune
+   *        simulée sur son brut. Sinon, code/stock/drawing décrivent l'unique programme.
    * @param {number} o.toolDiameter
    * @param {number} [o.rapidRate]      vitesse des G0 de la machine (mm/min), pour le temps estimé
    * @param {boolean} [o.light]         thème clair
    * @param {Function} [o.onClose]
    */
-  constructor(host, { code, stock, drawing = [], toolDiameter, rapidRate = 3000, light = false, onClose = null }) {
+  constructor(host, { code, stock, drawing = [], parts = null, toolDiameter, rapidRate = 3000, light = false, onClose = null }) {
     this.host = host;
-    this.code = code;
-    this.stock = stock;
-    this.drawing = drawing;
+    this.parts = parts?.length > 1 ? parts : [{ label: '', code, stock, drawing }];
+    this.code = this.parts[0].code;
+    this.stock = this.parts[0].stock;
+    this.drawing = this.parts[0].drawing ?? [];
     this.toolR = toolDiameter / 2;
     this.onClose = onClose;
     this.playing = false;
@@ -160,10 +164,12 @@ export class SimulationView {
     const speedOpts = SPEEDS.map(s => `<option value="${s}"${s === this.speed ? ' selected' : ''}>×${s}</option>`).join('');
     const twoFaces = !!this.program.flip;
     const hasDrawing = this.drawing.length > 0;
+    const partOpts = this.parts.map((p, i) => `<option value="${i}">${p.label}</option>`).join('');
     el.innerHTML = `
       <div class="sim-toolbar">
         <span class="sim-title">${t('sim.title')}</span>
         <label class="sim-lbl">${t('sim.speed')} <select class="sim-speed">${speedOpts}</select></label>
+        ${this.parts.length > 1 ? `<label class="sim-lbl" title="${t('sim.part_tip')}">${t('sim.part')} <select class="sim-part">${partOpts}</select></label>` : ''}
         ${twoFaces ? `<label class="sim-lbl" title="${t('sim.view_tip')}">${t('sim.view')} <select class="sim-view">
           <option value="auto">${t('sim.view_auto')}</option>
           <option value="1">${t('sim.view_face1')}</option>
@@ -220,6 +226,7 @@ export class SimulationView {
     });
     q('.sim-speed').addEventListener('change', e => { this.speed = Number(e.target.value); lsSet('sim.speed', this.speed); });
     q('.sim-view')?.addEventListener('change', e => { this.viewMode = e.target.value; this._updateView(); });
+    q('.sim-part')?.addEventListener('change', e => this._switchPart(Number(e.target.value)));
     this.ui.tool.addEventListener('change', () => this._applyVisibility());
     this.ui.paths.addEventListener('change', () => this._applyVisibility());
     this.ui.rapids.addEventListener('change', () => this._applyVisibility());
@@ -267,6 +274,32 @@ export class SimulationView {
     if (on) { this.playing = false; this._updatePlayIcon(); this._seek(this.total); }
     this.uniforms.uPartOnly.value = on ? 1 : 0;
     this._applyVisibility();
+  }
+
+  /** Change de pièce (bruts distincts) : nouveau programme, nouveau brut, simulation au début. */
+  _switchPart(i) {
+    const p = this.parts[i];
+    if (!p) return;
+    this.playing = false;
+    this._updatePlayIcon();
+    this._setPartOnly(false);
+    [this.surface, this.under, this.sides, this.paths, this.rapids, this.drawLines, this.toolMesh].forEach(o => this._disposeObj(o));
+    [this.heightTex, this.floorTex, this.maskTex].forEach(tx => tx?.dispose());
+    this.drawLines = null;
+    this.code = p.code;
+    this.stock = p.stock;
+    this.drawing = p.drawing ?? [];
+    this.viewFace = 1;
+    this.world.rotation.set(0, 0, 0);
+    this.world.position.set(0, 0, 0);
+    this._loadProgram();
+    this._buildSim();
+    this._buildPaths();
+    this._buildDrawing();
+    this._buildTool();
+    this._applyVisibility();
+    this._fitCamera();
+    this._seek(0, true);
   }
 
   // ─── Scène ───────────────────────────────────────────────────────────────
