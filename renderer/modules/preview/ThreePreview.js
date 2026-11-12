@@ -3,6 +3,10 @@ import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { insetPolygon } from '../gcode/Offset.js';
 
+// Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
+// comme dans la simulation d'usinage.
+const BOX_COLOR = 0xff7518;
+
 /**
  * Prévisualisation 3D WebGL avec Three.js.
  * Système de coordonnées Z-up :
@@ -44,7 +48,7 @@ export class ThreePreview {
     this.camera.position.set(300, -300, 250);
 
     // Lumières
-    const ambient = new THREE.AmbientLight(0x334466, 3);
+    const ambient = new THREE.AmbientLight(0xffffff, 1.3);   // neutre : la teinte des pièces reste fidèle
     this.scene.add(ambient);
 
     const sun = new THREE.DirectionalLight(0xffffff, 3);
@@ -56,11 +60,11 @@ export class ThreePreview {
     sc.left = -400; sc.right = 400; sc.top = 400; sc.bottom = -400;
     this.scene.add(sun);
 
-    const fill = new THREE.DirectionalLight(0x4466ff, 1.2);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.7);
     fill.position.set(-300, 300, 100);
     this.scene.add(fill);
 
-    const rim = new THREE.DirectionalLight(0x00ffaa, 0.5);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.35);
     rim.position.set(0, 0, -300);
     this.scene.add(rim);
 
@@ -189,7 +193,7 @@ export class ThreePreview {
     // Fond (forme réelle, épaisseur bt)
     const bottomShape = this._shape(pts);
     const bottomGeo = new THREE.ExtrudeGeometry(bottomShape, { depth: bt, bevelEnabled: false });
-    this._mesh(bottomGeo, this._mat(0x7a4a1a, { roughness: 0.85 }));
+    this._mesh(bottomGeo, this._mat(BOX_COLOR, { roughness: 0.85 }));
 
     // Parois (et cloisons) : forme percée de la cavité — ou des compartiments — extrudée de bt à H
     const innerPts = this._offsetPts(pts, -wt);  // offset négatif = vers l'intérieur (CCW)
@@ -198,13 +202,13 @@ export class ThreePreview {
     wallShape.holes = holes.map(h => this._path(h));
 
     const wallGeo = new THREE.ExtrudeGeometry(wallShape, { depth: H - bt, bevelEnabled: false });
-    const wallMesh = this._mesh(wallGeo, this._mat(0xb06030, { roughness: 0.75 }));
+    const wallMesh = this._mesh(wallGeo, this._mat(BOX_COLOR, { roughness: 0.75 }));
     wallMesh.position.z = bt;
 
     // Plancher intérieur de chaque compartiment (légèrement au-dessus du fond)
     for (const h of holes) {
       const floorMesh = this._mesh(new THREE.ShapeGeometry(this._shape(h)),
-        this._mat(0x1a0f08, { roughness: 0.95, side: THREE.FrontSide }));
+        this._mat(BOX_COLOR, { roughness: 0.95, side: THREE.FrontSide }));
       floorMesh.position.z = bt + 0.5;
     }
   }
@@ -212,7 +216,7 @@ export class ThreePreview {
   _buildFingerBox(pts, H, boxParams = {}) {
     const t       = boxParams.thickness ?? 6;
     const withLid = boxParams.withLid   ?? true;
-    const col     = 0xb04a10;
+    const col     = BOX_COLOR;
 
     // Fond
     this._mesh(
@@ -236,7 +240,7 @@ export class ThreePreview {
     // Plancher intérieur visible
     const floorMesh = this._mesh(
       new THREE.ShapeGeometry(this._shape(innerPts)),
-      this._mat(0x1a0f08, { roughness: 0.95, side: THREE.FrontSide })
+      this._mat(BOX_COLOR, { roughness: 0.95, side: THREE.FrontSide })
     );
     floorMesh.position.z = t + 0.5;
 
@@ -262,7 +266,7 @@ export class ThreePreview {
     // Fond (pleine forme, épaisseur bFl)
     this._mesh(
       new THREE.ExtrudeGeometry(this._shape(pts), { depth: bFl, bevelEnabled: false }),
-      this._mat(0x8a3a0a, { roughness: 0.85 })
+      this._mat(BOX_COLOR, { roughness: 0.85 })
     );
 
     // Parois (et cloisons) : de bFl à H-rD (s'arrête avant la rainure pour éviter le Z-fighting).
@@ -272,7 +276,7 @@ export class ThreePreview {
     wallShape.holes = holes.map(h => this._path(h));
     const wallMesh = this._mesh(
       new THREE.ExtrudeGeometry(wallShape, { depth: Math.max(0.1, H - rD - bFl), bevelEnabled: false }),
-      this._mat(0xb04a10, { roughness: 0.7 })
+      this._mat(BOX_COLOR, { roughness: 0.7 })
     );
     wallMesh.position.z = bFl;
     if (cells && rs === 1) {
@@ -280,7 +284,7 @@ export class ThreePreview {
       partShape.holes = cells.map(h => this._path(h));
       const partTop = this._mesh(
         new THREE.ExtrudeGeometry(partShape, { depth: rD, bevelEnabled: false }),
-        this._mat(0xb04a10, { roughness: 0.7 })
+        this._mat(BOX_COLOR, { roughness: 0.7 })
       );
       partTop.position.z = H - rD;
     }
@@ -289,7 +293,7 @@ export class ThreePreview {
     for (const h of holes) {
       const floorMesh = this._mesh(
         new THREE.ShapeGeometry(this._shape(h)),
-        this._mat(0x080f25, { roughness: 0.95, side: THREE.FrontSide })
+        this._mat(BOX_COLOR, { roughness: 0.95, side: THREE.FrontSide })
       );
       floorMesh.position.z = bFl + 0.5;
     }
@@ -311,7 +315,7 @@ export class ThreePreview {
     topWallShape.holes = [topWallHole];
     const topWallMesh = this._mesh(
       new THREE.ExtrudeGeometry(topWallShape, { depth: rD, bevelEnabled: false }),
-      this._mat(0xb04a10, { roughness: 0.7 })
+      this._mat(BOX_COLOR, { roughness: 0.7 })
     );
     topWallMesh.position.z = H - rD;
     // La rainure de feuillure (grooveOuter → grooveInner) reste vide : vraie marche, comme usinée
@@ -334,7 +338,7 @@ export class ThreePreview {
     const lidCav   = mirror(innerPts);
     const lid = new THREE.Group();
     const opt = assembled ? { transparent: true, opacity: 0.8 } : {};   // assemblé : on devine l'emboîtement
-    const wood = this._mat(0xb04a10, { roughness: 0.7, ...opt });
+    const wood = this._mat(BOX_COLOR, { roughness: 0.7, ...opt });
     const add  = (geo, mat, z0 = 0) => { const m = this._mesh(geo, mat); m.position.z = z0; lid.add(m); };
     const ring = (outer, inner, z0, depth) => {
       if (depth <= 0.05) return;
@@ -344,7 +348,7 @@ export class ThreePreview {
     };
 
     add(new THREE.ExtrudeGeometry(this._shape(lidOuter), { depth: bFll, bevelEnabled: false }),
-      this._mat(0x8a3a0a, { roughness: 0.85, ...opt }));                       // fond du couvercle
+      this._mat(BOX_COLOR, { roughness: 0.85, ...opt }));                       // fond du couvercle
     if (rs === 0) {
       ring(lidOuter, lidCav, bFll, lidH - bFll);
     } else {
@@ -353,7 +357,7 @@ export class ThreePreview {
       ring(lidRab, lidCav, bFll, lidH - rD - bFll);    // sous la feuillure
     }
     add(new THREE.ShapeGeometry(this._shape(lidCav)),
-      this._mat(0x080f25, { roughness: 0.95, side: THREE.FrontSide, ...opt }), bFll + 0.5);   // fond de cavité
+      this._mat(BOX_COLOR, { roughness: 0.95, side: THREE.FrontSide, ...opt }), bFll + 0.5);   // fond de cavité
 
     this.scene.add(lid);
     this.meshes.push(lid);
@@ -385,7 +389,7 @@ export class ThreePreview {
       // Fond plein
       const bottomMesh = this._mesh(
         new THREE.ExtrudeGeometry(this._shape(pts), { depth: bFl, bevelEnabled: false }),
-        mat(phantom ? 0x1a4060 : 0x18a060)
+        mat(BOX_COLOR)
       );
       bottomMesh.position.z = zBase;
 
@@ -397,7 +401,7 @@ export class ThreePreview {
       wallShape.holes = [wallHole];
       const wallMesh = this._mesh(
         new THREE.ExtrudeGeometry(wallShape, { depth: H - bFl, bevelEnabled: false }),
-        mat(phantom ? 0x204880 : 0x20c080)
+        mat(BOX_COLOR)
       );
       wallMesh.position.z = zBase + bFl;
 
@@ -405,7 +409,7 @@ export class ThreePreview {
       if (!phantom) {
         const floorMesh = this._mesh(
           new THREE.ShapeGeometry(this._shape(innerPts)),
-          this._mat(0x080f25, { roughness: 0.95, side: THREE.FrontSide })
+          this._mat(BOX_COLOR, { roughness: 0.95, side: THREE.FrontSide })
         );
         floorMesh.position.z = zBase + bFl + 0.5;
       }
@@ -418,7 +422,7 @@ export class ThreePreview {
     if (plugPts.length >= 3) {
       const plugMesh = this._mesh(
         new THREE.ExtrudeGeometry(this._shape(plugPts), { depth: rimH, bevelEnabled: false }),
-        this._mat(0x0e7040, { roughness: 0.7 })
+        this._mat(BOX_COLOR, { roughness: 0.7 })
       );
       plugMesh.position.z = -rimH;
     }
