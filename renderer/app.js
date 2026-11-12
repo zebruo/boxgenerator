@@ -561,7 +561,7 @@ function getMachineParams() {
 const EXPORT_OPTS_DEFAULT = {
   entry: 'plunge', rampLen: null, helixR: null, helixTurns: 1,
   leadInOn: false, leadInR: null, finishOn: false, finishAllowance: 0.2,
-  tabsOn: true, tabCount: 4, tabWidth: 8, tabHeight: 2, pocketConc: true, rasterFinish: true,
+  tabsOn: true, tabCount: 4, tabWidth: 8, tabHeight: 2, pocketConc: true,
 };
 
 function loadExportOpts() {
@@ -597,7 +597,6 @@ function exportGenOptions(machine) {
       leadIn: o.leadInOn ? (o.leadInR ?? d.leadR) : false, finishAllowance,
     },
     pocketConc: o.pocketConc,
-    rasterFinish: o.rasterFinish,
     finishAllowance,
   };
 }
@@ -1027,10 +1026,6 @@ function showExportModal(sections, machine = {}) {
         </label>
         <span class="entry-lbl pocket-raster-lbl" data-tip="${t('modal.tip_raster')}">${t('modal.raster')}</span>
       </div>
-      <label class="tabs-toggle-row raster-finish-row" data-tip="${t('modal.tip_raster_finish')}">
-        <input type="checkbox" id="modal-raster-finish">
-        <span>${t('modal.raster_finish')}</span>
-      </label>
     </div>
     <p class="modal-sub">${t(opsKey, { count: optional.length })}</p>
     <div class="modal-toolbar">
@@ -1107,7 +1102,7 @@ function showExportModal(sections, machine = {}) {
     const origin  = computeOrigin(z0, machine);
     const fc = state.boxType.generateGCode(
       state.shape, state.boxParams,
-      { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcStats.checked, rasterFinish: modal.querySelector('#modal-raster-finish').checked, finishAllowance: entryOpts.finishAllowance }
+      { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcStats.checked, finishAllowance: entryOpts.finishAllowance }
     );
     const fSections = parseGCodeSections(fc);
     const sel = new Set();
@@ -1192,14 +1187,6 @@ function showExportModal(sections, machine = {}) {
   });
 
   const pocketConcCb = modal.querySelector('#modal-pocket-conc');
-  // Passe de finition : n'a d'effet qu'en balayage (case visible seulement si « concentrique » est décoché)
-  const rasterFinishCb  = modal.querySelector('#modal-raster-finish');
-  const rasterFinishRow = modal.querySelector('.raster-finish-row');
-  rasterFinishCb.checked = o.rasterFinish !== false;
-  const syncRasterFinish = () => { rasterFinishRow.hidden = pocketConcCb.checked; };
-  syncRasterFinish();
-  pocketConcCb.addEventListener('change', syncRasterFinish);
-  rasterFinishCb.addEventListener('change', updateModalStats);
   // Met à jour les labels de poche dans la liste quand la stratégie change
   pocketConcCb.addEventListener('change', () => {
     list.querySelectorAll('.sec-label').forEach(lbl => {
@@ -1230,7 +1217,6 @@ function showExportModal(sections, machine = {}) {
       tabWidth:        fin(num('#modal-tab-width'), 8),
       tabHeight:       fin(num('#modal-tab-height'), 2),
       pocketConc:      pocketConcCb.checked,
-      rasterFinish:    rasterFinishCb.checked,
     };
   };
   const rememberOpts = () => saveExportOpts(readExportOpts());
@@ -1274,7 +1260,7 @@ function showExportModal(sections, machine = {}) {
     const z0      = getZ0Settings();
     const origin  = computeOrigin(z0, machine);
     const finalCode = state.boxType.generateGCode(
-      state.shape, state.boxParams, { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, rasterFinish: rasterFinishCb.checked, finishAllowance: entryOpts.finishAllowance }
+      state.shape, state.boxParams, { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
     );
     const finalSections = parseGCodeSections(finalCode);
 
@@ -1342,7 +1328,7 @@ function showExportModal(sections, machine = {}) {
         const lidOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
         const lidCode = state.boxType.generateGCode(
           state.shape, state.boxParams,
-          { ...machine, ...lidOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, rasterFinish: rasterFinishCb.checked, finishAllowance: entryOpts.finishAllowance, lidAtOrigin: true }
+          { ...machine, ...lidOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance, lidAtOrigin: true }
         );
         sectionsForExport = parseGCodeSections(lidCode);
         // Corrige le préambule : ═══ CORPS ═══ → ═══ COUVERCLE ═══
@@ -1354,7 +1340,7 @@ function showExportModal(sections, machine = {}) {
         const bodyOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
         const bodyCode = state.boxType.generateGCode(
           state.shape, state.boxParams,
-          { ...machine, ...bodyOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, rasterFinish: rasterFinishCb.checked, finishAllowance: entryOpts.finishAllowance }
+          { ...machine, ...bodyOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
         );
         sectionsForExport = parseGCodeSections(bodyCode);
       }

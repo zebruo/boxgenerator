@@ -364,8 +364,6 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   display: flex; align-items: center; justify-content: space-between;
 }
 .export-modal .pocket-strategy-row .tabs-toggle-row { margin-bottom: 0; }
-.export-modal .raster-finish-row { margin: 8px 0 0; }
-.export-modal .raster-finish-row[hidden] { display: none; }
 .export-modal .pocket-raster-lbl {
   color: var(--text-muted); font-size: 12px; cursor: default;
 }

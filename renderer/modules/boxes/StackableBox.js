@@ -56,7 +56,7 @@ export class StackableBox {
     const fa = machineParams.finishAllowance ?? 0;
     const doPocket  = machineParams.pocketConc
       ? (p, lbl) => pocketConcentric(gen, p, lbl, 0, fa)
-      : (p, lbl) => gen.pocketShape(p, lbl);
+      : (p, lbl) => gen.pocketShape(p, lbl, 0, fa);
 
     // Positions trous de centrage — hors contour, dans le brut
     const holeY  = bb.height / 2;

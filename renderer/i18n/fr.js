@@ -164,7 +164,6 @@ export const fr = {
     pocket_strategy:  'Stratégie poche',
     concentric:       'Concentrique (défaut)',
     raster:           'Raster (zig-zag) si décoché',
-    raster_finish:    'Contour de finition après le balayage',
     ops_one:          '{{count}} opération — cochez ce que vous voulez exporter :',
     ops_other:        '{{count}} opérations — cochez ce que vous voulez exporter :',
     select_all:       'Tout cocher',
@@ -189,7 +188,6 @@ export const fr = {
     tip_leadin_r:    'Rayon arc lead-in/out = 0.4 × Ø outil = {{val}}mm par défaut.\nL\'arc doit tenir dans l\'espace libre autour du contour.',
     tip_concentric:  'Chemin concentrique (anneau par anneau).\n✔ Recommandé pour les formes convexes (rectangle, cercle, ovale, polygone).\n✔ Meilleure finition des parois de poche.\n✗ À éviter pour les formes très concaves.',
     tip_raster:      'Balayage horizontal zig-zag, ligne par ligne.\n✔ Universel : fonctionne pour toutes les formes.\n✔ Idéal pour les formes concaves (C, U, L).\n✗ Peut laisser de légères stries sur les parois de poche.',
-    tip_raster_finish: 'Après le balayage de chaque passe, la fraise suit le contour de la poche.\n✔ Parois nettes, sans stries ni matière restante.\nDécochée : balayage seul, plus rapide, parois en escalier.',
   },
 
   // ── Dialogues de confirmation ───────────────────────────────────────────

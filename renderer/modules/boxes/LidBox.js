@@ -82,7 +82,7 @@ export class LidBox {
     const fa = machineParams.finishAllowance ?? 0;
     const doPocket = machineParams.pocketConc
       ? (pts, lbl, ds = 0) => pocketConcentric(gen, pts, lbl, ds, fa)
-      : (pts, lbl, ds = 0) => gen.pocketShape(pts, lbl, ds);
+      : (pts, lbl, ds = 0) => gen.pocketShape(pts, lbl, ds, fa);
 
     // ═══════════════════════════════════════════════════════════════════════
     // CORPS

@@ -112,7 +112,7 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
 
   const trees = _buildRingTree(points, r + finishAllowance, stepOver, r);
   if (!trees.length) {
-    gen.pocketShape(points, label, depthStart);
+    gen.pocketShape(points, label, depthStart, finishAllowance);
     return;
   }
 

@@ -27,7 +27,7 @@ export class OpenTray {
     const fa = machineParams.finishAllowance ?? 0;
     const doPocket = machineParams.pocketConc
       ? (pts, lbl) => pocketConcentric(gen, pts, lbl, 0, fa)
-      : (pts, lbl) => gen.pocketShape(pts, lbl);
+      : (pts, lbl) => gen.pocketShape(pts, lbl, 0, fa);
 
     gen.header(`Plateau ouvert — ${bb.width.toFixed(0)}×${bb.height.toFixed(0)}×${height.toFixed(0)}mm`);
 

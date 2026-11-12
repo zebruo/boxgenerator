@@ -21,7 +21,6 @@ export class GCodeGenerator {
       originY: machine.originY ?? 0,  // décalage Y (mm)
       zOffset: machine.zOffset ?? 0,  // 0 = Z0 en surface, matThickness = Z0 en bas du brut
       arcs:    machine.arcs    ?? true, // regroupe les segments G1 en arcs G2/G3 à la sortie
-      rasterFinish: machine.rasterFinish ?? true, // poche raster : passe de finition sur le contour
       unit: 'mm'
     };
     this.lines = [];
@@ -975,22 +974,23 @@ export class GCodeGenerator {
   }
 
   /**
-   * Poche d'une forme quelconque par balayage raster (zig-zag), puis passe de finition.
+   * Poche d'une forme quelconque par balayage raster (zig-zag).
    *
-   * Le balayage reste dans le contour décalé de r (+ une petite surépaisseur si la finition
-   * est active), calculé par Clipper : l'outil reste partout à r de la paroi, y compris sur
-   * les parois obliques ou courbes (un décalage purement horizontal la mordait).
-   * Finition (machine.rasterFinish, active par défaut) : à chaque passe, l'outil suit le
-   * contour décalé de r exactement, ce qui efface les stries du balayage sur les parois.
+   * À chaque passe : balayage dans le contour décalé de r + finishAllowance (Clipper : l'outil
+   * reste à distance de la paroi même oblique ou courbe), puis tour de ce même contour pour
+   * enlever les marches laissées par le balayage le long des parois.
+   * Si finishAllowance > 0 (« Finition parois ») : une passe de finition unique à pleine
+   * profondeur suit ensuite le contour exact (décalé de r), comme pour les autres usinages.
    *
    * Entre deux lignes, l'outil se dégage à `clearance` mm au-dessus du fond de passe (et non
    * au safeZ) ; retrait complet seulement pour les tronçons disjoints d'une même ligne.
    *
    * @param {Array<{x,y}>} points  - contour fermé de la poche
    * @param {string}       label
-   * @param {number}       depthStart - profondeur déjà usinée (mm)
+   * @param {number}       depthStart      - profondeur déjà usinée (mm)
+   * @param {number}       finishAllowance - surépaisseur de paroi enlevée en finition (mm)
    */
-  pocketShape(points, label = 'Pocket', depthStart = 0) {
+  pocketShape(points, label = 'Pocket', depthStart = 0, finishAllowance = 0) {
     if (points.length < 3) return;
 
     const td          = this.machine.toolDiameter;
@@ -1003,10 +1003,9 @@ export class GCodeGenerator {
     const clearance   = 1.0;  // dégagement inter-lignes au-dessus du fond de passe (mm)
     const zo          = this.machine.zOffset;
 
-    const finish = this.machine.rasterFinish !== false;
-    const leave  = finish ? Math.min(0.2, r * 0.25) : 0;   // surépaisseur enlevée par la finition
-    const walls  = offsetPolygons(points, -r);                       // trajet de finition
-    const zone   = leave > 0 ? offsetPolygons(points, -(r + leave)) : walls;   // zone balayée
+    const fa    = Math.max(0, finishAllowance);
+    const walls = offsetPolygons(points, -r);                          // finition : contour exact
+    const zone  = fa > 0 ? offsetPolygons(points, -(r + fa)) : walls;  // ébauche : balayage + tour
 
     if (!walls.length) {
       this.comment(`ATTENTION: forme trop petite pour l'outil (${td}mm)`);
@@ -1019,7 +1018,7 @@ export class GCodeGenerator {
     const rows = ys.length && span > 0 ? Math.max(1, Math.ceil(span / stepOver)) : 0;
     const rowYs = rows ? Array.from({ length: rows + 1 }, (_, i) => minY + EDGE + span * i / rows) : [];
 
-    this.comment(`─── ${label} — Pocket raster${finish ? ' + finition' : ''} ───`);
+    this.comment(`─── ${label} — Pocket raster${fa > 0 ? `, finition +${fa}mm` : ''} ───`);
 
     for (let pass = 1; pass <= passes; pass++) {
       const z      = -(depthStart + stepZ * pass);
@@ -1057,15 +1056,28 @@ export class GCodeGenerator {
         dir *= -1;
       }
 
-      // Finition : contour exact (centre outil à r de la paroi) à cette profondeur
-      if (finish) {
-        for (const loop of walls) {
-          this.rapidZ(this.machine.safeZ);
-          this.rapidTo(loop[0].x, loop[0].y);
-          reenter();
-          for (let i = 1; i < loop.length; i++) this.lineTo(loop[i].x, loop[i].y);
-          this.lineTo(loop[0].x, loop[0].y);
-        }
+      // Tour du contour d'ébauche : enlève les marches du balayage le long des parois
+      for (const loop of zone) {
+        this.rapidZ(this.machine.safeZ);
+        this.rapidTo(loop[0].x, loop[0].y);
+        reenter();
+        for (let i = 1; i < loop.length; i++) this.lineTo(loop[i].x, loop[i].y);
+        this.lineTo(loop[0].x, loop[0].y);
+      }
+      this.rapidZ(this.machine.safeZ);
+    }
+
+    // Finition parois : une passe à pleine profondeur sur le contour exact
+    if (fa > 0) {
+      const z = -this.machine.materialThickness;
+      this.comment(`Passe finition paroi — Z=${z.toFixed(3)}`);
+      for (const loop of walls) {
+        this.rapidZ(this.machine.safeZ);
+        this.rapidTo(loop[0].x, loop[0].y);
+        if (depthStart > 0) this.emit(`G0 Z${(-depthStart + zo).toFixed(3)}`);
+        this.plungeTo(z);
+        for (let i = 1; i < loop.length; i++) this.lineTo(loop[i].x, loop[i].y);
+        this.lineTo(loop[0].x, loop[0].y);
       }
       this.rapidZ(this.machine.safeZ);
     }
