@@ -318,7 +318,7 @@ function renderShapeParams() {
       ).join('');
       row.innerHTML = `
         <label title="${t(d.label)}" style="grid-column:1/4">${t(d.label)}</label>
-        <select data-param="${d.id}" style="grid-column:1/4;background:#1a1a3a;color:#c0c4e0;border:1px solid #3a3a6a;border-radius:4px;padding:3px 6px;font-size:11px;">${opts}</select>
+        <select data-param="${d.id}" style="grid-column:1/4;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:11px;">${opts}</select>
       `;
       row.style.gridTemplateColumns = '1fr';
       row.querySelector('select').addEventListener('change', e => {

@@ -48,7 +48,7 @@ export class ThreePreview {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.setClearColor(0x0f0f1a);
+    this.renderer.setClearColor(0x2a2a2a);
 
     // Scène
     this.scene = new THREE.Scene();
@@ -83,7 +83,7 @@ export class ThreePreview {
     this.scene.add(rim);
 
     // Grille horizontale (plan XY, Z-up)
-    this.grid = new THREE.GridHelper(2000, 60, 0x252540, 0x1a1a30);
+    this.grid = new THREE.GridHelper(2000, 60, 0x454545, 0x363636);
     this.grid.rotation.x = Math.PI / 2;
     this.scene.add(this.grid);
 
@@ -114,15 +114,15 @@ export class ThreePreview {
 
   setTheme(light) {
     if (light) {
-      this.renderer.setClearColor(0xc4c4d4);
+      this.renderer.setClearColor(0xc6c6c6);
       this.scene.remove(this.grid);
-      this.grid = new THREE.GridHelper(2000, 60, 0x9898B8, 0xB0B0CC);
+      this.grid = new THREE.GridHelper(2000, 60, 0x9a9a9a, 0xb2b2b2);
       this.grid.rotation.x = Math.PI / 2;
       this.scene.add(this.grid);
     } else {
-      this.renderer.setClearColor(0x0f0f1a);
+      this.renderer.setClearColor(0x2a2a2a);
       this.scene.remove(this.grid);
-      this.grid = new THREE.GridHelper(2000, 60, 0x252540, 0x1a1a30);
+      this.grid = new THREE.GridHelper(2000, 60, 0x454545, 0x363636);
       this.grid.rotation.x = Math.PI / 2;
       this.scene.add(this.grid);
     }

@@ -307,7 +307,7 @@ export class SimulationView {
   _setupThree() {
     this.renderer = new THREE.WebGLRenderer({ canvas: this.ui.canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setClearColor(this.light ? 0xd4d4de : 0x45454d);
+    this.renderer.setClearColor(this.light ? 0xd6d6d6 : 0x454545);
     this.scene = new THREE.Scene();
     this.world = new THREE.Group();   // repère du brut ; retourné pour la vue face 2
     this.scene.add(this.world);
@@ -499,7 +499,7 @@ export class SimulationView {
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
-    this.drawLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: this.light ? 0x101018 : 0x1c1c22 }));
+    this.drawLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: this.light ? 0x141414 : 0x1c1c1c }));
     this.world.add(this.drawLines);
   }
 

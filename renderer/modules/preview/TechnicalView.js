@@ -29,46 +29,46 @@ export class TechnicalView {
     this.canvas.addEventListener('mousemove', e => this._onHover(e));
 
     this.C = {
-      bg:      '#0f0f1a',
-      panel:   '#101020',
+      bg:      '#2a2a2a',
+      panel:   '#262626',
       wood:    '#7a5230',
       woodLt:  '#a06840',
-      inner:   '#181830',
+      inner:   '#333333',
       rabbet:  '#2ab87a',
       dim:     '#f0c040',
-      dimLine: '#505080',
-      text:    '#b0b4d0',
-      title:   '#405090',
-      divider: '#202040',
+      dimLine: '#6a6a6a',
+      text:    '#c4c4c4',
+      title:   '#7c7c7c',
+      divider: '#3a3a3a',
     };
   }
 
   static COLORS_DARK = {
-    bg:      '#0f0f1a',
-    panel:   '#101020',
+    bg:      '#2a2a2a',
+    panel:   '#262626',
     wood:    '#7a5230',
     woodLt:  '#a06840',
-    inner:   '#181830',
+    inner:   '#333333',
     rabbet:  '#2ab87a',
     dim:     '#f0c040',
-    dimLine: '#505080',
-    text:    '#b0b4d0',
-    title:   '#405090',
-    divider: '#202040',
+    dimLine: '#6a6a6a',
+    text:    '#c4c4c4',
+    title:   '#7c7c7c',
+    divider: '#3a3a3a',
   };
 
   static COLORS_LIGHT = {
-    bg:      '#c4c4d4',
-    panel:   '#d0d0e0',
+    bg:      '#c6c6c6',
+    panel:   '#d2d2d2',
     wood:    '#c8a060',
     woodLt:  '#d8b878',
-    inner:   '#d0d0e4',
+    inner:   '#d6d6d6',
     rabbet:  '#008f70',
     dim:     '#cc6200',
-    dimLine: '#9090b0',
-    text:    '#1a1a3a',
+    dimLine: '#959595',
+    text:    '#1c1c1c',
     title:   '#1a6fcc',
-    divider: '#c0c0d8',
+    divider: '#c2c2c2',
   };
 
   setTheme(light) {
@@ -234,7 +234,7 @@ export class TechnicalView {
         ctx.closePath();
         ctx.fillStyle = this.C.inner;
         ctx.fill();
-        ctx.strokeStyle = '#383860';
+        ctx.strokeStyle = this.C.dimLine;
         ctx.lineWidth = 0.7 / sc;
         ctx.stroke();
       }
@@ -797,7 +797,7 @@ export class TechnicalView {
       top:          (rect.top  + ha.cy * scaleY - 13) + 'px',
       width:        '80px',
       height:       '26px',
-      background:   '#16162c',
+      background:   this.C.panel,
       color:        '#f0c040',
       border:       '1.5px solid #f0c040',
       borderRadius: '4px',
