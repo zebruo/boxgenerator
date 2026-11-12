@@ -6,6 +6,7 @@ import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 // Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
 // comme dans la simulation d'usinage.
 const BOX_COLOR = 0xff7518;
+const PHANTOM_COLOR = 0x8e8e96;   // pièces d'illustration (boîte du dessous de l'empilable)
 
 /**
  * Prévisualisation 3D WebGL avec Three.js.
@@ -164,7 +165,8 @@ export class ThreePreview {
     this.controls.update();
 
     // Grille sous la boîte (Z=0 = sol, grille à Z=-1)
-    const gridZ = boxTypeKey === 'stackable' ? -(H + _rimH) - 1 : -1;
+    // Boîte empilable : sol entre la boîte usinée et la boîte du dessous (milieu de l'intervalle)
+    const gridZ = boxTypeKey === 'stackable' ? -_rimH / 2 : -1;
     this.grid.position.set(layW / 2, layD / 2, gridZ);
 
     // Gizmo Z0 et brut — top par défaut au sommet de la boîte (Z=H) ; boîte à couvercle :
@@ -380,7 +382,8 @@ export class ThreePreview {
 
     // Construit une boîte creuse (fond + parois) à la position zBase
     const buildHollow = (zBase, phantom) => {
-      const mat = (col) => this._mat(col, {
+      // Boîte du dessous (illustration de l'empilement) : grise et translucide
+      const mat = (col) => this._mat(phantom ? PHANTOM_COLOR : col, {
         roughness: 0.75,
         transparent: phantom,
         opacity: phantom ? 0.35 : 1.0
