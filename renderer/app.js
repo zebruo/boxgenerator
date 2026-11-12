@@ -69,7 +69,8 @@ const state = {
   shape:      null,
   boxType:    null,
   boxParams:  { height: 30, wallThickness: 6 },
-  view:       '3d'  // '3d' | 'tech'
+  view:       '3d', // '3d' | 'tech'
+  exportOpts: null  // options de la fenêtre d'export (initialisées après EXPORT_OPTS_DEFAULT)
 };
 
 let threePreview   = null;  // instancié à la première ouverture de la vue 3D
@@ -185,6 +186,11 @@ function bindEvents() {
 
   // Generate G-code
   document.getElementById('btn-generate').addEventListener('click', generateGCode);
+
+  // Simulation d'usinage (fichier exporté, avec les options d'export mémorisées)
+  document.getElementById('btn-simulate').addEventListener('click', () => {
+    openSimulation().catch(err => { console.error(err); showNotif(`Simulation : ${err.message}`); });
+  });
 
   // Session save / load
   document.getElementById('btn-save-session').addEventListener('click', saveSession);
@@ -549,6 +555,82 @@ function getMachineParams() {
   };
 }
 
+// ─── Options d'export mémorisées ─────────────────────────────────────────────
+// Réglées dans la fenêtre d'export, réutilisées à sa prochaine ouverture et par la
+// simulation (qui joue ainsi exactement le fichier exporté). Les valeurs qui dépendent
+// du diamètre d'outil restent null tant qu'elles valent le défaut calculé.
+const EXPORT_OPTS_DEFAULT = {
+  entry: 'plunge', rampLen: null, helixR: null, helixTurns: 1,
+  leadInOn: false, leadInR: null, finishOn: false, finishAllowance: 0.2,
+  tabsOn: true, tabCount: 4, tabWidth: 8, tabHeight: 2, pocketConc: true,
+};
+
+function loadExportOpts() {
+  try { return { ...EXPORT_OPTS_DEFAULT, ...JSON.parse(localStorage.getItem('exportOpts') || '{}') }; }
+  catch { return { ...EXPORT_OPTS_DEFAULT }; }
+}
+
+state.exportOpts = loadExportOpts();
+
+function saveExportOpts(opts) {
+  state.exportOpts = opts;
+  try { localStorage.setItem('exportOpts', JSON.stringify(opts)); } catch { /* stockage indisponible */ }
+}
+
+// Valeurs par défaut dépendant du diamètre d'outil (mêmes formules que la fenêtre d'export)
+function exportToolDefaults(td) {
+  return {
+    ramp:   Math.max(1,   (td * 2).toFixed(1) * 1),    // 2 × ⌀outil
+    helixR: Math.max(0.5, (td * 0.6).toFixed(2) * 1),  // 0.6 × ⌀outil
+    leadR:  Math.max(0.5, (td * 0.4).toFixed(2) * 1),  // 0.4 × ⌀outil
+  };
+}
+
+// Options de génération (tabOpts, entryOpts…) correspondant aux options d'export mémorisées
+function exportGenOptions(machine) {
+  const o = state.exportOpts;
+  const d = exportToolDefaults(machine.toolDiameter ?? 3.175);
+  const finishAllowance = o.finishOn ? o.finishAllowance : 0;
+  return {
+    tabOpts: o.tabsOn ? { count: o.tabCount, width: o.tabWidth, height: o.tabHeight } : null,
+    entryOpts: {
+      entry: o.entry, rampLen: o.rampLen ?? d.ramp, helixR: o.helixR ?? d.helixR, helixTurns: o.helixTurns,
+      leadIn: o.leadInOn ? (o.leadInR ?? d.leadR) : false, finishAllowance,
+    },
+    pocketConc: o.pocketConc,
+    finishAllowance,
+  };
+}
+
+// ─── Simulation d'usinage ────────────────────────────────────────────────────
+let simView = null;
+
+async function openSimulation() {
+  if (!state.shape || !state.boxType) return;
+  const machine = getMachineParams();
+  const origin  = computeOrigin(getZ0Settings(), machine);
+  const code = state.boxType.generateGCode(state.shape, state.boxParams, { ...machine, ...origin, ...exportGenOptions(machine) });
+
+  // Brut : emprise du travail (coordonnées machine) + marge pour voir la rainure du contour
+  const bb = state.boxType.getGCodeBoundingBox
+    ? state.boxType.getGCodeBoundingBox(state.shape, state.boxParams, machine)
+    : state.shape.getBoundingBox();
+  const margin = Math.max(Number.parseFloat(document.getElementById('stock-offset').value) || 0, machine.toolDiameter * 2 + 4);
+  const stock = {
+    x0: bb.minX + origin.originX - margin, x1: bb.minX + bb.width  + origin.originX + margin,
+    y0: bb.minY + origin.originY - margin, y1: bb.minY + bb.height + origin.originY + margin,
+    top: origin.zOffset, bottom: origin.zOffset - machine.materialThickness,
+  };
+
+  const { SimulationView } = await import('./modules/sim/SimulationView.js');
+  simView?.close();
+  simView = new SimulationView(document.querySelector('.preview-area'), {
+    code, stock, toolDiameter: machine.toolDiameter,
+    light: document.documentElement.dataset.theme === 'light',
+    onClose: () => { simView = null; },
+  });
+}
+
 // Lit la position et le niveau du gizmo Z0 depuis les boutons actifs
 function getZ0Settings() {
   const posBtn = document.querySelector('.z0-btn.active');
@@ -814,9 +896,10 @@ function showExportModal(sections, machine = {}) {
   const optional = sections.filter(s => !s.required);
   // Valeurs par défaut calculées depuis les paramètres machine réels
   const td      = machine.toolDiameter      ?? 3.175;
-  const defRamp   = Math.max(1, (td * 2).toFixed(1) * 1);      // 2 × ⌀outil
-  const defHelixR = Math.max(0.5, (td * 0.6).toFixed(2) * 1);  // 0.6 × ⌀outil
-  const defLeadR  = Math.max(0.5, (td * 0.4).toFixed(2) * 1);  // 0.4 × ⌀outil
+  const { ramp: defRamp, helixR: defHelixR, leadR: defLeadR } = exportToolDefaults(td);
+  // Dernières options utilisées (mémorisées)
+  const o = state.exportOpts;
+  const dim = on => on ? '' : 'opacity:.4;pointer-events:none';
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -830,61 +913,61 @@ function showExportModal(sections, machine = {}) {
       <div class="entry-row">
         <span class="entry-lbl">${t('modal.entry_tool')}</span>
         <div class="entry-mode-btns">
-          <button class="entry-mode-btn active" data-mode="plunge" data-tip="${t('modal.tip_plunge')}">${t('modal.plunge')}</button>
-          <button class="entry-mode-btn" data-mode="ramp" data-tip="${t('modal.tip_ramp')}">${t('modal.ramp')}</button>
-          <button class="entry-mode-btn" data-mode="helix" data-tip="${t('modal.tip_helix')}">${t('modal.helix')}</button>
+          <button class="entry-mode-btn${o.entry === 'plunge' ? ' active' : ''}" data-mode="plunge" data-tip="${t('modal.tip_plunge')}">${t('modal.plunge')}</button>
+          <button class="entry-mode-btn${o.entry === 'ramp'   ? ' active' : ''}" data-mode="ramp" data-tip="${t('modal.tip_ramp')}">${t('modal.ramp')}</button>
+          <button class="entry-mode-btn${o.entry === 'helix'  ? ' active' : ''}" data-mode="helix" data-tip="${t('modal.tip_helix')}">${t('modal.helix')}</button>
         </div>
       </div>
       <div class="entry-fields" id="modal-entry-fields">
-        <span class="entry-field-group" id="entry-ramp-fields" style="display:none">
+        <span class="entry-field-group" id="entry-ramp-fields" style="display:${o.entry === 'ramp' ? '' : 'none'}">
           <span class="tab-f-lbl" data-tip="${t('modal.tip_ramp_len', { val: (td*2).toFixed(1) })}">${t('modal.ramp_length')}</span>
-          <input type="number" id="modal-ramp-len" class="tab-input" value="${defRamp}" min="1" max="50" step="0.5">
+          <input type="number" id="modal-ramp-len" class="tab-input" value="${o.rampLen ?? defRamp}" min="1" max="50" step="0.5">
           <span class="tab-f-unit">mm</span>
         </span>
-        <span class="entry-field-group" id="entry-helix-fields" style="display:none">
+        <span class="entry-field-group" id="entry-helix-fields" style="display:${o.entry === 'helix' ? '' : 'none'}">
           <span class="tab-f-lbl" data-tip="${t('modal.tip_helix_r', { val: (td*0.6).toFixed(2) })}">${t('modal.radius')}</span>
-          <input type="number" id="modal-helix-r" class="tab-input" value="${defHelixR}" min="0.5" max="20" step="0.5">
+          <input type="number" id="modal-helix-r" class="tab-input" value="${o.helixR ?? defHelixR}" min="0.5" max="20" step="0.5">
           <span class="tab-f-unit">mm</span>
           <span class="tab-f-lbl" data-tip="${t('modal.tip_helix_turns')}">${t('modal.turns')}</span>
-          <input type="number" id="modal-helix-turns" class="tab-input" value="1" min="1" max="5" step="1">
+          <input type="number" id="modal-helix-turns" class="tab-input" value="${o.helixTurns}" min="1" max="5" step="1">
         </span>
       </div>
       <div class="entry-row" style="margin-top:6px">
         <label class="entry-lead-row" data-tip="${t('modal.tip_leadin')}">
-          <input type="checkbox" id="modal-leadin-on">
+          <input type="checkbox" id="modal-leadin-on"${o.leadInOn ? ' checked' : ''}>
           <span class="tab-f-lbl">${t('modal.leadin')}</span>
         </label>
-        <span class="entry-lead-fields" id="modal-leadin-fields" style="opacity:.4;pointer-events:none">
+        <span class="entry-lead-fields" id="modal-leadin-fields" style="${dim(o.leadInOn)}">
           <span class="tab-f-lbl" data-tip="${t('modal.tip_leadin_r', { val: (td*0.4).toFixed(2) })}">${t('modal.radius')}</span>
-          <input type="number" id="modal-leadin-r" class="tab-input" value="${defLeadR}" min="0.5" max="20" step="0.5">
+          <input type="number" id="modal-leadin-r" class="tab-input" value="${o.leadInR ?? defLeadR}" min="0.5" max="20" step="0.5">
           <span class="tab-f-unit">mm</span>
         </span>
       </div>
       <div class="entry-row" style="margin-top:6px">
         <label class="entry-lead-row" data-tip="${t('modal.tip_finish')}">
-          <input type="checkbox" id="modal-finish-on">
+          <input type="checkbox" id="modal-finish-on"${o.finishOn ? ' checked' : ''}>
           <span class="tab-f-lbl">${t('modal.finish_pass')}</span>
         </label>
-        <span class="entry-lead-fields" id="modal-finish-fields" style="opacity:.4;pointer-events:none">
+        <span class="entry-lead-fields" id="modal-finish-fields" style="${dim(o.finishOn)}">
           <span class="tab-f-lbl">${t('modal.skin')}</span>
-          <input type="number" id="modal-finish-allowance" class="tab-input" value="0.2" min="0.05" max="1" step="0.05">
+          <input type="number" id="modal-finish-allowance" class="tab-input" value="${o.finishAllowance}" min="0.05" max="1" step="0.05">
           <span class="tab-f-unit">mm</span>
         </span>
       </div>
     </div>
     <div class="tabs-section">
       <label class="tabs-toggle-row">
-        <input type="checkbox" id="modal-tabs-on" checked>
+        <input type="checkbox" id="modal-tabs-on"${o.tabsOn ? ' checked' : ''}>
         <span>${t('modal.tabs_label')}</span>
       </label>
-      <div class="tabs-fields" id="modal-tabs-fields">
+      <div class="tabs-fields${o.tabsOn ? '' : ' disabled'}" id="modal-tabs-fields">
         <span class="tab-f-lbl">${t('modal.tab_count')}</span>
-        <input type="number" id="modal-tab-count"  class="tab-input" value="4"   min="1"   max="12"  step="1">
+        <input type="number" id="modal-tab-count"  class="tab-input" value="${o.tabCount}"  min="1"   max="12"  step="1">
         <span class="tab-f-lbl">${t('modal.tab_width')}</span>
-        <input type="number" id="modal-tab-width"  class="tab-input" value="8"   min="1"   max="20"  step="0.5">
+        <input type="number" id="modal-tab-width"  class="tab-input" value="${o.tabWidth}"  min="1"   max="20"  step="0.5">
         <span class="tab-f-unit">mm</span>
         <span class="tab-f-lbl">${t('modal.tab_height')}</span>
-        <input type="number" id="modal-tab-height" class="tab-input" value="2"   min="0.5" max="10"  step="0.5">
+        <input type="number" id="modal-tab-height" class="tab-input" value="${o.tabHeight}" min="0.5" max="10"  step="0.5">
         <span class="tab-f-unit">mm</span>
       </div>
     </div>
@@ -992,26 +1075,29 @@ function showExportModal(sections, machine = {}) {
   modal.querySelector('#modal-pocket-conc').addEventListener('change', updateModalStats);
   modal.querySelectorAll('.entry-mode-btn').forEach(b => b.addEventListener('click', () => setTimeout(updateModalStats, 0)));
 
-  // Applique l'état initial des tabs sur les labels (tabs coché par défaut)
-  list.querySelectorAll('.sec-label').forEach(lbl => {
-    if (lbl.textContent.toLowerCase().includes('outside'))
-      lbl.textContent = lbl.textContent.replace('outside)', 'outside + tabs)');
-  });
+  // Applique l'état initial des tabs sur les labels (selon les options mémorisées)
+  if (o.tabsOn) {
+    list.querySelectorAll('.sec-label').forEach(lbl => {
+      if (lbl.textContent.toLowerCase().includes('outside'))
+        lbl.textContent = lbl.textContent.replace('outside)', 'outside + tabs)');
+    });
+  }
 
-  // Concentrique coché par défaut + mise à jour labels
+  // Stratégie de poche mémorisée + mise à jour labels
   // La prévisualisation est générée avec pocketConc:true → labels du type
-  // "Pocket spirale (N anneaux...)" ou "Pocket (...)" → on normalise tout en "Pocket concentrique"
-  modal.querySelector('#modal-pocket-conc').checked = true;
+  // "Pocket concentrique (N anneaux...)", "Pocket spirale (...)" ou "Pocket (...)" → normalisés
+  modal.querySelector('#modal-pocket-conc').checked = o.pocketConc;
+  const pocketLabel = t(o.pocketConc ? 'modal.pocket_conc_label' : 'modal.pocket_raster_label');
   list.querySelectorAll('.sec-label').forEach(lbl => {
     lbl.textContent = lbl.textContent
-      .replace(/Pocket spirale \([^)]*\)/, t('modal.pocket_conc_label'))
-      .replace(/Pocket \([^)]*\)/,         t('modal.pocket_conc_label'))
-      .replace('Pocket raster',            t('modal.pocket_conc_label'));
+      .replace(/Pocket concentrique \([^)]*\)/, pocketLabel)
+      .replace(/Pocket spirale \([^)]*\)/,      pocketLabel)
+      .replace(/Pocket \([^)]*\)/,              pocketLabel)
+      .replace('Pocket raster',                 pocketLabel);
   });
 
-  // Toggle tabs fields enabled/disabled
   // ── Entry mode buttons ──────────────────────────────────────────────────
-  let selectedEntry = 'plunge';
+  let selectedEntry = o.entry;
   modal.querySelectorAll('.entry-mode-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       modal.querySelectorAll('.entry-mode-btn').forEach(b => b.classList.remove('active'));
@@ -1063,6 +1149,34 @@ function showExportModal(sections, machine = {}) {
         .replace(t('modal.pocket_conc_label'),   pocketConcCb.checked ? t('modal.pocket_conc_label') : t('modal.pocket_raster_label'));
     });
   });
+
+  // ── Mémorisation des options (réutilisées à la prochaine ouverture et par la simulation)
+  const readExportOpts = () => {
+    const num = sel => Number.parseFloat(modal.querySelector(sel).value);
+    const int = sel => Number.parseInt(modal.querySelector(sel).value, 10);
+    // null = valeur par défaut calculée depuis le diamètre d'outil (suit un changement d'outil)
+    const orDefault = (v, def) => (Number.isFinite(v) && Math.abs(v - def) > 1e-9 ? v : null);
+    const fin = (v, def) => (Number.isFinite(v) && v > 0 ? v : def);
+    return {
+      entry:           selectedEntry,
+      rampLen:         orDefault(num('#modal-ramp-len'), defRamp),
+      helixR:          orDefault(num('#modal-helix-r'), defHelixR),
+      helixTurns:      fin(int('#modal-helix-turns'), 1),
+      leadInOn:        leadInCb.checked,
+      leadInR:         orDefault(num('#modal-leadin-r'), defLeadR),
+      finishOn:        finishOnCb.checked,
+      finishAllowance: fin(num('#modal-finish-allowance'), 0.2),
+      tabsOn:          tabsOnCb.checked,
+      tabCount:        fin(int('#modal-tab-count'), 4),
+      tabWidth:        fin(num('#modal-tab-width'), 8),
+      tabHeight:       fin(num('#modal-tab-height'), 2),
+      pocketConc:      pocketConcCb.checked,
+    };
+  };
+  const rememberOpts = () => saveExportOpts(readExportOpts());
+  modal.addEventListener('input', rememberOpts);
+  modal.addEventListener('change', rememberOpts);
+  modal.querySelectorAll('.entry-mode-btn').forEach(b => b.addEventListener('click', rememberOpts));
 
   updateModalStats();
 

@@ -245,7 +245,10 @@
       <aside class="panel-right">
         <div class="gcode-header">
           <span class="section-title" data-i18n="ui.gcode_panel">G-code</span>
-          <button id="btn-generate" class="btn btn-accent" data-i18n="ui.btn_generate">Générer</button>
+          <div class="gcode-header-actions">
+            <button id="btn-simulate" class="btn btn-secondary" data-i18n-title="tip.btn_simulate" title="Simuler l'usinage"><i class="fa-solid fa-play"></i> <span data-i18n="ui.btn_simulate">Simuler</span></button>
+            <button id="btn-generate" class="btn btn-accent" data-i18n="ui.btn_generate">Générer</button>
+          </div>
         </div>
         <div class="gcode-stats" id="gcode-stats"></div>
         <pre id="gcode-output"
