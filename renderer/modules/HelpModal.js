@@ -84,7 +84,7 @@ export function showHelpModal(machine = {}) {
           <dt>Export G-code</dt>
           <dd>Ouvre la fenêtre d'export avec les options d'entrée outil, lead-in/out, tabs de maintien et sélection des sections à exporter. Le G-code est <strong>re-généré</strong> avec ces options au moment de l'export — le visualiseur affiche toujours la version sans options.</dd>
           <dt>SVG</dt>
-          <dd>Exporte les panneaux à plat en SVG vectoriel. Utile pour vérification ou découpe laser.</dd>
+          <dd>Exporte les pièces en SVG (mm, mêmes contours que le G-code, cloisons comprises). Trois calques : <strong>Découpe</strong> (rouge, contours traversants), <strong>Usinages</strong> (bleu, poches non traversantes) et <strong>Repères</strong> (noms des pièces, à masquer avant découpe). Pour la découpe laser ou la retouche dans Inkscape / Fusion 360.</dd>
         </dl>
       </section>
 

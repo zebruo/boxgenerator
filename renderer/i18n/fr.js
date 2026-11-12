@@ -241,6 +241,15 @@ export const fr = {
   },
 
   // ── Labels panneaux (vue à plat finger-joint) ────────────────────────────
+  svg: {
+    layer_cut:     'Découpe',
+    layer_pockets: 'Usinages (non traversants)',
+    layer_labels:  'Repères',
+    body:          'Corps',
+    face1:         'Face 1',
+    face2:         'Face 2 (pièce retournée)',
+  },
+
   panel: {
     bottom: 'Fond',
     top:    'Couvercle',

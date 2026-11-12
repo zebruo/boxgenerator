@@ -219,12 +219,12 @@ export class FingerJointBox {
     const sideRel  = withLid ? this._sideWithTop(D, H, fw, t, bl)   : this._sideWithoutTop(D, H, fw, t, bl);
 
     return [
-      { label: 'Fond',          rel: this._bottom(W, D, fw, t, bl), ox: 0,       oy: 0 },
-      ...(withLid ? [{ label: 'Couvercle', rel: this._bottom(W, D, fw, t, bl), ox: W + gap, oy: 0 }] : []),
-      { label: 'Paroi avant',   rel: frontRel,                       ox: 0,       oy: D + gap },
-      { label: 'Paroi arrière', rel: frontRel,                       ox: W + gap, oy: D + gap },
-      { label: 'Côté gauche',   rel: sideRel,                        ox: 0,       oy: D + H + 2 * gap },
-      { label: 'Côté droit',    rel: sideRel,                        ox: D + gap, oy: D + H + 2 * gap },
+      { key: 'bottom', label: 'Fond',          rel: this._bottom(W, D, fw, t, bl), ox: 0,       oy: 0 },
+      ...(withLid ? [{ key: 'top', label: 'Couvercle', rel: this._bottom(W, D, fw, t, bl), ox: W + gap, oy: 0 }] : []),
+      { key: 'front',  label: 'Paroi avant',   rel: frontRel,                       ox: 0,       oy: D + gap },
+      { key: 'back',   label: 'Paroi arrière', rel: frontRel,                       ox: W + gap, oy: D + gap },
+      { key: 'left',   label: 'Côté gauche',   rel: sideRel,                        ox: 0,       oy: D + H + 2 * gap },
+      { key: 'right',  label: 'Côté droit',    rel: sideRel,                        ox: D + gap, oy: D + H + 2 * gap },
     ];
   }
 
@@ -248,7 +248,7 @@ export class FingerJointBox {
   /** Contours théoriques des panneaux pour la simulation (même disposition que le G-code). */
   getDrawing(shape, params) {
     return this._buildGCodeLayout(shape, params)
-      .map(p => ({ pts: this._toPoints(p.rel, p.ox, p.oy), face: 1, outer: true }));
+      .map(p => ({ pts: this._toPoints(p.rel, p.ox, p.oy), face: 1, outer: true, label: 'panel.' + p.key }));
   }
 
   getGCodeBoundingBox(shape, params) {

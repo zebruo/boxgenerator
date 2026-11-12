@@ -2,6 +2,7 @@
 import { t, setLang, currentLang } from './modules/i18n.js';
 import { ThreePreview }   from './modules/preview/ThreePreview.js';
 import { TechnicalView }  from './modules/preview/TechnicalView.js';
+import { buildFabricationSVG } from './modules/export/SvgExport.js';
 import { Rectangle }      from './modules/shapes/Rectangle.js';
 import { Circle }         from './modules/shapes/Circle.js';
 import { Oval }           from './modules/shapes/Oval.js';
@@ -1427,36 +1428,12 @@ async function loadSession() {
 
 async function exportSVG() {
   if (!state.shape || !state.boxType) return;
-  const panels = state.boxType.getFlatPanels(state.shape, state.boxParams);
-  let maxX = 0, maxY = 0;
-  for (const p of panels) { maxX = Math.max(maxX, p.x + p.width); maxY = Math.max(maxY, p.y + p.height); }
-
-  // Normalise un path absolu en relatif (soustrait dx,dy) — seulement si le path utilise des coords absolues
-  const normPath = (path, dx, dy) => {
-    const m = path.match(/M(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-    if (!m) return path;
-    const firstX = parseFloat(m[1]), firstY = parseFloat(m[2]);
-    // Si le path commence déjà près de (0,0), il est déjà relatif → pas de normalisation
-    if (Math.abs(firstX) < 1 && Math.abs(firstY) < 1) return path;
-    return path.replace(/(-?\d+\.?\d*),(-?\d+\.?\d*)/g,
-      (_, x, y) => `${(parseFloat(x) - dx).toFixed(3)},${(parseFloat(y) - dy).toFixed(3)}`);
-  };
-
-  const label = p => p.label.startsWith('panel.') ? t(p.label) : p.label;
-
-  const svgParts = panels.map(p =>
-    `<g transform="translate(${p.x},${p.y})">
-      <path d="${normPath(p.path, p.x, p.y)}" fill="${hexToRgba(p.color, 0.15)}" stroke="${p.color}" stroke-width="0.5"/>
-      <text x="${p.width / 2}" y="${p.height / 2}" text-anchor="middle" dominant-baseline="middle" fill="${p.color}" font-size="6" font-family="sans-serif">${label(p)}</text>
-    </g>`
-  ).join('\n');
-
-  const bg = document.documentElement.dataset.theme === 'light' ? '#ffffff' : '#0f0f1a';
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${maxX} ${maxY}" width="${maxX}mm" height="${maxY}mm">
-  <rect width="${maxX}" height="${maxY}" fill="${bg}"/>
-${svgParts}
-</svg>`;
+  // Mêmes contours que le G-code et la simulation (cloisons, couvercle, face 2 comprises)
+  const drawing = state.boxType.getDrawing
+    ? state.boxType.getDrawing(state.shape, state.boxParams, getMachineParams())
+    : [{ pts: state.shape.getContourPoints(), face: 1, outer: true }];
+  const svg = buildFabricationSVG(drawing, t);
+  if (!svg) return;
 
   const name = `boxgen_${state.shapeKey}_${state.boxTypeKey}.svg`;
   if (window.electronAPI) {
@@ -1466,13 +1443,6 @@ ${svgParts}
 }
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────────
-function hexToRgba(hex, alpha) {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
 function escHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

@@ -241,6 +241,15 @@ export const en = {
   },
 
   // ── Panel labels (finger-joint flat view) ───────────────────────────────
+  svg: {
+    layer_cut:     'Cut',
+    layer_pockets: 'Machining (not through)',
+    layer_labels:  'Labels',
+    body:          'Body',
+    face1:         'Side 1',
+    face2:         'Side 2 (part flipped)',
+  },
+
   panel: {
     bottom: 'Bottom',
     top:    'Lid',
