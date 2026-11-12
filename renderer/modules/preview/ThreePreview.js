@@ -407,7 +407,7 @@ export class ThreePreview {
     };
 
     add(new THREE.ExtrudeGeometry(this._shape(lidOuter), { depth: bFll, bevelEnabled: false }),
-      this._mat(BOX_COLOR, { roughness: 0.85, ...opt }));                       // fond du couvercle
+      this._mat(BOX_COLOR, { roughness: 0.85 }));                               // fond du couvercle
     if (rs === 0) {
       ring(lidOuter, lidCav, bFll, lidH - bFll);
     } else {
@@ -416,7 +416,7 @@ export class ThreePreview {
       ring(lidRab, lidCav, bFll, lidH - rD - bFll);    // sous la feuillure
     }
     add(new THREE.ShapeGeometry(this._shape(lidCav)),
-      this._mat(BOX_COLOR, { roughness: 0.95, side: THREE.FrontSide, ...opt }), bFll + 0.5);   // fond de cavité
+      this._mat(BOX_COLOR, { roughness: 0.95, side: THREE.FrontSide }), bFll + 0.5);   // fond de cavité
 
     this.scene.add(lid);
     this.meshes.push(lid);
