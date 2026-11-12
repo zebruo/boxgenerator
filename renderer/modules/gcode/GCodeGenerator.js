@@ -1,4 +1,5 @@
 import { compactGCode } from './GCodeCompactor.js';
+import { insetPolygon } from './Offset.js';
 
 /**
  * Générateur G-code CNC générique.
@@ -1127,9 +1128,12 @@ export class GCodeGenerator {
    * Insète un contour fermé de d mm vers l'intérieur.
    * Utilisé par les modules de boîte pour les poches et feuillures
    * afin que l'outil suive les rayons de coin de la forme.
+   * Décalage Clipper : si d dépasse un rayon de coin, le coin devient vif (au lieu de se
+   * retourner et de mordre dans la paroi). Renvoie [] si la forme disparaît ; si elle se
+   * scinde, renvoie le plus grand morceau.
    */
   insetContour(points, d) {
-    return this._offsetContourDist(points, d);  // +d : normale gauche pointe vers l'intérieur (contours CW en coords écran)
+    return insetPolygon(points, d);
   }
 
   /**
