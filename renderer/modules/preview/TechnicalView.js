@@ -216,7 +216,7 @@ export class TechnicalView {
 
     // Cavité intérieure — ou compartiments s'il y a des cloisons
     if (boxTypeKey !== 'finger-joint') {
-      const ip = this._offsetPts(pts, wt);
+      const ip = insetPolygon(pts, wt);   // décalage Clipper : coins vifs si paroi > rayon de coin
       for (const poly of cells ?? [ip]) {
         if (poly.length <= 2) continue;
         ctx.beginPath();

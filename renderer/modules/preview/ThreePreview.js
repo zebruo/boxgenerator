@@ -1,7 +1,7 @@
 import * as THREE from '../../lib/three.module.js';
 import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
-import { insetPolygon } from '../gcode/Offset.js';
+import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 
 // Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
 // comme dans la simulation d'usinage.
@@ -507,33 +507,15 @@ export class ThreePreview {
   }
 
   /**
-   * Décale un contour de `offset` mm par bisectrice en chaque sommet.
-   * offset < 0 → vers l'intérieur pour formes CCW (coordonnées math Y-up).
+   * Décale un contour de `offset` mm (offset < 0 : vers l'intérieur).
+   * Décalage Clipper, comme le G-code : quand le décalage dépasse un rayon de coin, le coin
+   * devient vif au lieu de se retourner (l'ancien décalage sommet par sommet produisait
+   * alors un contour qui se croise, et des triangles aberrants à l'extrusion).
+   * Renvoie le plus grand morceau, ou [] si la forme disparaît.
    */
   _offsetPts(pts, offset) {
-    const n = pts.length;
-    return pts.map((curr, i) => {
-      const prev = pts[(i - 1 + n) % n];
-      const next = pts[(i + 1) % n];
-
-      const t1x = curr.x - prev.x, t1y = curr.y - prev.y;
-      const t2x = next.x - curr.x, t2y = next.y - curr.y;
-      const l1  = Math.hypot(t1x, t1y) || 1;
-      const l2  = Math.hypot(t2x, t2y) || 1;
-
-      // Normale droite (outward pour CCW)
-      const n1x =  t1y / l1, n1y = -t1x / l1;
-      const n2x =  t2y / l2, n2y = -t2x / l2;
-
-      let bx = n1x + n2x, by = n1y + n2y;
-      const bl = Math.hypot(bx, by) || 1;
-      bx /= bl; by /= bl;
-
-      const dot   = n1x * bx + n1y * by;
-      const miter = Math.min(Math.abs(dot) > 0.01 ? 1 / dot : 1, 3);
-
-      return { x: curr.x + offset * miter * bx, y: curr.y + offset * miter * by };
-    });
+    if (Math.abs(offset) < 1e-9) return pts;
+    return offsetPolygons(pts, offset)[0] ?? [];
   }
 
   // ─── Gizmo Z0 ─────────────────────────────────────────────────────────────
