@@ -15,6 +15,7 @@ import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { t } from '../i18n.js';
 import { parseProgram, moveIndexAt, formatDuration, toStockFrame } from './GCodeProgram.js';
 import { StockSim, cellFor } from './StockSim.js';
+import { offsetPolygons } from '../gcode/Offset.js';
 
 const KIND_COLORS = { pocket: 0x2f80ed, contour: 0xf2711c, drill: 0x27ae60 };
 const RAPID_COLOR = 0x9aa0a6;
@@ -374,11 +375,18 @@ export class SimulationView {
       .map(d => d.pts.map(p => this._toStock({ ...p, z: 0 }, d.face)));
   }
 
-  /** Masque des cases appartenant à une pièce (intérieur des contours « outer »). */
+  /**
+   * Masque des cases appartenant à une pièce (intérieur des contours « outer »).
+   * Les contours sont élargis d'un peu moins d'un demi-rayon de fraise : la matière de la
+   * pièce peut dépasser légèrement le contour théorique (ex. cercle dessiné en polygone,
+   * usiné en vrai cercle) ; sans cette marge, cette mince bande masquée faisait disparaître
+   * des morceaux de flanc. La chute, au-delà de la rainure (largeur Ø), reste masquée.
+   */
   _partMask() {
     const { nx, ny, x0, y0, cell } = this.sim;
     const mask = new Uint8Array(nx * ny);
-    const polys = this._outerPolys();
+    const grow = Math.min(0.6, this.toolR * 0.5);
+    const polys = this._outerPolys().flatMap(p => offsetPolygons(p, grow, { join: 'round' }));
     if (!polys.length) { mask.fill(255); return mask; }
     for (let j = 0; j < ny; j++) {
       const y = y0 + j * cell;
