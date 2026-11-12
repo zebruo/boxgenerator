@@ -386,6 +386,29 @@ export class GCodeGenerator {
     this.lineTo(pts[0].x, pts[0].y);
   }
 
+  /**
+   * Distances de décalage (vers l'intérieur de `points`) des anneaux qui vident une bande le
+   * long du contour (feuillure, rebord), de dFrom à dTo inclus, régulièrement espacées.
+   * Pas ≤ 60 % Ø, et assez serré pour les coins saillants : les coins de deux anneaux
+   * voisins sont écartés de pas / sin(θ/2) en diagonale (θ = angle intérieur), écart qui doit
+   * rester sous Ø, sans quoi il reste une colonne de matière dans chaque coin.
+   * Le dernier anneau est exactement à dTo (bord de la bande).
+   */
+  ringInsets(points, dFrom, dTo) {
+    if (dTo <= dFrom + 1e-6) return [dTo];
+    const td = this.machine.toolDiameter;
+    let step = 0.6 * td;
+    const n = points.length;
+    for (let i = 0; i < n; i++) {
+      const a = points[(i - 1 + n) % n], b = points[i], c = points[(i + 1) % n];
+      const ux = b.x - a.x, uy = b.y - a.y, vx = c.x - b.x, vy = c.y - b.y;
+      const turn = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);   // > 0 : coin saillant (contour CCW)
+      if (turn > 1e-3) step = Math.min(step, 0.95 * td * Math.sin((Math.PI - turn) / 2));
+    }
+    const count = Math.ceil((dTo - dFrom) / step - 1e-9);
+    return Array.from({ length: count + 1 }, (_, i) => dFrom + (dTo - dFrom) * i / count);
+  }
+
   /** Longueur de chaque segment du contour fermé et périmètre. */
   _segLengths(pts) {
     const n = pts.length, segLengths = [];

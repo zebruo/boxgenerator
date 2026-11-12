@@ -96,18 +96,15 @@ export class LidBox {
     } else {
       // Feuillure extérieure : creuse l'anneau périphérique (passes concentriques)
       const td = gen.machine.toolDiameter;
-      const stepOver = td * 0.6;
       const ringW = rabbet + clearance;
       const dMin = td / 2;
       const dMax = ringW - td / 2;
       if (dMin > dMax + 1e-6) {
         gen.comment(`ATTENTION: fraise Ø${td}mm trop large pour feuillure ${ringW.toFixed(1)}mm — utiliser Ø≤${(ringW).toFixed(1)}mm`);
       }
-      const ringContours = [];
-      for (let d = dMin; d <= dMax + 1e-6; d += stepOver) {
-        const c = gen.insetContour(bodyPts, d);
-        if (c.length > 2) ringContours.push(c);
-      }
+      // Anneaux jusqu'au bord exact de la feuillure (pas resserré dans les coins)
+      const ringContours = dMin > dMax + 1e-6 ? [] : gen.ringInsets(bodyPts, dMin, dMax)
+        .map(d => gen.insetContour(bodyPts, d)).filter(c => c.length > 2);
       if (ringContours.length) gen.cutContoursInterleaved(ringContours, 'center', entryOpts, t('gcode.op_body_rabbet_ext'));
     }
 

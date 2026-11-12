@@ -107,14 +107,9 @@ export class StackableBox {
     const toolR = gen.machine.toolDiameter / 2;
     gen.machine.materialThickness = rimHeight;
     gen.comment("Rainure plot — anneau de " + tongueInset.toFixed(1) + "mm de large");
-    const ringContours = [];
-    for (let d = toolR; d < tongueInset - toolR * 0.01; d += gen.machine.toolDiameter) {
-      const ringPts = gen.insetContour(pts2, d);
-      if (ringPts.length >= 3) ringContours.push(ringPts);
-    }
-    // Passe finale au bord exact du plot
-    const finalPts = gen.insetContour(pts2, tongueInset);
-    if (finalPts.length >= 3) ringContours.push(finalPts);
+    // Anneaux du bord extérieur jusqu'au bord exact du plot (pas resserré dans les coins)
+    const ringContours = gen.ringInsets(pts2, toolR, tongueInset)
+      .map(d => gen.insetContour(pts2, d)).filter(c => c.length >= 3);
     gen.cutContoursInterleaved(ringContours, 'outside', entryOpts, t('gcode.op_rim_mill'));
 
     // 2b. Contour exterieur — EN DERNIER (tabs maintiennent la piece)
