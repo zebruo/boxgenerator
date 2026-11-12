@@ -66,6 +66,9 @@ export class ThreePreview {
     sun.position.set(300, -200, 500);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
+    // Biais contre l'« acné d'ombre » (stries en moiré sur les faces rasantes)
+    sun.shadow.bias = -0.0005;
+    sun.shadow.normalBias = 0.6;
     const sc = sun.shadow.camera;
     sc.near = 1; sc.far = 3000;
     sc.left = -400; sc.right = 400; sc.top = 400; sc.bottom = -400;
@@ -282,9 +285,9 @@ export class ThreePreview {
     // gauche / droit : (x, y, z) → (t − z | W − z, x, H − y)
     place(side,  M(0, 0, -1, t,  1, 0, 0, 0,   0, -1, 0, H), mat('left'));
     place(side,  M(0, 0, -1, W,  1, 0, 0, 0,   0, -1, 0, H), mat('right'));
-    // couvercle, légèrement transparent pour voir l'intérieur
+    // couvercle opaque (le bouton X-Ray permet de voir l'intérieur)
     if (withLid) {
-      place(floor, M(1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, H - t), mat('lid', { transparent: true, opacity: 0.55 }));
+      place(floor, M(1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, H - t), mat('lid'));
     }
     return { W, D, assembled: true, height: H };
   }
@@ -372,8 +375,7 @@ export class ThreePreview {
     const lidOuter = mirror(rs === 0 ? this._offsetPts(pts, -(wt - r)) : pts);
     const lidCav   = mirror(innerPts);
     const lid = new THREE.Group();
-    const opt = assembled ? { transparent: true, opacity: 0.8 } : {};   // assemblé : on devine l'emboîtement
-    const wood = this._mat(BOX_COLOR, { roughness: 0.7, ...opt });
+    const wood = this._mat(BOX_COLOR, { roughness: 0.7 });   // opaque : X-Ray pour voir l'intérieur
     const add  = (geo, mat, z0 = 0) => { const m = this._mesh(geo, mat); m.position.z = z0; lid.add(m); };
     const ring = (outer, inner, z0, depth) => {
       if (depth <= 0.05) return;
