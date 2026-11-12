@@ -794,65 +794,38 @@ function updateInfoBar() {
   const area = (bb.width * bb.height / 100).toFixed(1);
   infoArea.textContent = `${t('info.surface')}: ${area} cm²`;
 
-  // Taille plaque conseillée
-  {
-    const bb2    = state.shape.getBoundingBox();
-    const W      = bb2.width, D = bb2.height;
-    const margin = 20;
-    const gap    = 20;
-    let sw = 0, sh = 0;
+  // Taille plaque conseillée : emprise réelle des pièces (mêmes contours que le G-code,
+  // la simulation et l'export SVG) + trous hors pièce, plus une marge de chaque côté
+  const margin = 20;
+  const ext = items => {
+    const xs = items.flatMap(d => d.pts.map(p => p.x)), ys = items.flatMap(d => d.pts.map(p => p.y));
+    return xs.length ? { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) } : null;
+  };
+  const sheet = e => `${Math.ceil(e.maxX - e.minX + 2 * margin)} × ${Math.ceil(e.maxY - e.minY + 2 * margin)}`;
+  const drawing = state.boxType?.getDrawing
+    ? state.boxType.getDrawing(state.shape, state.boxParams, getMachineParams())
+    : [{ pts: state.shape.getContourPoints(), face: 1 }];
+  // Face 1 seulement : la face 2 (pièce retournée) occupe le même brut
+  const face1 = drawing.filter(d => (d.face ?? 1) === 1);
+  // Trous de goupille (boîte empilable) : des disques ajoutés à l'emprise
+  const holes = (state.boxType?.getPinHoles?.(state.shape, state.boxParams) ?? [])
+    .map(h => ({ pts: [{ x: h.x - h.d / 2, y: h.y - h.d / 2 }, { x: h.x + h.d / 2, y: h.y + h.d / 2 }] }));
 
-    if (state.boxTypeKey === 'finger-joint') {
-      // 5 panneaux : 2 colonnes × 3 rangées (fond / avant+arr / côtés)
-      // sw = 2×W + gap + 2×margin
-      // sh = D + 2×H + 2×gap + 2×margin
-      const H = state.boxParams.height ?? 40;
-      sw = Math.ceil(2 * W + gap + 2 * margin);
-      sh = Math.ceil(D + 2 * H + 2 * gap + 2 * margin);
-
-    } else if (state.boxTypeKey === 'open-tray') {
-      // 1 seule pièce
-      sw = Math.ceil(W + 2 * margin);
-      sh = Math.ceil(D + 2 * margin);
-
-    } else if (state.boxTypeKey === 'lid-box') {
-      const hBody = state.boxParams.height    ?? 40;
-      const hLid  = state.boxParams.lidHeight ?? 15;
-      if (hBody !== hLid) {
-        // Hauteurs différentes → 2 bruts séparés (1 par pièce)
-        const p = Math.ceil(W + 2 * margin);
-        const q = Math.ceil(D + 2 * margin);
-        infoSheet.textContent = `${t('info.sheet_size')} : 2× ${p} × ${q} mm`;
-        infoSheet.classList.remove('hidden');
-        sw = -1; // déjà affiché, skip le bloc commun
-      } else {
-        // Même hauteur → 2 pièces sur 1 brut, même logique que le G-code
-        const useVertical = Math.max(W, 2 * D + gap) < Math.max(2 * W + gap, D);
-        if (useVertical) {
-          sw = Math.ceil(W + 2 * margin);
-          sh = Math.ceil(2 * D + gap + 2 * margin);
-        } else {
-          sw = Math.ceil(2 * W + gap + 2 * margin);
-          sh = Math.ceil(D + 2 * margin);
-        }
-      }
-
-    } else if (state.boxTypeKey === 'stackable') {
-      // 1 pièce + 2 trous de centrage latéraux hors contour
-      const regHoleDia    = state.boxParams.regHoleDia    ?? 6;
-      const regHoleOffset = state.boxParams.regHoleOffset ?? 15;
-      sw = Math.ceil(W + regHoleDia + 2 * regHoleOffset + 2 * margin);
-      sh = Math.ceil(D + 2 * margin);
-    }
-
-    if (sw === -1) {
-      // déjà affiché (cas lid-box hauteurs différentes)
-    } else if (sw > 0 && sh > 0) {
-      infoSheet.textContent = `${t('info.sheet_size')} : ${sw} × ${sh} mm`;
-      infoSheet.classList.remove('hidden');
-    } else {
-      infoSheet.classList.add('hidden');
-    }
+  let text = null;
+  const hBody = state.boxParams.height ?? 40, hLid = state.boxParams.lidHeight ?? 15;
+  if (state.boxTypeKey === 'lid-box' && hBody !== hLid) {
+    // Hauteurs différentes → un brut par pièce (voir l'avertissement à l'export)
+    const body = ext(face1.filter(d => d.part === 'body')), lid = ext(face1.filter(d => d.part === 'lid'));
+    if (body && lid) text = sheet(body) === sheet(lid) ? `2× ${sheet(body)}` : `${sheet(body)} + ${sheet(lid)}`;
+  } else {
+    const all = ext([...face1, ...holes]);
+    if (all) text = sheet(all);
+  }
+  if (text) {
+    infoSheet.textContent = `${t('info.sheet_size')} : ${text} mm`;
+    infoSheet.classList.remove('hidden');
+  } else {
+    infoSheet.classList.add('hidden');
   }
 }
 

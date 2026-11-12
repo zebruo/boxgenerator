@@ -59,9 +59,7 @@ export class StackableBox {
       : (p, lbl) => gen.pocketShape(p, lbl, 0, fa);
 
     // Positions trous de centrage — hors contour, dans le brut
-    const holeY  = bb.height / 2;
-    const holeXL = -(regHoleDia / 2 + regHoleOffset);
-    const holeXR = bb.width + regHoleDia / 2 + regHoleOffset;
+    const [holeL, holeR] = this.getPinHoles(shape, params);
 
     gen.header(
       `Boite empilable \u2014 ${bb.width.toFixed(0)}\u00d7${bb.height.toFixed(0)}\u00d7${height.toFixed(0)}mm`
@@ -78,8 +76,8 @@ export class StackableBox {
 
     // 1a. Trous de centrage (peuvent depasser dans le martyre si pinDepth > height)
     gen.machine.materialThickness = effectivePinDepth;
-    gen.drillHole(holeXL, holeY, effectivePinDepth, t('gcode.op_pin_left',  { d: regHoleDia }), regHoleDia);
-    gen.drillHole(holeXR, holeY, effectivePinDepth, t('gcode.op_pin_right', { d: regHoleDia }), regHoleDia);
+    gen.drillHole(holeL.x, holeL.y, effectivePinDepth, t('gcode.op_pin_left',  { d: regHoleDia }), regHoleDia);
+    gen.drillHole(holeR.x, holeR.y, effectivePinDepth, t('gcode.op_pin_right', { d: regHoleDia }), regHoleDia);
 
     // 1b. Cavite interieure (depuis le dessus)
     const pocketDepth = height - bottomThickness;
@@ -134,6 +132,19 @@ export class StackableBox {
     gen.machine.materialThickness = savedT;
     gen.footer();
     return gen.getCode();
+  }
+
+  /**
+   * Trous de goupille de repositionnement (repère de la forme) : un de chaque côté du contour,
+   * à mi-profondeur, à regHoleOffset mm du bord. Partagé par le G-code et la taille de plaque.
+   * @returns {{x, y, d}[]}
+   */
+  getPinHoles(shape, params) {
+    const { regHoleDia = 6, regHoleOffset = 15 } = params;
+    const bb = shape.getBoundingBox();
+    // Symétriques autour de X = largeur / 2 : l'axe de retournement de la face 2 (_mirrorOp2)
+    const y = bb.height / 2, off = regHoleDia / 2 + regHoleOffset;
+    return [{ x: -off, y, d: regHoleDia }, { x: bb.width + off, y, d: regHoleDia }];
   }
 
   /**
