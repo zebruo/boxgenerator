@@ -557,35 +557,48 @@ export class GCodeGenerator {
     const leadIn  = leadInR  ? this._leadArc(entryPts, leadInR, 'in') : null;
     const leadOut = leadOutR ? this._leadOutArc(exitPts, leadOutR)    : null;
 
-    // Émet un arc G3 sur le cercle de travail (r_off_work)
-    const emitArc = (fromA, toA) => {
-      const x1 = cx + r_off_work * Math.cos(fromA);
-      const y1 = cy + r_off_work * Math.sin(fromA);
-      const x2 = cx + r_off_work * Math.cos(toA);
-      const y2 = cy + r_off_work * Math.sin(toA);
+    // Émet un arc G3 sur le cercle de rayon rad
+    const emitArc = (fromA, toA, rad = r_off_work) => {
+      const x1 = cx + rad * Math.cos(fromA);
+      const y1 = cy + rad * Math.sin(fromA);
+      const x2 = cx + rad * Math.cos(toA);
+      const y2 = cy + rad * Math.sin(toA);
       this.emit(`G3 X${(x2 + ox).toFixed(3)} Y${(y2 + oy).toFixed(3)} I${(cx - x1).toFixed(3)} J${(cy - y1).toFixed(3)} F${f}`);
     };
 
-    // Construction des segments pour la dernière passe avec tabs
-    let tabSegs = null;
-    if (hasTabs) {
-      const tabHalfAng = tabWidth / (2 * r_off_work);
+    // Découpage du tour en portions 'cut' / 'tab' pour un cercle de rayon rad
+    // (tabs centrés à 45°, 135°… : jamais sur le point de départ à 3 h)
+    const buildTabSegs = rad => {
+      const tabHalfAng = tabWidth / (2 * rad);
       const boundaries = [];
       for (let t = 0; t < tabCount; t++) {
         const center = (2 * Math.PI / tabCount) * (t + 0.5);
         boundaries.push({ start: center - tabHalfAng, end: center + tabHalfAng });
       }
       boundaries.sort((a, b) => a.start - b.start);
-
-      tabSegs = [];
+      const segs = [];
       let angle = 0;
       for (const tab of boundaries) {
-        if (tab.start > angle + 1e-6) tabSegs.push({ type: 'cut', from: angle, to: tab.start });
-        tabSegs.push({ type: 'tab', from: tab.start, to: tab.end });
+        if (tab.start > angle + 1e-6) segs.push({ type: 'cut', from: angle, to: tab.start });
+        segs.push({ type: 'tab', from: tab.start, to: tab.end });
         angle = tab.end;
       }
-      if (angle < 2 * Math.PI - 1e-6) tabSegs.push({ type: 'cut', from: angle, to: 2 * Math.PI });
-    }
+      if (angle < 2 * Math.PI - 1e-6) segs.push({ type: 'cut', from: angle, to: 2 * Math.PI });
+      return segs;
+    };
+    // Un tour complet à la profondeur z, remontée à tabZ sur les tabs
+    const emitTabbedTurn = (segs, z, rad) => {
+      for (const seg of segs) {
+        if (seg.type === 'cut') {
+          emitArc(seg.from, seg.to, rad);
+        } else {
+          this.rapidZ(tabZ);
+          emitArc(seg.from, seg.to, rad);
+          this.plungeTo(z);
+        }
+      }
+    };
+    const tabSegs = hasTabs ? buildTabSegs(r_off_work) : null;
 
     // Positionnement initial
     this.rapidZ(this.machine.safeZ);
@@ -594,7 +607,9 @@ export class GCodeGenerator {
     for (let pass = 1; pass <= passes; pass++) {
       const z      = -(stepZ * pass);
       const isLast = pass === passes;
-      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${isLast && hasTabs ? ' [tabs actifs]' : ''}`);
+      // Tabs actifs dès que la passe descend sous leur sommet (pas seulement la dernière)
+      const tabsOn = hasTabs && z < tabZ - 1e-9;
+      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${tabsOn ? ' [tabs actifs]' : ''}`);
 
       if (leadIn) {
         if (pass > 1) {
@@ -607,32 +622,17 @@ export class GCodeGenerator {
         this.plungeTo(z);
       }
 
-      if (!isLast || !hasTabs) {
+      if (tabsOn) {
+        emitTabbedTurn(tabSegs, z, r_off_work);
+      } else {
         this.emit(`G3 X${(cx - r_off_work + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off_work).toFixed(3)} J0.000 F${f}`);
         this.emit(`G3 X${(startX + ox).toFixed(3)} Y${(startY + oy).toFixed(3)} I${(r_off_work).toFixed(3)} J0.000 F${f}`);
-        if (isLast && !fa) {
-          if (leadOut) {
-            for (const p of leadOut.arcPts) this.lineTo(p.x, p.y);
-          } else {
-            this.lineTo(startX, startY + oc);
-          }
-        }
-      } else {
-        for (const seg of tabSegs) {
-          if (seg.type === 'cut') {
-            emitArc(seg.from, seg.to);
-          } else {
-            this.rapidZ(tabZ);
-            emitArc(seg.from, seg.to);
-            this.plungeTo(z);
-          }
-        }
-        if (!fa) {
-          if (leadOut) {
-            for (const p of leadOut.arcPts) this.lineTo(p.x, p.y);
-          } else {
-            this.lineTo(startX, startY + oc);
-          }
+      }
+      if (isLast && !fa) {
+        if (leadOut) {
+          for (const p of leadOut.arcPts) this.lineTo(p.x, p.y);
+        } else {
+          this.lineTo(startX, startY + oc);
         }
       }
     }
@@ -653,7 +653,7 @@ export class GCodeGenerator {
       const leadInFin  = leadInR  ? this._leadArc(entryPtsFin, leadInR, 'in') : null;
       const leadOutFin = leadOutR ? this._leadOutArc(exitPtsFin, leadOutR)    : null;
       const z = -depth;
-      this.comment(`Passe finition paroi — Z=${z.toFixed(3)}`);
+      this.comment(`Passe finition paroi — Z=${z.toFixed(3)}${hasTabs ? ' [tabs actifs]' : ''}`);
       this.rapidZ(this.machine.safeZ);
       if (leadInFin) {
         this.rapidTo(leadInFin.approachPt.x, leadInFin.approachPt.y);
@@ -663,8 +663,13 @@ export class GCodeGenerator {
         this.rapidTo(startXFin, startYFin);
         this.plungeTo(z);
       }
-      this.emit(`G3 X${(cx - r_off_exact + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off_exact).toFixed(3)} J0.000 F${f}`);
-      this.emit(`G3 X${(startXFin + ox).toFixed(3)} Y${(startYFin + oy).toFixed(3)} I${(r_off_exact).toFixed(3)} J0.000 F${f}`);
+      if (hasTabs) {
+        // Finition à pleine profondeur : les tabs doivent être épargnés ici aussi
+        emitTabbedTurn(buildTabSegs(r_off_exact), z, r_off_exact);
+      } else {
+        this.emit(`G3 X${(cx - r_off_exact + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off_exact).toFixed(3)} J0.000 F${f}`);
+        this.emit(`G3 X${(startXFin + ox).toFixed(3)} Y${(startYFin + oy).toFixed(3)} I${(r_off_exact).toFixed(3)} J0.000 F${f}`);
+      }
       if (leadOutFin) {
         for (const p of leadOutFin.arcPts) this.lineTo(p.x, p.y);
       } else {
@@ -831,11 +836,16 @@ export class GCodeGenerator {
     const leadLabel  = leadInR ? `, lead-in R${leadInR}mm` : '';
     this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}, ${safeTabCenters.length} tabs ${tabWidth}×${tabHeight}mm${skippedTabs ? `, ${skippedTabs} évité(s) sur angles` : ''}) ───`);
 
-    for (let pass = 1; pass <= passes; pass++) {
-      const z        = -(stepZ * pass);
-      const lastPass = pass === passes;
+    const tabEv = this._tabEvents(safeTabCenters, tabWidth, perimeter);
 
-      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${lastPass ? ' [tabs actifs]' : ''}`);
+    for (let pass = 1; pass <= passes; pass++) {
+      const z      = -(stepZ * pass);
+      // Tabs actifs dès que la passe descend sous leur sommet (pas seulement la dernière)
+      const tabsOn = z < tabZ - 1e-9;
+      // Départ dans un tab : on n'entre qu'au sommet du tab (ne pas le percer)
+      const zIn    = tabsOn && tabEv.startInTab ? tabZ : z;
+
+      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${tabsOn ? ' [tabs actifs]' : ''}`);
       this.rapidZ(this.machine.safeZ);
 
       // ── Entrée outil ───────────────────────────────────────────────────
@@ -843,7 +853,7 @@ export class GCodeGenerator {
         const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
         const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
         this.rapidTo(cx + helixR, cy);
-        this._helixIn(cx, cy, helixR, z, helixTurns);
+        this._helixIn(cx, cy, helixR, zIn, helixTurns);
         if (leadIn) {
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
           this.lineTo(pts[0].x, pts[0].y);
@@ -852,7 +862,7 @@ export class GCodeGenerator {
         }
       } else if (entry === 'ramp') {
         this.rapidTo(pts[0].x, pts[0].y);
-        this._rampIn(pts, z, rampLen);
+        this._rampIn(pts, zIn, rampLen);
         if (leadIn) {
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
           this.lineTo(pts[0].x, pts[0].y);
@@ -860,65 +870,25 @@ export class GCodeGenerator {
       } else {
         if (leadIn) {
           this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          this.plungeTo(z);
+          this.plungeTo(zIn);
           this.lineTo(pts[0].x, pts[0].y);
         } else {
           this.rapidTo(pts[0].x, pts[0].y);
-          this.plungeTo(z);
+          this.plungeTo(zIn);
         }
       }
 
-      if (!lastPass) {
-        // Passes intermédiaires : contour normal
+      if (!tabsOn) {
+        // Passes au-dessus des tabs : contour normal
         for (let i = 1; i < n; i++) this.lineTo(pts[i].x, pts[i].y);
         this.lineTo(pts[0].x, pts[0].y);
-        this._emitOvercut(pts);
       } else {
-        // Dernière passe : tabs positionnés sur le chemin curviligne global.
-        // Fonctionne pour toute forme, y compris les cercles/ovales dont les
-        // segments individuels sont plus courts que la largeur d'un tab.
-
-        // Événements de changement de Z triés par distance curviligne :
-        // 'up' = début du tab (monte à tabZ), 'down' = fin du tab (replonge à z)
-        const zEvents = [];
-        for (const center of safeTabCenters) {
-          const s = Math.max(0, center - tabWidth / 2);
-          const e = Math.min(perimeter - 1e-6, center + tabWidth / 2);
-          zEvents.push({ dist: s, action: 'up'   });
-          zEvents.push({ dist: e, action: 'down' });
-        }
-        zEvents.sort((a, b) => a.dist - b.dist);
-
-        let cumDist = 0;
-        let evIdx   = 0;
-
-        for (let i = 0; i < n; i++) {
-          const a   = pts[i];
-          const b   = pts[(i + 1) % n];
-          const len = segLengths[i];
-          if (len < 1e-6) { cumDist += len; continue; }
-          const dx = (b.x - a.x) / len;
-          const dy = (b.y - a.y) / len;
-          const segEnd = cumDist + len;
-
-          // Traiter tous les événements Z dont la position tombe dans ce segment
-          while (evIdx < zEvents.length && zEvents[evIdx].dist < segEnd) {
-            const ev = zEvents[evIdx++];
-            const t  = (ev.dist - cumDist) / len;
-            this.lineTo(a.x + dx * t * len, a.y + dy * t * len);
-            if (ev.action === 'up') {
-              this.rapidZ(tabZ);
-            } else {
-              this.plungeTo(z);
-            }
-          }
-
-          this.lineTo(b.x, b.y);
-          cumDist += len;
-        }
-        // La boucle zEvents ferme déjà à pts[0] sur le dernier segment — pas de closure explicite
-        this._emitOvercut(pts);
+        // Passes sous le sommet des tabs : remontée à tabZ au passage de chaque tab.
+        // Si la boucle finit dans un tab, l'outil est à tabZ et le dépassement final
+        // passe au-dessus du tab sans l'entamer.
+        this._cutLoopWithTabs(pts, segLengths, tabEv.events, z, tabZ);
       }
+      this._emitOvercut(pts);
     }
 
     // ── Passe de finition paroi ────────────────────────────────────────────
@@ -935,41 +905,66 @@ export class GCodeGenerator {
       // Mise à l'échelle des positions de tabs vers le nouveau périmètre
       const finTabCenters = safeTabCenters.map(c => c * finPerimeter / perimeter);
 
-      const zFin = -depth;
-      const zEvents = [];
-      for (const center of finTabCenters) {
-        zEvents.push({ dist: Math.max(0, center - tabWidth / 2), action: 'up' });
-        zEvents.push({ dist: Math.min(finPerimeter - 1e-6, center + tabWidth / 2), action: 'down' });
-      }
-      zEvents.sort((a, b) => a.dist - b.dist);
+      const zFin  = -depth;
+      const finEv = this._tabEvents(finTabCenters, tabWidth, finPerimeter);
 
       this.comment(`Passe finition paroi — Z=${zFin.toFixed(3)} [tabs actifs]`);
       this.rapidZ(this.machine.safeZ);
       this.rapidTo(ptsFin[0].x, ptsFin[0].y);
-      this.plungeTo(zFin);
-
-      let cumDist = 0, evIdx = 0;
-      for (let i = 0; i < nFin; i++) {
-        const a = ptsFin[i], b = ptsFin[(i + 1) % nFin];
-        const len = finSegLengths[i];
-        if (len < 1e-6) { cumDist += len; continue; }
-        const dx = (b.x - a.x) / len, dy = (b.y - a.y) / len;
-        const segEnd = cumDist + len;
-        while (evIdx < zEvents.length && zEvents[evIdx].dist < segEnd) {
-          const ev = zEvents[evIdx++];
-          const t = (ev.dist - cumDist) / len;
-          this.lineTo(a.x + dx * t * len, a.y + dy * t * len);
-          if (ev.action === 'up') this.rapidZ(tabZ);
-          else this.plungeTo(zFin);
-        }
-        this.lineTo(b.x, b.y);
-        cumDist += len;
-      }
+      this.plungeTo(finEv.startInTab ? tabZ : zFin);
+      this._cutLoopWithTabs(ptsFin, finSegLengths, finEv.events, zFin, tabZ);
       this._emitOvercut(ptsFin);
     }
 
     this.rapidZ(this.machine.safeZ);
     this.comment('');
+  }
+
+  /**
+   * Événements Z des tabs le long d'un contour fermé de périmètre P (abscisse curviligne
+   * depuis le point de départ). 'up' = début de tab (remonter à tabZ), 'down' = fin de tab.
+   * Un tab qui chevauche le point de départ est scindé en deux morceaux (début et fin de
+   * boucle) ; startInTab indique alors qu'il faut entrer au sommet du tab.
+   */
+  _tabEvents(centers, width, P) {
+    const EPS = 1e-6;
+    const intervals = [];
+    for (const c of centers) {
+      const s = c - width / 2, e = c + width / 2;
+      if (s < 0)      intervals.push([0, e], [s + P, P]);
+      else if (e > P) intervals.push([s, P], [0, e - P]);
+      else            intervals.push([s, e]);
+    }
+    const events = [];
+    for (const [s, e] of intervals) {
+      if (s > EPS)     events.push({ dist: s, action: 'up' });
+      if (e < P - EPS) events.push({ dist: e, action: 'down' });
+    }
+    events.sort((a, b) => a.dist - b.dist);
+    return { events, startInTab: intervals.some(([s]) => s <= EPS) };
+  }
+
+  /**
+   * Parcourt le contour fermé pts à la profondeur z, en remontant à tabZ entre les
+   * événements 'up' et 'down' (voir _tabEvents). Revient au point de départ.
+   */
+  _cutLoopWithTabs(pts, segLengths, events, z, tabZ) {
+    const n = pts.length;
+    let cum = 0, k = 0;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n], len = segLengths[i];
+      if (len < 1e-6) { cum += len; continue; }
+      const segEnd = cum + len;
+      while (k < events.length && events[k].dist < segEnd) {
+        const ev = events[k++];
+        const t  = (ev.dist - cum) / len;
+        this.lineTo(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+        if (ev.action === 'up') this.rapidZ(tabZ);
+        else this.plungeTo(z);
+      }
+      this.lineTo(b.x, b.y);
+      cum += len;
+    }
   }
 
   /**
