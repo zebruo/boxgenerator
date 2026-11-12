@@ -142,9 +142,15 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 }
 .param-row input[type=number]:focus { border-color: var(--accent); }
 /* Flèches natives : visibles seulement au survol ou à la saisie, à la couleur du thème */
-.param-row input[type=number]::-webkit-inner-spin-button { opacity: 0; margin-left: 2px; cursor: pointer; }
+.param-row input[type=number]::-webkit-inner-spin-button,
+.export-modal .tab-input::-webkit-inner-spin-button,
+.sim-lbl input[type=number]::-webkit-inner-spin-button { opacity: 0; margin-left: 2px; cursor: pointer; }
 .param-row input[type=number]:hover::-webkit-inner-spin-button,
-.param-row input[type=number]:focus::-webkit-inner-spin-button { opacity: .8; }
+.param-row input[type=number]:focus::-webkit-inner-spin-button,
+.export-modal .tab-input:hover::-webkit-inner-spin-button,
+.export-modal .tab-input:focus::-webkit-inner-spin-button,
+.sim-lbl input[type=number]:hover::-webkit-inner-spin-button,
+.sim-lbl input[type=number]:focus::-webkit-inner-spin-button { opacity: .8; }
 .param-row input[type=number][readonly] {
   color: var(--text-muted); cursor: default; border-style: dashed;
 }
@@ -391,9 +397,9 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .export-modal .tab-f-lbl  { color: var(--text-muted); white-space: nowrap; }
 .export-modal .tab-f-unit { color: var(--text-muted); margin-right: 4px; }
 .export-modal .tab-input  {
-  width: 50px; background: var(--bg-dark); color: var(--text);
+  width: 58px; background: var(--bg-dark); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 3px 5px; font-size: 11px; text-align: right;
+  padding: 3px 3px 3px 5px; font-size: 11px; line-height: 18px; text-align: right;
 }
 
 /* ── Section entrée outil dans la modale d'export ── */
@@ -908,7 +914,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-card); color: var(--text); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 2px 4px; font-size: 12px;
 }
-.sim-lbl input[type=number] { width: 64px; }
+.sim-lbl input[type=number] { width: 72px; line-height: 18px; padding: 2px 3px 2px 4px; }
 .sim-lbl input[type=checkbox] { accent-color: var(--accent); }
 .sim-stage { position: relative; flex: 1; min-height: 0; }
 .sim-info {
