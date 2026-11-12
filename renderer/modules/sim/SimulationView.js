@@ -311,8 +311,16 @@ export class SimulationView {
 
     const rg = new THREE.BufferGeometry();
     rg.setAttribute('position', new THREE.Float32BufferAttribute(rapid, 3));
+    // Pointillés repartant de zéro sur chaque segment : un même déplacement répété à chaque
+    // passe se superpose exactement (avec des distances cumulées, les copies décalées
+    // remplissaient les trous et le trait paraissait continu).
+    const dist = new Float32Array(rapid.length / 3);
+    for (let k = 0; k < dist.length; k += 2) {
+      const p = k * 3;
+      dist[k + 1] = Math.hypot(rapid[p + 3] - rapid[p], rapid[p + 4] - rapid[p + 1], rapid[p + 5] - rapid[p + 2]);
+    }
+    rg.setAttribute('lineDistance', new THREE.BufferAttribute(dist, 1));
     this.rapids = new THREE.LineSegments(rg, new THREE.LineDashedMaterial({ color: RAPID_COLOR, dashSize: 2, gapSize: 2 }));
-    this.rapids.computeLineDistances();
     this.rapids.visible = false;
     this.scene.add(this.rapids);
   }
