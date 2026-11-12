@@ -72,6 +72,13 @@ export class LidBox {
     // Après retournement physique du couvercle, le contour miroir s'aligne exactement avec le corps.
     const mirrorPts = pts => pts.map(p => ({ x: W - p.x, y: p.y })).reverse();
     const savedT    = gen.machine.materialThickness;
+    // Hauteurs de découpe de chaque pièce : sa propre hauteur + le surplus de brut éventuel.
+    // Hauteurs différentes → deux bruts (avertissement à l'export) : le contour du couvercle
+    // ne doit pas descendre à l'épaisseur du corps (il entrerait dans le martyr), et
+    // inversement. Hauteurs égales : inchangé (= savedT).
+    const stockExtra = Math.max(0, savedT - Math.max(height, lidHeight));
+    const bodyT = height    + stockExtra;
+    const lidT  = lidHeight + stockExtra;
     const fa = machineParams.finishAllowance ?? 0;
     const doPocket = machineParams.pocketConc
       ? (pts, lbl, ds = 0) => pocketConcentric(gen, pts, lbl, ds, fa)
@@ -124,7 +131,7 @@ export class LidBox {
       }
     }
 
-    gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
+    gen.machine.materialThickness = bodyT;  // hauteur du corps (+ surplus de brut)
     if (arcDef) {
       gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_body_contour'), tabOpts || null);
     } else if (tabOpts) {
@@ -167,7 +174,7 @@ export class LidBox {
         if (lidInnerPts0.length > 2) doPocket(lidInnerPts0, t('gcode.op_lid_cavity'));
       }
       // 2. Contour extérieur (dernière opération)
-      gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
+      gen.machine.materialThickness = lidT;   // hauteur du couvercle (+ surplus de brut)
       if (arcDef) {
         gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r - inset0, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts || null);
       } else if (tabOpts) {
@@ -192,7 +199,7 @@ export class LidBox {
         if (lidInnerPts1.length > 2) doPocket(lidInnerPts1, t('gcode.op_lid_cavity'), rabbetDepth);
       }
       // 3. Contour extérieur (dernière opération)
-      gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
+      gen.machine.materialThickness = lidT;   // hauteur du couvercle (+ surplus de brut)
       if (arcDef) {
         gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts || null);
       } else if (tabOpts) {
@@ -227,16 +234,17 @@ export class LidBox {
     const shift = pts => pts.map(p => ({ x: p.x + dx, y: p.y + dy }));
     const lidOuter = rabbetSide === 0 ? mirrorPts(insetPolygon(bodyPts, wallThickness - rabbet)) : mirrorPts(bodyPts);
     const cavity = insetPolygon(bodyPts, wallThickness);
-    const items = [{ pts: bodyPts, face: 1, outer: true }];
+    // part : pièce à laquelle appartient le contour (simulation pièce par pièce)
+    const items = [{ pts: bodyPts, face: 1, outer: true, part: 'body' }];
     // Corps : compartiments s'il y a des cloisons, sinon la cavité
     const cells = (params.partitions ?? 0) > 0
       ? buildPartitionContours(W, D, wallThickness, params.partitions,
           params.partitionDir === 'horizontal' ? 'horizontal' : 'vertical', machineParams.toolDiameter ?? 3.175,
           { minX: bb.minX, minY: bb.minY, cavity })
       : null;
-    for (const c of cells ?? (cavity.length > 2 ? [cavity] : [])) items.push({ pts: c, face: 1 });
-    if (cavity.length > 2) items.push({ pts: shift(mirrorPts(cavity)), face: 1 });
-    if (lidOuter.length > 2) items.push({ pts: shift(lidOuter), face: 1, outer: true });
+    for (const c of cells ?? (cavity.length > 2 ? [cavity] : [])) items.push({ pts: c, face: 1, part: 'body' });
+    if (cavity.length > 2) items.push({ pts: shift(mirrorPts(cavity)), face: 1, part: 'lid' });
+    if (lidOuter.length > 2) items.push({ pts: shift(lidOuter), face: 1, outer: true, part: 'lid' });
     return items;
   }
 
