@@ -1479,7 +1479,7 @@ function showNotif(msg) {
   el.textContent = msg;
   Object.assign(el.style, {
     position: 'fixed', bottom: '20px', right: '20px',
-    background: '#4affcc', color: '#000', padding: '8px 14px',
+    background: 'var(--accent)', color: 'var(--on-accent)', padding: '8px 14px',
     borderRadius: '6px', fontWeight: '600', zIndex: 9999,
     fontSize: '12px', boxShadow: '0 2px 12px rgba(0,0,0,.4)'
   });
