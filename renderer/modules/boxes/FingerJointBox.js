@@ -245,6 +245,12 @@ export class FingerJointBox {
     return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
   }
 
+  /** Contours théoriques des panneaux pour la simulation (même disposition que le G-code). */
+  getDrawing(shape, params) {
+    return this._buildGCodeLayout(shape, params)
+      .map(p => ({ pts: this._toPoints(p.rel, p.ox, p.oy), face: 1, outer: true }));
+  }
+
   getGCodeBoundingBox(shape, params) {
     const layout = this._buildGCodeLayout(shape, params);
     // minX/minY = 0 : le layout part toujours de l'origine (0,0).

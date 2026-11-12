@@ -623,11 +623,17 @@ async function openSimulation() {
     top: origin.zOffset, bottom: origin.zOffset - machine.materialThickness,
   };
 
+  // Contours théoriques des pièces (case « Dessin », masque « Pièce finie seule »), repère machine
+  const rawDrawing = state.boxType.getDrawing
+    ? state.boxType.getDrawing(state.shape, state.boxParams, machine)
+    : [{ pts: state.shape.getContourPoints(), face: 1, outer: true }];
+  const drawing = rawDrawing.map(d => ({ ...d, pts: d.pts.map(p => ({ x: p.x + origin.originX, y: p.y + origin.originY })) }));
+
   const { SimulationView } = await import('./modules/sim/SimulationView.js');
   simView?.close();
   // Le panneau recouvre toute la zone centrale (barre 3D / Vues 2D comprise, inactive pendant la simulation)
   simView = new SimulationView(document.querySelector('.panel-center'), {
-    code, stock, toolDiameter: machine.toolDiameter, rapidRate: machine.rapidRate,
+    code, stock, drawing, toolDiameter: machine.toolDiameter, rapidRate: machine.rapidRate,
     light: document.documentElement.dataset.theme === 'light',
     onClose: () => { simView = null; },
   });

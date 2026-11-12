@@ -12,6 +12,8 @@
 const MOTION_RE = /^G0?([0-3])(?![0-9.])/;
 const WORD_RE   = /([A-Z])([-+]?\d*\.?\d+)/g;
 const SECTION_RE = /^;\s*─{3,}\s*(.+?)\s*─{3,}/;
+// Repère de retournement écrit par les boîtes usinées sur deux faces (ex. StackableBox)
+const FACE2_RE   = /^;\s*FACE 2\b.*miroir ([XY]) autour de [XY]=([-+]?\d*\.?\d+)/i;
 
 /** Classe une section d'après son libellé : 'pocket' | 'drill' | 'contour'. */
 export function sectionKind(label) {
@@ -41,13 +43,16 @@ function arcSweep(x0, y0, x1, y1, cx, cy, g) {
  * @param {object} [opts]
  * @param {number} [opts.rapidRate=3000]  vitesse des G0 (mm/min)
  * @param {{x,y,z}} [opts.start]          position initiale (défaut : X0 Y0 au-dessus du brut)
- * @returns {{ moves: object[], sections: {label, kind, t0}[], totalTime: number }}
+ * @returns {{ moves: object[], sections: {label, kind, t0, face}[], totalTime: number,
+ *             flip: {axis: 'x'|'y', c: number, t0: number} | null }}
+ *   Chaque mouvement porte `face` (1, ou 2 après le repère de retournement) ; ses
+ *   coordonnées restent celles du G-code (repère machine de sa face).
  */
 export function parseProgram(code, { rapidRate = 3000, start = null } = {}) {
   const moves = [];
   const sections = [];
   let pos = start ? { ...start } : null;
-  let gMode = 0, feed = 1000, t = 0, sec = -1, cycleReturnZ = null;
+  let gMode = 0, feed = 1000, t = 0, sec = -1, cycleReturnZ = null, face = 1, flip = null;
 
   const push = (type, to, extra = {}) => {
     if (!pos) { pos = { ...to }; return; }
@@ -61,7 +66,7 @@ export function parseProgram(code, { rapidRate = 3000, start = null } = {}) {
     }
     const rate = type === 'rapid' ? rapidRate : Math.max(1, extra.f ?? feed);
     const dt = len > 0 ? len / rate * 60 : 0;
-    moves.push({ type, x0: from.x, y0: from.y, z0: from.z, x: to.x, y: to.y, z: to.z, t0: t, t1: t + dt, sec, len, ...extra });
+    moves.push({ type, x0: from.x, y0: from.y, z0: from.z, x: to.x, y: to.y, z: to.z, t0: t, t1: t + dt, sec, face, len, ...extra });
     t += dt;
     pos = { ...to };
   };
@@ -69,7 +74,13 @@ export function parseProgram(code, { rapidRate = 3000, start = null } = {}) {
   for (const raw of code.split('\n')) {
     const line = raw.trim();
     const sm = line.match(SECTION_RE);
-    if (sm) { sections.push({ label: sm[1], kind: sectionKind(sm[1]), t0: t }); sec = sections.length - 1; continue; }
+    if (sm) { sections.push({ label: sm[1], kind: sectionKind(sm[1]), t0: t, face }); sec = sections.length - 1; continue; }
+    const fm = line.match(FACE2_RE);
+    if (fm) {
+      face = 2;
+      flip = { axis: fm[1].toLowerCase(), c: Number.parseFloat(fm[2]), t0: t };
+      continue;   // les déplacements suivants sont dans le repère machine de la face 2
+    }
     const semi = line.indexOf(';');
     const c = (semi >= 0 ? line.slice(0, semi) : line).trim().toUpperCase();
     if (!c) continue;
@@ -109,7 +120,21 @@ export function parseProgram(code, { rapidRate = 3000, start = null } = {}) {
       push('arc', to, { f: feed, cx, cy, a0, sw, r: Math.hypot(pos.x - cx, pos.y - cy) });
     }
   }
-  return { moves, sections, totalTime: t };
+  return { moves, sections, totalTime: t, flip };
+}
+
+/**
+ * Passe un point du repère machine de sa face au repère du brut (face 1 = dessus).
+ * Face 2 : miroir selon l'axe de retournement, et profondeur comptée depuis le dessous
+ * (Z machine z → hauteur top + bottom − z dans le brut).
+ */
+export function toStockFrame(p, face, flip, top, bottom) {
+  if (face !== 2 || !flip) return p;
+  return {
+    x: flip.axis === 'x' ? 2 * flip.c - p.x : p.x,
+    y: flip.axis === 'y' ? 2 * flip.c - p.y : p.y,
+    z: top + bottom - p.z,
+  };
 }
 
 /** Position de l'outil à la fraction u ∈ [0,1] d'un mouvement. */

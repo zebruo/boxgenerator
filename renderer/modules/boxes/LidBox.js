@@ -1,6 +1,7 @@
 import { GCodeGenerator } from '../gcode/GCodeGenerator.js';
 import { pocketConcentric } from '../gcode/PocketConcentric.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
+import { insetPolygon } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
 
 /**
@@ -205,6 +206,30 @@ export class LidBox {
 
     gen.footer();
     return gen.getCode();
+  }
+
+  /**
+   * Contours théoriques pour la simulation : corps à l'origine, couvercle décalé comme
+   * dans le G-code (même règle de disposition que generateGCode), coordonnées de la forme.
+   */
+  getDrawing(shape, params, machineParams = {}) {
+    const { wallThickness = 6, rabbet = 3, rabbetSide = 0 } = params;
+    const bb = shape.getBoundingBox();
+    const W = bb.width, D = bb.height, lidGap = 20;
+    const bodyPts = shape.getContourPoints();
+    const mirrorPts = pts => pts.map(p => ({ x: W - p.x, y: p.y })).reverse();
+    let dx = 0, dy = 0;
+    if (!machineParams.lidAtOrigin) {
+      const useVertical = Math.max(W, 2 * D + lidGap) < Math.max(2 * W + lidGap, D);
+      if (useVertical) dy = D + lidGap; else dx = W + lidGap;
+    }
+    const shift = pts => pts.map(p => ({ x: p.x + dx, y: p.y + dy }));
+    const lidOuter = rabbetSide === 0 ? mirrorPts(insetPolygon(bodyPts, wallThickness - rabbet)) : mirrorPts(bodyPts);
+    const cavity = insetPolygon(bodyPts, wallThickness);
+    const items = [{ pts: bodyPts, face: 1, outer: true }];
+    if (cavity.length > 2) items.push({ pts: cavity, face: 1 }, { pts: shift(mirrorPts(cavity)), face: 1 });
+    if (lidOuter.length > 2) items.push({ pts: shift(lidOuter), face: 1, outer: true });
+    return items;
   }
 
   getGCodeBoundingBox(shape, _params, machineParams) {

@@ -1,16 +1,19 @@
 /**
  * SimulationView.js — Panneau superposé de simulation d'usinage (matière + parcours).
  *
- * S'affiche par-dessus la zone d'aperçu. Rejoue le G-code (GCodeProgram) dans une grille
- * de hauteurs (StockSim) et l'affiche en 3D : brut usiné, fraise, trajectoires colorées
- * par opération. Commandes : lecture, pas à pas par opération, progression, vitesse,
- * résolution, vitesse des rapides (pour le temps estimé).
+ * S'affiche par-dessus la zone centrale. Rejoue le G-code (GCodeProgram) dans une grille
+ * de hauteurs à deux faces (StockSim) et l'affiche en 3D : brut usiné (dessus et dessous),
+ * fraise, trajectoires colorées par opération, contours théoriques (« Dessin »).
+ *
+ * Repère de la scène = repère du brut, face 1 (dessus) vers le haut. Les mouvements de la
+ * face 2 (pièce retournée, ex. boîte empilable) y sont ramenés par toStockFrame ; la vue
+ * « Face 2 » retourne toute la scène comme la pièce sur la machine.
  */
 
 import * as THREE from '../../lib/three.module.js';
 import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { t } from '../i18n.js';
-import { parseProgram, moveIndexAt, formatDuration } from './GCodeProgram.js';
+import { parseProgram, moveIndexAt, formatDuration, toStockFrame } from './GCodeProgram.js';
 import { StockSim, cellFor } from './StockSim.js';
 
 const KIND_COLORS = { pocket: 0x2f80ed, contour: 0xf2711c, drill: 0x27ae60 };
@@ -21,76 +24,83 @@ const SPEEDS = [1, 5, 10, 20, 50, 100, 200, 500];
 function lsGet(key, def) { try { return localStorage.getItem(key) ?? def; } catch { return def; } }
 function lsSet(key, val) { try { localStorage.setItem(key, val); } catch { /* stockage indisponible */ } }
 
-const VERT = /* glsl */`
-  uniform sampler2D uHeight;
+// ─── Shaders ────────────────────────────────────────────────────────────────
+// Textures : uHeight (dessus de la matière), uFloor (dessous), uMask (1 = dans une pièce).
+// Une case est vide quand dessous ≥ dessus. uViewFlip retourne les normales quand la scène
+// est retournée (vue face 2 : (−1,1,−1) autour de l'axe Y, (1,−1,−1) autour de l'axe X)
+// pour garder l'éclairage venant d'en haut.
+const COMMON = /* glsl */`
+  uniform sampler2D uHeight, uFloor, uMask;
   uniform vec2 uSize;
-  uniform float uBottom;
+  uniform float uCell, uTop, uBottom, uPartOnly;
+  uniform vec3 uColor, uViewFlip;
   varying vec2 vCell;
-  void main() {
-    vCell = uv * (uSize - 1.0);
-    float h = texture2D(uHeight, (floor(vCell + 0.5) + 0.5) / uSize).r;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position.xy, max(h, uBottom), 1.0);
+  vec2 tc(vec2 c) { return (clamp(c, vec2(0.0), uSize - 1.0) + 0.5) / uSize; }
+  float Hs(vec2 c) { return texture2D(uHeight, tc(c)).r; }
+  float Fs(vec2 c) { return texture2D(uFloor,  tc(c)).r; }
+  float light(vec3 n) {
+    n = normalize(n * uViewFlip);
+    return 0.38 + 0.55 * max(dot(n, normalize(vec3(0.35, -0.55, 0.75))), 0.0)
+                + 0.18 * max(dot(n, normalize(vec3(-0.5, 0.45, 0.6))), 0.0);
+  }
+  bool hidden(vec2 c) {
+    return Fs(c) >= Hs(c) - 0.001 || (uPartOnly > 0.5 && texture2D(uMask, tc(c)).r < 0.5);
   }`;
 
-const FRAG = /* glsl */`
-  uniform sampler2D uHeight;
-  uniform vec2 uSize;
-  uniform float uCell, uTop, uBottom;
-  uniform vec3 uColor;
-  varying vec2 vCell;
-  float H(vec2 c) {
-    c = clamp(c, vec2(0.0), uSize - 1.0);
-    return max(texture2D(uHeight, (c + 0.5) / uSize).r, uBottom);
-  }
+// Dessus de la matière
+const VERT_TOP = COMMON + /* glsl */`
+  void main() {
+    vCell = uv * (uSize - 1.0);
+    vec2 c = floor(vCell + 0.5);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position.xy, max(Hs(c), Fs(c)), 1.0);
+  }`;
+const FRAG_TOP = COMMON + /* glsl */`
+  float H(vec2 c) { return max(Hs(c), Fs(c)); }
   void main() {
     vec2 c = floor(vCell + 0.5);
-    float h = H(c);
-    if (h <= uBottom + 0.001) discard;              // découpe traversante : on voit à travers
-    vec3 n = normalize(vec3((H(c - vec2(1.0, 0.0)) - H(c + vec2(1.0, 0.0))) / (2.0 * uCell),
-                            (H(c - vec2(0.0, 1.0)) - H(c + vec2(0.0, 1.0))) / (2.0 * uCell), 1.0));
-    float d = 0.38 + 0.55 * max(dot(n, normalize(vec3(0.35, -0.55, 0.75))), 0.0)
-                   + 0.18 * max(dot(n, normalize(vec3(-0.5, 0.45, 0.6))), 0.0);
-    float depth = clamp((uTop - h) / max(uTop - uBottom, 0.001), 0.0, 1.0);
-    gl_FragColor = vec4(uColor * (1.0 - 0.28 * depth) * d, 1.0);
+    if (hidden(c)) discard;                          // découpe traversante ou hors pièce
+    vec3 n = vec3((H(c - vec2(1.0, 0.0)) - H(c + vec2(1.0, 0.0))) / (2.0 * uCell),
+                  (H(c - vec2(0.0, 1.0)) - H(c + vec2(0.0, 1.0))) / (2.0 * uCell), 1.0);
+    float depth = clamp((uTop - Hs(c)) / max(uTop - uBottom, 0.001), 0.0, 1.0);
+    gl_FragColor = vec4(uColor * (1.0 - 0.28 * depth) * light(n), 1.0);
   }`;
 
-// Dessous du brut : plein là où il reste de la matière jusqu'au fond, ajouré là où la
-// découpe traverse (on voit alors la rainure et les tabs par en dessous).
-const VERT_BOTTOM = /* glsl */`
-  uniform vec2 uSize;
-  varying vec2 vCell;
+// Dessous de la matière (plat, ou creusé par la face 2)
+const VERT_UNDER = COMMON + /* glsl */`
   void main() {
     vCell = uv * (uSize - 1.0);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec2 c = floor(vCell + 0.5);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position.xy, min(Fs(c), Hs(c)) - 0.02, 1.0);
   }`;
-
-const FRAG_BOTTOM = /* glsl */`
-  uniform sampler2D uHeight;
-  uniform vec2 uSize;
-  uniform float uBottom;
-  uniform vec3 uColor;
-  varying vec2 vCell;
+const FRAG_UNDER = COMMON + /* glsl */`
+  float F(vec2 c) { return min(Fs(c), Hs(c)); }
   void main() {
-    vec2 c = clamp(floor(vCell + 0.5), vec2(0.0), uSize - 1.0);
-    if (texture2D(uHeight, (c + 0.5) / uSize).r <= uBottom + 0.001) discard;
-    gl_FragColor = vec4(uColor * 0.62, 1.0);
+    vec2 c = floor(vCell + 0.5);
+    if (hidden(c)) discard;
+    vec3 n = vec3((F(c + vec2(1.0, 0.0)) - F(c - vec2(1.0, 0.0))) / (2.0 * uCell),
+                  (F(c + vec2(0.0, 1.0)) - F(c - vec2(0.0, 1.0))) / (2.0 * uCell), -1.0);
+    float depth = clamp((Fs(c) - uBottom) / max(uTop - uBottom, 0.001), 0.0, 1.0);
+    gl_FragColor = vec4(uColor * 0.85 * (1.0 - 0.28 * depth) * light(n), 1.0);
   }`;
 
 export class SimulationView {
   /**
-   * @param {HTMLElement} host   conteneur (zone d'aperçu) dans lequel le panneau se superpose
+   * @param {HTMLElement} host   conteneur (zone centrale) dans lequel le panneau se superpose
    * @param {object} o
    * @param {string} o.code             G-code à simuler
-   * @param {{x0,y0,x1,y1,top,bottom}} o.stock  brut, en coordonnées machine
+   * @param {{x0,y0,x1,y1,top,bottom}} o.stock  brut, en coordonnées machine (face 1)
+   * @param {{pts:{x,y}[], face:number, outer?:boolean}[]} [o.drawing]  contours théoriques
+   *        (repère machine de leur face) ; outer = contour qui détache une pièce
    * @param {number} o.toolDiameter
    * @param {number} [o.rapidRate]      vitesse des G0 de la machine (mm/min), pour le temps estimé
    * @param {boolean} [o.light]         thème clair
    * @param {Function} [o.onClose]
    */
-  constructor(host, { code, stock, toolDiameter, rapidRate = 3000, light = false, onClose = null }) {
+  constructor(host, { code, stock, drawing = [], toolDiameter, rapidRate = 3000, light = false, onClose = null }) {
     this.host = host;
     this.code = code;
     this.stock = stock;
+    this.drawing = drawing;
     this.toolR = toolDiameter / 2;
     this.onClose = onClose;
     this.playing = false;
@@ -99,12 +109,16 @@ export class SimulationView {
     this.resolution = 'standard';          // ≈ 0,27 mm : suffisant pour ces pièces
     this.rapidRate = rapidRate > 0 ? rapidRate : 3000;
     this.light = light;
+    this.viewMode = 'auto';                // 'auto' | '1' | '2' (boîtes usinées sur deux faces)
+    this.viewFace = 1;
+    this.partOnly = false;
 
+    this._loadProgram();
     this._buildDom();
     this._setupThree();
-    this._loadProgram();
     this._buildSim();
     this._buildPaths();
+    this._buildDrawing();
     this._buildTool();
     this._fitCamera();
     this._seek(0);
@@ -121,13 +135,22 @@ export class SimulationView {
     const el = document.createElement('div');
     el.className = 'sim-overlay';
     const speedOpts = SPEEDS.map(s => `<option value="${s}"${s === this.speed ? ' selected' : ''}>×${s}</option>`).join('');
+    const twoFaces = !!this.program.flip;
+    const hasDrawing = this.drawing.length > 0;
     el.innerHTML = `
       <div class="sim-toolbar">
         <span class="sim-title">${t('sim.title')}</span>
         <label class="sim-lbl">${t('sim.speed')} <select class="sim-speed">${speedOpts}</select></label>
+        ${twoFaces ? `<label class="sim-lbl" title="${t('sim.view_tip')}">${t('sim.view')} <select class="sim-view">
+          <option value="auto">${t('sim.view_auto')}</option>
+          <option value="1">${t('sim.view_face1')}</option>
+          <option value="2">${t('sim.view_face2')}</option>
+        </select></label>` : ''}
         <label class="sim-lbl"><input type="checkbox" class="sim-show-tool" checked> ${t('sim.tool')}</label>
         <label class="sim-lbl"><input type="checkbox" class="sim-show-paths" checked> ${t('sim.paths')}</label>
         <label class="sim-lbl" title="${t('sim.rapids_tip')}"><input type="checkbox" class="sim-show-rapids"> ${t('sim.rapids')}</label>
+        ${hasDrawing ? `<label class="sim-lbl" title="${t('sim.drawing_tip')}"><input type="checkbox" class="sim-show-drawing" checked> ${t('sim.drawing')}</label>
+        <label class="sim-lbl" title="${t('sim.part_only_tip')}"><input type="checkbox" class="sim-part-only"> ${t('sim.part_only')}</label>` : ''}
         <button class="sim-btn sim-close" title="${t('sim.close')}"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="sim-stage">
@@ -162,17 +185,23 @@ export class SimulationView {
     this.ui = {
       canvas: q('.sim-canvas'), progress: q('.sim-progress'), play: q('.sim-play'),
       time: q('.sim-time'), total: q('.sim-total'), op: q('.sim-op'), status: q('.sim-status'),
+      tool: q('.sim-show-tool'), paths: q('.sim-show-paths'), rapids: q('.sim-show-rapids'),
+      drawing: q('.sim-show-drawing'), partOnly: q('.sim-part-only'),
     };
 
     el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => this._action(b.dataset.act)));
     q('.sim-close').addEventListener('click', () => this.close());
     this.ui.progress.addEventListener('input', () => {
+      this._setPartOnly(false);
       this._seek(this.total * this.ui.progress.value / 10000);
     });
     q('.sim-speed').addEventListener('change', e => { this.speed = Number(e.target.value); lsSet('sim.speed', this.speed); });
-    q('.sim-show-tool').addEventListener('change', e => { this.toolMesh.visible = e.target.checked; });
-    q('.sim-show-paths').addEventListener('change', e => { this.paths.visible = e.target.checked; });
-    q('.sim-show-rapids').addEventListener('change', e => { this.rapids.visible = e.target.checked; });
+    q('.sim-view')?.addEventListener('change', e => { this.viewMode = e.target.value; this._updateView(); });
+    this.ui.tool.addEventListener('change', () => this._applyVisibility());
+    this.ui.paths.addEventListener('change', () => this._applyVisibility());
+    this.ui.rapids.addEventListener('change', () => this._applyVisibility());
+    this.ui.drawing?.addEventListener('change', () => this._applyVisibility());
+    this.ui.partOnly?.addEventListener('change', e => this._setPartOnly(e.target.checked));
     this._onKey = e => {
       if (e.key === 'Escape') this.close();
       else if (e.key === ' ' && !e.target.closest?.('input, select, textarea')) { e.preventDefault(); this._action('play'); }
@@ -182,6 +211,7 @@ export class SimulationView {
 
   _action(act) {
     const secs = this.program.sections.map(s => s.t0);
+    if (act !== 'end') this._setPartOnly(false);
     if (act === 'play') {
       if (!this.playing && this.time >= this.total - 1e-6) this._seek(0);
       this.playing = !this.playing;
@@ -189,7 +219,31 @@ export class SimulationView {
     else if (act === 'end')   { this.playing = false; this._seek(this.total); }
     else if (act === 'next')  { this._seek(secs.find(s => s > this.time + 0.01) ?? this.total); }
     else if (act === 'prev')  { this._seek([...secs].reverse().find(s => s < this.time - 0.5) ?? 0); }
+    this._updatePlayIcon();
+  }
+
+  _updatePlayIcon() {
     this.ui.play.innerHTML = `<i class="fa-solid fa-${this.playing ? 'pause' : 'play'}"></i>`;
+  }
+
+  /** Visibilité des éléments selon les cases (et le mode « Pièce finie seule »). */
+  _applyVisibility() {
+    const full = !this.partOnly;
+    if (this.toolMesh) this.toolMesh.visible = full && this.ui.tool.checked;
+    if (this.paths)    this.paths.visible    = full && this.ui.paths.checked;
+    if (this.rapids)   this.rapids.visible   = full && this.ui.rapids.checked;
+    if (this.sides)    this.sides.visible    = full;
+    if (this.drawLines) this.drawLines.visible = !!this.ui.drawing?.checked;
+  }
+
+  /** « Pièce finie seule » : fin du programme, seule la matière des pièces est affichée. */
+  _setPartOnly(on) {
+    if (on === this.partOnly) return;
+    this.partOnly = on;
+    if (this.ui.partOnly) this.ui.partOnly.checked = on;
+    if (on) { this.playing = false; this._updatePlayIcon(); this._seek(this.total); }
+    this.uniforms.uPartOnly.value = on ? 1 : 0;
+    this._applyVisibility();
   }
 
   // ─── Scène ───────────────────────────────────────────────────────────────
@@ -199,6 +253,8 @@ export class SimulationView {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setClearColor(this.light ? 0xd4d4de : 0x45454d);
     this.scene = new THREE.Scene();
+    this.world = new THREE.Group();   // repère du brut ; retourné pour la vue face 2
+    this.scene.add(this.world);
     this.camera = new THREE.PerspectiveCamera(40, 1, 0.5, 20000);
     this.camera.up.set(0, 0, 1);
     this.scene.add(new THREE.AmbientLight(0xffffff, 1.4));
@@ -223,37 +279,53 @@ export class SimulationView {
     this.total = this.program.totalTime;
   }
 
+  /** Point du repère machine de sa face → repère du brut (scène). */
+  _toStock(p, face) {
+    return toStockFrame(p, face, this.program.flip, this.stock.top, this.stock.bottom);
+  }
+
   _buildSim() {
     const s = this.stock;
     const t0 = performance.now();
     const cell = cellFor(s.x1 - s.x0, s.y1 - s.y0, this.resolution);
-    this.sim = new StockSim({ ...s, cell, toolRadius: this.toolR, moves: this.program.moves });
+    this.sim = new StockSim({ ...s, cell, toolRadius: this.toolR, moves: this.program.moves, flip: this.program.flip });
     const { nx, ny } = this.sim;
 
-    // Surface : grille de sommets déplacés par la texture de hauteurs
-    this._disposeObj(this.surface);
-    this._disposeObj(this.sides);
-    this.heightTex?.dispose();
-    this.heightTex = new THREE.DataTexture(this.sim.heights, nx, ny, THREE.RedFormat, THREE.FloatType);
-    this.heightTex.minFilter = this.heightTex.magFilter = THREE.NearestFilter;
-    this.heightTex.needsUpdate = true;
-    const w = this.sim.x1 - this.sim.x0, d = this.sim.y1 - this.sim.y0;
-    const geo = new THREE.PlaneGeometry(w, d, nx - 1, ny - 1);
-    const uniforms = {
-      uHeight: { value: this.heightTex }, uSize: { value: new THREE.Vector2(nx, ny) },
-      uCell: { value: this.sim.cell }, uTop: { value: s.top }, uBottom: { value: s.bottom },
-      uColor: { value: WOOD },
+    const tex = (data, type) => {
+      const tx = new THREE.DataTexture(data, nx, ny, THREE.RedFormat, type);
+      tx.minFilter = tx.magFilter = THREE.NearestFilter;
+      tx.needsUpdate = true;
+      return tx;
     };
-    // DoubleSide : par une découpe traversante, on voit les flancs de la rainure et les tabs
-    const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms, side: THREE.DoubleSide });
-    this.surface = new THREE.Mesh(geo, mat);
-    this.surface.position.set((this.sim.x0 + this.sim.x1) / 2, (this.sim.y0 + this.sim.y1) / 2, 0);
-    this.surface.frustumCulled = false;
-    this.scene.add(this.surface);
+    this.heightTex = tex(this.sim.heights, THREE.FloatType);
+    this.floorTex  = tex(this.sim.floors,  THREE.FloatType);
+    this.maskTex   = tex(this._partMask(), THREE.UnsignedByteType);
+    this.uniforms = {
+      uHeight: { value: this.heightTex }, uFloor: { value: this.floorTex }, uMask: { value: this.maskTex },
+      uSize: { value: new THREE.Vector2(nx, ny) }, uCell: { value: this.sim.cell },
+      uTop: { value: s.top }, uBottom: { value: s.bottom }, uColor: { value: WOOD },
+      uPartOnly: { value: 0 }, uViewFlip: { value: new THREE.Vector3(1, 1, 1) },
+    };
 
-    // Flancs et dessous du brut
+    // Dessus et dessous : grilles de sommets déplacés par les textures (vus des deux côtés)
+    const w = this.sim.x1 - this.sim.x0, d = this.sim.y1 - this.sim.y0;
+    const cx = (this.sim.x0 + this.sim.x1) / 2, cy = (this.sim.y0 + this.sim.y1) / 2;
+    const surf = (vert, frag) => {
+      const m = new THREE.Mesh(
+        new THREE.PlaneGeometry(w, d, nx - 1, ny - 1),
+        new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms: this.uniforms, side: THREE.DoubleSide }),
+      );
+      m.position.set(cx, cy, 0);
+      m.frustumCulled = false;
+      this.world.add(m);
+      return m;
+    };
+    this.surface = surf(VERT_TOP, FRAG_TOP);
+    this.under   = surf(VERT_UNDER, FRAG_UNDER);
+
+    // Flancs du brut
     const sideMat = new THREE.MeshLambertMaterial({ color: WOOD.clone().multiplyScalar(0.8), side: THREE.DoubleSide });
-    const hgt = s.top - s.bottom, cx = (this.sim.x0 + this.sim.x1) / 2, cy = (this.sim.y0 + this.sim.y1) / 2;
+    const hgt = s.top - s.bottom;
     const sides = new THREE.Group();
     const wall = (len, rotZ, px, py) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(len, hgt), sideMat);
@@ -265,19 +337,42 @@ export class SimulationView {
     wall(w, 0, cx, this.sim.y1);
     wall(d, Math.PI / 2, this.sim.x0, cy);
     wall(d, Math.PI / 2, this.sim.x1, cy);
-    // Dessous : même grille de cases que la surface, ajouré là où la découpe traverse
-    const under = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, d),
-      new THREE.ShaderMaterial({ vertexShader: VERT_BOTTOM, fragmentShader: FRAG_BOTTOM, uniforms, side: THREE.DoubleSide }),
-    );
-    under.position.set(cx, cy, s.bottom - 0.02);   // juste sous la surface (pas de scintillement)
-    sides.add(under);
     this.sides = sides;
-    this.scene.add(sides);
+    this.world.add(sides);
 
     this._lastVersion = -1;
     this.computeMs = performance.now() - t0;
     this._status();
+  }
+
+  /** Contours « outer » du dessin, en repère du brut. */
+  _outerPolys() {
+    return this.drawing.filter(d => d.outer && d.pts.length > 2)
+      .map(d => d.pts.map(p => this._toStock({ ...p, z: 0 }, d.face)));
+  }
+
+  /** Masque des cases appartenant à une pièce (intérieur des contours « outer »). */
+  _partMask() {
+    const { nx, ny, x0, y0, cell } = this.sim;
+    const mask = new Uint8Array(nx * ny);
+    const polys = this._outerPolys();
+    if (!polys.length) { mask.fill(255); return mask; }
+    for (let j = 0; j < ny; j++) {
+      const y = y0 + j * cell;
+      for (const poly of polys) {
+        const xs = [];
+        for (let i = 0, k = poly.length - 1; i < poly.length; k = i++) {
+          const a = poly[i], b = poly[k];
+          if ((a.y > y) !== (b.y > y)) xs.push(a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y));
+        }
+        xs.sort((p, q) => p - q);
+        for (let k = 0; k + 1 < xs.length; k += 2) {
+          const i0 = Math.max(0, Math.ceil((xs[k] - x0) / cell)), i1 = Math.min(nx - 1, Math.floor((xs[k + 1] - x0) / cell));
+          for (let i = i0; i <= i1; i++) mask[j * nx + i] = 255;
+        }
+      }
+    }
+    return mask;
   }
 
   _buildPaths() {
@@ -286,20 +381,21 @@ export class SimulationView {
     for (const mv of this.program.moves) {
       if (mv.type === 'dwell' || mv.len === 0) continue;
       const kind = this.program.sections[mv.sec]?.kind ?? 'contour';
-      const pts = [];
+      const raw = [];
       if (mv.type === 'arc') {
         const n = Math.max(2, Math.ceil(Math.abs(mv.sw) / (Math.PI / 36)));
         for (let k = 0; k <= n; k++) {
           const a = mv.a0 + mv.sw * k / n;
-          pts.push(mv.cx + mv.r * Math.cos(a), mv.cy + mv.r * Math.sin(a), mv.z0 + (mv.z - mv.z0) * k / n);
+          raw.push({ x: mv.cx + mv.r * Math.cos(a), y: mv.cy + mv.r * Math.sin(a), z: mv.z0 + (mv.z - mv.z0) * k / n });
         }
       } else {
-        pts.push(mv.x0, mv.y0, mv.z0, mv.x, mv.y, mv.z);
+        raw.push({ x: mv.x0, y: mv.y0, z: mv.z0 }, { x: mv.x, y: mv.y, z: mv.z });
       }
+      const pts = raw.map(p => this._toStock(p, mv.face));
       const out = mv.type === 'rapid' ? rapid : feed;
       col.setHex(KIND_COLORS[kind] ?? KIND_COLORS.contour);
-      for (let k = 0; k + 5 < pts.length; k += 3) {      // un segment par paire de points consécutifs
-        out.push(pts[k], pts[k + 1], pts[k + 2], pts[k + 3], pts[k + 4], pts[k + 5]);
+      for (let k = 0; k + 1 < pts.length; k++) {      // un segment par paire de points consécutifs
+        out.push(pts[k].x, pts[k].y, pts[k].z, pts[k + 1].x, pts[k + 1].y, pts[k + 1].z);
         if (out === feed) feedCol.push(col.r, col.g, col.b, col.r, col.g, col.b);
       }
     }
@@ -307,7 +403,7 @@ export class SimulationView {
     fg.setAttribute('position', new THREE.Float32BufferAttribute(feed, 3));
     fg.setAttribute('color', new THREE.Float32BufferAttribute(feedCol, 3));
     this.paths = new THREE.LineSegments(fg, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
-    this.scene.add(this.paths);
+    this.world.add(this.paths);
 
     const rg = new THREE.BufferGeometry();
     rg.setAttribute('position', new THREE.Float32BufferAttribute(rapid, 3));
@@ -322,7 +418,25 @@ export class SimulationView {
     rg.setAttribute('lineDistance', new THREE.BufferAttribute(dist, 1));
     this.rapids = new THREE.LineSegments(rg, new THREE.LineDashedMaterial({ color: RAPID_COLOR, dashSize: 2, gapSize: 2 }));
     this.rapids.visible = false;
-    this.scene.add(this.rapids);
+    this.world.add(this.rapids);
+  }
+
+  /** « Dessin » : contours théoriques, juste au-dessus (face 1) ou au-dessous (face 2) du brut. */
+  _buildDrawing() {
+    if (!this.drawing.length) return;
+    const s = this.stock, seg = [];
+    for (const d of this.drawing) {
+      const z = d.face === 2 ? s.bottom - 0.05 : s.top + 0.05;
+      const pts = d.pts.map(p => ({ ...this._toStock({ ...p, z: 0 }, d.face), z }));
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        seg.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(seg, 3));
+    this.drawLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: this.light ? 0x101018 : 0x1c1c22 }));
+    this.world.add(this.drawLines);
   }
 
   _buildTool() {
@@ -331,7 +445,7 @@ export class SimulationView {
     geo.rotateX(Math.PI / 2);
     geo.translate(0, 0, len / 2);       // origine du maillage = bout de la fraise
     this.toolMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xd0d4da, metalness: 0.6, roughness: 0.35 }));
-    this.scene.add(this.toolMesh);
+    this.world.add(this.toolMesh);
   }
 
   _fitCamera() {
@@ -343,20 +457,49 @@ export class SimulationView {
     this.controls.update();
   }
 
+  /** Vue face 1 (dessus en haut) ou face 2 (pièce retournée comme sur la machine). */
+  _setViewFace(face) {
+    if (face === this.viewFace) return;
+    this.viewFace = face;
+    const f = this.program.flip, s = this.stock;
+    const zm = s.top + s.bottom;          // retournement : z → top + bottom − z
+    this.world.rotation.set(0, 0, 0);
+    this.world.position.set(0, 0, 0);
+    if (face === 2 && f) {
+      if (f.axis === 'x') { this.world.rotation.y = Math.PI; this.world.position.set(2 * f.c, 0, zm); }
+      else                { this.world.rotation.x = Math.PI; this.world.position.set(0, 2 * f.c, zm); }
+    }
+    const flipped = face === 2 && f;
+    this.uniforms.uViewFlip.value.set(flipped && f.axis === 'x' ? -1 : 1, flipped && f.axis === 'y' ? -1 : 1, flipped ? -1 : 1);
+  }
+
+  _updateView(currentFace = this._currentFace ?? 1) {
+    this._setViewFace(this.viewMode === 'auto' ? currentFace : Number(this.viewMode));
+  }
+
   // ─── Simulation ──────────────────────────────────────────────────────────
 
   _seek(time, force = false) {
     this.time = Math.max(0, Math.min(this.total, time));
     if (force) this.sim.reset();
-    const p = this.sim.seek(this.time);
-    if (p) this.toolMesh?.position.set(p.x, p.y, p.z);
+    this.sim.seek(this.time);
+    const mv = this.program.moves[moveIndexAt(this.program.moves, this.time)];
+    const face = mv?.face ?? 1;
+    const p = this.sim.toolPosition();
+    if (p && this.toolMesh) {
+      const q = this._toStock(p, face);
+      this.toolMesh.position.set(q.x, q.y, q.z);
+      this.toolMesh.rotation.set(0, face === 2 && this.program.flip ? Math.PI : 0, 0);   // face 2 : outil par en dessous
+    }
+    this._currentFace = face;
+    if (this.program.flip) this._updateView(face);
     const frac = this.total ? this.time / this.total : 0;
     this.ui.progress.value = Math.round(frac * 10000);
     this.ui.progress.style.setProperty('--p', `${(frac * 100).toFixed(2)}%`);   // partie remplie de la ligne de temps
     this.ui.time.textContent  = formatDuration(this.time);
     this.ui.total.textContent = formatDuration(this.total);
-    const mv = this.program.moves[moveIndexAt(this.program.moves, this.time)];
-    this.ui.op.textContent = this.program.sections[mv?.sec]?.label ?? '';
+    const label = this.program.sections[mv?.sec]?.label ?? '';
+    this.ui.op.textContent = this.program.flip && label ? `${t(face === 2 ? 'sim.view_face2' : 'sim.view_face1')} · ${label}` : label;
   }
 
   _status() {
@@ -372,10 +515,11 @@ export class SimulationView {
     this._lastFrame = now;
     if (this.playing) {
       this._seek(this.time + dt * this.speed);
-      if (this.time >= this.total) { this.playing = false; this.ui.play.innerHTML = '<i class="fa-solid fa-play"></i>'; }
+      if (this.time >= this.total) { this.playing = false; this._updatePlayIcon(); }
     }
     if (this.sim.version !== this._lastVersion) {
       this.heightTex.needsUpdate = true;
+      if (this.program.flip) this.floorTex.needsUpdate = true;   // le dessous ne change qu'en face 2
       this._lastVersion = this.sim.version;
     }
     this.controls.update();
@@ -393,7 +537,7 @@ export class SimulationView {
 
   _disposeObj(obj) {
     if (!obj) return;
-    this.scene.remove(obj);
+    obj.parent?.remove(obj);
     obj.traverse(o => { o.geometry?.dispose(); o.material?.dispose?.(); });
   }
 
@@ -403,8 +547,8 @@ export class SimulationView {
     cancelAnimationFrame(this._raf);
     this._resizeObs?.disconnect();
     document.removeEventListener('keydown', this._onKey);
-    [this.surface, this.sides, this.paths, this.rapids, this.toolMesh].forEach(o => this._disposeObj(o));
-    this.heightTex?.dispose();
+    [this.surface, this.under, this.sides, this.paths, this.rapids, this.drawLines, this.toolMesh].forEach(o => this._disposeObj(o));
+    [this.heightTex, this.floorTex, this.maskTex].forEach(tx => tx?.dispose());
     this.controls.dispose();
     this.renderer.dispose();
     this.el.remove();

@@ -1,6 +1,7 @@
 import { GCodeGenerator } from '../gcode/GCodeGenerator.js';
 import { pocketConcentric } from '../gcode/PocketConcentric.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
+import { insetPolygon } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
 
 /**
@@ -65,6 +66,20 @@ export class OpenTray {
 
     gen.footer();
     return gen.getCode();
+  }
+
+  /**
+   * Contours théoriques pour la simulation (case « Dessin ») et le masque « Pièce finie
+   * seule » : coordonnées de la forme (origine programme non appliquée).
+   * outer = contour qui détache la pièce du brut.
+   */
+  getDrawing(shape, params) {
+    const pts = shape.getContourPoints();
+    const cavity = insetPolygon(pts, params.wallThickness ?? 6);
+    return [
+      { pts, face: 1, outer: true },
+      ...(cavity.length > 2 ? [{ pts: cavity, face: 1 }] : []),
+    ];
   }
 
   /**

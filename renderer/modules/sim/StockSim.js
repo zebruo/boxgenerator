@@ -1,13 +1,15 @@
 /**
  * StockSim.js — Simulation d'enlèvement de matière par grille de hauteurs.
  *
- * Le brut est une grille régulière (pas `cell` mm) dont chaque case garde la hauteur du
- * dessus de la matière. La fraise (droite, rayon r) abaisse les cases sous son disque à
+ * Le brut est une grille régulière (pas `cell` mm). Chaque case garde deux hauteurs : le
+ * dessus de la matière (`heights`, abaissé par les usinages de la face 1) et le dessous
+ * (`floors`, relevé par ceux de la face 2, pièce retournée). La case est vide quand
+ * floors ≥ heights. La fraise (droite, rayon r) agit sur les cases sous son disque à
  * chaque point de son trajet. La simulation avance dans le temps du programme : avancer est
  * incrémental ; revenir en arrière recalcule depuis le début.
  */
 
-import { pointOnMove } from './GCodeProgram.js';
+import { pointOnMove, toStockFrame } from './GCodeProgram.js';
 
 export class StockSim {
   /**
@@ -17,8 +19,10 @@ export class StockSim {
    * @param {number} o.cell                  pas de la grille (mm)
    * @param {number} o.toolRadius            rayon de la fraise (mm)
    * @param {object[]} o.moves               mouvements datés (GCodeProgram.parseProgram)
+   * @param {object}   [o.flip]              retournement face 2 (parseProgram().flip)
    */
-  constructor({ x0, y0, x1, y1, top, bottom, cell, toolRadius, moves }) {
+  constructor({ x0, y0, x1, y1, top, bottom, cell, toolRadius, moves, flip = null }) {
+    this.flip = flip;
     this.cell = cell;
     this.nx = Math.max(2, Math.round((x1 - x0) / cell) + 1);
     this.ny = Math.max(2, Math.round((y1 - y0) / cell) + 1);
@@ -28,6 +32,7 @@ export class StockSim {
     this.top = top; this.bottom = bottom;
     this.moves = moves;
     this.heights = new Float32Array(this.nx * this.ny);
+    this.floors  = new Float32Array(this.nx * this.ny);
 
     this.rc = toolRadius / cell;   // rayon de la fraise en cases
     this.step = cell * 0.7;        // pas d'échantillonnage du trajet
@@ -36,6 +41,7 @@ export class StockSim {
 
   reset() {
     this.heights.fill(this.top);
+    this.floors.fill(this.bottom);
     this.idx = 0;           // mouvement en cours
     this.u = 0;             // fraction déjà simulée de ce mouvement
     this.time = 0;
@@ -49,15 +55,30 @@ export class StockSim {
    */
   _stamp(x, y, z) {
     if (z >= this.top) return;
+    this._disk(x, y, this.heights, z, true);
+  }
+
+  /** Face 2 (pièce retournée) : relève le dessous de la matière jusqu'à hb (repère du brut). */
+  _stampUnder(x, y, hb) {
+    if (hb <= this.bottom) return;
+    this._disk(x, y, this.floors, hb, false);
+  }
+
+  /**
+   * Cases de arr sous le disque de la fraise centré en (x, y) : abaissées à v (lower) ou
+   * relevées à v (sinon).
+   */
+  _disk(x, y, arr, v, lower) {
     const fx = (x - this.x0) / this.cell, fy = (y - this.y0) / this.cell;
-    const { nx, ny, heights, rc } = this;
+    const { nx, ny, rc } = this;
     const j0 = Math.max(0, Math.ceil(fy - rc)), j1 = Math.min(ny - 1, Math.floor(fy + rc));
     for (let j = j0; j <= j1; j++) {
       const dy = j - fy;
       const span = Math.sqrt(Math.max(0, rc * rc - dy * dy));
       const i0 = Math.max(0, Math.ceil(fx - span)), i1 = Math.min(nx - 1, Math.floor(fx + span));
       const row = j * nx;
-      for (let i = i0; i <= i1; i++) if (heights[row + i] > z) heights[row + i] = z;
+      if (lower) { for (let i = i0; i <= i1; i++) if (arr[row + i] > v) arr[row + i] = v; }
+      else       { for (let i = i0; i <= i1; i++) if (arr[row + i] < v) arr[row + i] = v; }
     }
   }
 
@@ -66,9 +87,13 @@ export class StockSim {
     if (Math.min(mv.z0, mv.z) >= this.top || mv.type === 'dwell') return;
     const len = mv.len * (ub - ua);
     const n = Math.max(1, Math.ceil(len / this.step));
+    const under = mv.face === 2 && this.flip;
     for (let k = 0; k <= n; k++) {
       const p = pointOnMove(mv, ua + (ub - ua) * k / n);
-      this._stamp(p.x, p.y, p.z);
+      if (!under) { this._stamp(p.x, p.y, p.z); continue; }
+      if (p.z >= this.top) continue;
+      const q = toStockFrame(p, 2, this.flip, this.top, this.bottom);
+      this._stampUnder(q.x, q.y, q.z);
     }
   }
 
@@ -97,11 +122,18 @@ export class StockSim {
     return pointOnMove(moves[this.idx], this.u);
   }
 
-  /** Hauteur de matière restante au point (x, y), ou null hors du brut. */
+  /** Hauteur du dessus de la matière au point (x, y), ou null hors du brut. */
   heightAt(x, y) {
     const i = Math.round((x - this.x0) / this.cell), j = Math.round((y - this.y0) / this.cell);
     if (i < 0 || j < 0 || i >= this.nx || j >= this.ny) return null;
     return this.heights[j * this.nx + i];
+  }
+
+  /** Hauteur du dessous de la matière au point (x, y) (relevé par la face 2), ou null. */
+  floorAt(x, y) {
+    const i = Math.round((x - this.x0) / this.cell), j = Math.round((y - this.y0) / this.cell);
+    if (i < 0 || j < 0 || i >= this.nx || j >= this.ny) return null;
+    return this.floors[j * this.nx + i];
   }
 }
 
