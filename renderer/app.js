@@ -250,7 +250,7 @@ function bindEvents() {
   });
 
   // Machine params — live update
-  ['param-thickness','param-tool-diameter','param-passes','param-feedrate','param-plunge','param-spindle','param-safe-z','param-arcs'].forEach(id => {
+  ['param-thickness','param-tool-diameter','param-passes','param-feedrate','param-plunge','param-spindle','param-safe-z','param-arcs','param-rapid'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => { updateRabbetToolWarning(); updatePartitionWarning(); updatePreview(); });
   });
 
@@ -551,7 +551,8 @@ function getMachineParams() {
     plungeRate:        parseFloat(document.getElementById('param-plunge').value),
     spindleSpeed:      parseFloat(document.getElementById('param-spindle').value),
     safeZ:             parseFloat(document.getElementById('param-safe-z').value),
-    arcs:              document.getElementById('param-arcs').checked
+    arcs:              document.getElementById('param-arcs').checked,
+    rapidRate:         Number.parseFloat(document.getElementById('param-rapid').value) || 3000  // G0 (temps estimé)
   };
 }
 
@@ -626,7 +627,7 @@ async function openSimulation() {
   simView?.close();
   // Le panneau recouvre toute la zone centrale (barre 3D / Vues 2D comprise, inactive pendant la simulation)
   simView = new SimulationView(document.querySelector('.panel-center'), {
-    code, stock, toolDiameter: machine.toolDiameter,
+    code, stock, toolDiameter: machine.toolDiameter, rapidRate: machine.rapidRate,
     light: document.documentElement.dataset.theme === 'light',
     onClose: () => { simView = null; },
   });
@@ -964,7 +965,7 @@ function showExportModal(sections, machine = {}) {
       <div class="tabs-fields${o.tabsOn ? '' : ' disabled'}" id="modal-tabs-fields">
         <span class="tab-f-lbl">${t('modal.tab_count')}</span>
         <input type="number" id="modal-tab-count"  class="tab-input" value="${o.tabCount}"  min="1"   max="12"  step="1">
-        <span class="tab-f-lbl">${t('modal.tab_width')}</span>
+        <span class="tab-f-lbl" data-tip="${t('modal.tip_tab_width')}">${t('modal.tab_width')}</span>
         <input type="number" id="modal-tab-width"  class="tab-input" value="${o.tabWidth}"  min="1"   max="20"  step="0.5">
         <span class="tab-f-unit">mm</span>
         <span class="tab-f-lbl">${t('modal.tab_height')}</span>
@@ -1370,6 +1371,7 @@ async function loadSession() {
     set('param-spindle',      mp.spindleSpeed);
     set('param-safe-z',       mp.safeZ);
     if (typeof mp.arcs === 'boolean') document.getElementById('param-arcs').checked = mp.arcs;
+    if (mp.rapidRate > 0) set('param-rapid', mp.rapidRate);
   }
 
   // Restaure Z0

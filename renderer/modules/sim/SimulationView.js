@@ -83,10 +83,11 @@ export class SimulationView {
    * @param {string} o.code             G-code à simuler
    * @param {{x0,y0,x1,y1,top,bottom}} o.stock  brut, en coordonnées machine
    * @param {number} o.toolDiameter
+   * @param {number} [o.rapidRate]      vitesse des G0 de la machine (mm/min), pour le temps estimé
    * @param {boolean} [o.light]         thème clair
    * @param {Function} [o.onClose]
    */
-  constructor(host, { code, stock, toolDiameter, light = false, onClose = null }) {
+  constructor(host, { code, stock, toolDiameter, rapidRate = 3000, light = false, onClose = null }) {
     this.host = host;
     this.code = code;
     this.stock = stock;
@@ -95,8 +96,8 @@ export class SimulationView {
     this.playing = false;
     this.time = 0;
     this.speed = Number(lsGet('sim.speed', 50)) || 50;
-    this.resolution = lsGet('sim.res', 'standard');
-    this.rapidRate = Number(lsGet('sim.rapid', 3000)) || 3000;
+    this.resolution = 'standard';          // ≈ 0,27 mm : suffisant pour ces pièces
+    this.rapidRate = rapidRate > 0 ? rapidRate : 3000;
     this.light = light;
 
     this._buildDom();
@@ -120,14 +121,10 @@ export class SimulationView {
     const el = document.createElement('div');
     el.className = 'sim-overlay';
     const speedOpts = SPEEDS.map(s => `<option value="${s}"${s === this.speed ? ' selected' : ''}>×${s}</option>`).join('');
-    const resOpts = ['fast', 'standard', 'fine']
-      .map(r => `<option value="${r}"${r === this.resolution ? ' selected' : ''}>${t('sim.res_' + r)}</option>`).join('');
     el.innerHTML = `
       <div class="sim-toolbar">
         <span class="sim-title">${t('sim.title')}</span>
         <label class="sim-lbl">${t('sim.speed')} <select class="sim-speed">${speedOpts}</select></label>
-        <label class="sim-lbl">${t('sim.resolution')} <select class="sim-res">${resOpts}</select></label>
-        <label class="sim-lbl" title="${t('sim.rapid_tip')}">G0 <input type="number" class="sim-rapid" min="100" max="30000" step="100" value="${this.rapidRate}"> mm/min</label>
         <label class="sim-lbl"><input type="checkbox" class="sim-show-tool" checked> ${t('sim.tool')}</label>
         <label class="sim-lbl"><input type="checkbox" class="sim-show-paths" checked> ${t('sim.paths')}</label>
         <label class="sim-lbl"><input type="checkbox" class="sim-show-rapids"> ${t('sim.rapids')}</label>
@@ -173,19 +170,6 @@ export class SimulationView {
       this._seek(this.total * this.ui.progress.value / 10000);
     });
     q('.sim-speed').addEventListener('change', e => { this.speed = Number(e.target.value); lsSet('sim.speed', this.speed); });
-    q('.sim-res').addEventListener('change', e => {
-      this.resolution = e.target.value; lsSet('sim.res', this.resolution);
-      this._buildSim(); this._seek(this.time, true);
-    });
-    q('.sim-rapid').addEventListener('change', e => {
-      const v = Number(e.target.value);
-      if (!(v > 0)) return;
-      const frac = this.total ? this.time / this.total : 0;
-      this.rapidRate = v; lsSet('sim.rapid', v);
-      this._loadProgram();
-      this.sim.moves = this.program.moves;
-      this._seek(frac * this.total, true);
-    });
     q('.sim-show-tool').addEventListener('change', e => { this.toolMesh.visible = e.target.checked; });
     q('.sim-show-paths').addEventListener('change', e => { this.paths.visible = e.target.checked; });
     q('.sim-show-rapids').addEventListener('change', e => { this.rapids.visible = e.target.checked; });

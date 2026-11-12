@@ -529,6 +529,9 @@ export class GCodeGenerator {
     const tabCount  = hasTabs ? (tabOpts.count  ?? 4)   : 0;
     const tabWidth  = hasTabs ? (tabOpts.width  ?? 8) : 0;
     const tabHeight = hasTabs ? (tabOpts.height ?? 2) : 0;
+    // Largeur saisie = pont de matière réel ; la fraise mord de son rayon de chaque côté,
+    // donc l'outil reste au-dessus du tab sur largeur + Ø
+    const tabPath   = tabWidth + this.machine.toolDiameter;
     const tabZ      = -(depth - tabHeight);
 
     const leadInR  = entryOpts.leadIn  ?? false;
@@ -569,7 +572,7 @@ export class GCodeGenerator {
     // Découpage du tour en portions 'cut' / 'tab' pour un cercle de rayon rad
     // (tabs centrés à 45°, 135°… : jamais sur le point de départ à 3 h)
     const buildTabSegs = rad => {
-      const tabHalfAng = tabWidth / (2 * rad);
+      const tabHalfAng = tabPath / (2 * rad);
       const boundaries = [];
       for (let t = 0; t < tabCount; t++) {
         const center = (2 * Math.PI / tabCount) * (t + 0.5);
@@ -694,7 +697,7 @@ export class GCodeGenerator {
    * @param {string}       side     - 'outside' | 'inside' | 'center'
    * @param {Object}       tabOpts  - options des tabs
    *   count  {number} : nombre de tabs (défaut 4)
-   *   width  {number} : largeur d'un tab en mm (défaut 8)
+   *   width  {number} : largeur du pont de matière en mm (défaut 8) ; trajet relevé = width + Ø
    *   height {number} : hauteur résiduelle du tab en mm (défaut 2)
    * @param {string}       label
    */
@@ -708,6 +711,9 @@ export class GCodeGenerator {
     const tabCount  = tabOpts.count  ?? 4;
     const tabWidth  = tabOpts.width  ?? 8;
     const tabHeight = tabOpts.height ?? 2;
+    // Largeur saisie = pont de matière réel ; la fraise mord de son rayon de chaque côté,
+    // donc l'outil reste au-dessus du tab sur largeur + Ø
+    const tabPath   = tabWidth + this.machine.toolDiameter;
 
     const fa       = entryOpts.finishAllowance ?? 0;
     const toolR    = this.machine.toolDiameter / 2;
@@ -755,7 +761,7 @@ export class GCodeGenerator {
     // Seuil bas : un arrondi discrétisé (ex. 11,25° par segment) est une suite de
     // « coins » ; il n'offre aucun segment assez long, donc aucun tab ne s'y pose.
     const CORNER_THR  = 1;               // degrés — au-delà : changement de direction
-    const cornerMargin = tabWidth / 2 + 2; // marge bord-de-tab → coin (mm)
+    const CORNER_CLEAR = 1;                // dégagement mini (mm) entre le trajet relevé et chaque coin
 
     // Recenser tous les coins (toutes directions confondues)
     const allCornerDists = [];
@@ -781,7 +787,7 @@ export class GCodeGenerator {
         const s   = sorted[i];
         const e   = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + perimeter;
         const len = e - s;
-        if (len > tabWidth + cornerMargin)
+        if (len > tabPath + 2 * CORNER_CLEAR)
           segs.push({ center: ((s + e) / 2) % perimeter, len });
       }
       return segs;
@@ -836,7 +842,7 @@ export class GCodeGenerator {
     const leadLabel  = leadInR ? `, lead-in R${leadInR}mm` : '';
     this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}, ${safeTabCenters.length} tabs ${tabWidth}×${tabHeight}mm${skippedTabs ? `, ${skippedTabs} évité(s) sur angles` : ''}) ───`);
 
-    const tabEv = this._tabEvents(safeTabCenters, tabWidth, perimeter);
+    const tabEv = this._tabEvents(safeTabCenters, tabPath, perimeter);
 
     for (let pass = 1; pass <= passes; pass++) {
       const z      = -(stepZ * pass);
@@ -906,7 +912,7 @@ export class GCodeGenerator {
       const finTabCenters = safeTabCenters.map(c => c * finPerimeter / perimeter);
 
       const zFin  = -depth;
-      const finEv = this._tabEvents(finTabCenters, tabWidth, finPerimeter);
+      const finEv = this._tabEvents(finTabCenters, tabPath, finPerimeter);
 
       this.comment(`Passe finition paroi — Z=${zFin.toFixed(3)} [tabs actifs]`);
       this.rapidZ(this.machine.safeZ);

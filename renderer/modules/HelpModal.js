@@ -176,7 +176,7 @@ export function showHelpModal(machine = {}) {
       <!-- ── Tabs ────────────────────────────────────────── -->
       <section class="help-section">
         <h4>Tabs de maintien</h4>
-        <p>Ponts de matière laissés sur la <strong>dernière passe uniquement</strong> pour maintenir la pièce dans le brut. L'outil remonte automatiquement au-dessus de chaque tab. Ils sont placés au milieu des côtés droits les plus longs, jamais dans un angle ni dans un arrondi ; sur une forme sans côté droit (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre. Par défaut : 4 tabs de 8 mm de long et 2 mm de haut.</p>
+        <p>Ponts de matière laissés sur la <strong>dernière passe uniquement</strong> pour maintenir la pièce dans le brut. L'outil remonte automatiquement au-dessus de chaque tab. Ils sont placés au milieu des côtés droits les plus longs, jamais dans un angle ni dans un arrondi ; sur une forme sans côté droit (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre. Par défaut : 4 tabs de 8 mm de long et 2 mm de haut. La largeur saisie est la longueur réelle du pont de matière : l'outil reste au-dessus du tab sur cette largeur plus son diamètre, car il mord de son rayon de chaque côté.</p>
       </section>
 
       <!-- ── Valeurs par défaut ──────────────────────────── -->
