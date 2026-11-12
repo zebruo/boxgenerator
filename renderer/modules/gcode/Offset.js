@@ -44,20 +44,39 @@ export function offsetPolygons(points, delta, { join = 'miter', miterLimit = 2, 
   const sign = Math.sign(signedArea(points));
   if (!sign) return [];
 
-  const path = points.map(p => ({ X: Math.round(p.x * SCALE), Y: Math.round(p.y * SCALE) }));
   const co = new C.ClipperOffset(miterLimit, arcTol * SCALE);
-  co.AddPath(path, join === 'round' ? C.JoinType.jtRound : C.JoinType.jtMiter, C.EndType.etClosedPolygon);
+  co.AddPath(toPath(points), join === 'round' ? C.JoinType.jtRound : C.JoinType.jtMiter, C.EndType.etClosedPolygon);
   const solution = new C.Paths();
   co.Execute(solution, delta * SCALE);
 
   return solution
     .filter(p => p.length >= 3 && C.Clipper.Orientation(p))   // contours extérieurs seulement
     .map(p => {
-      const q = p.map(v => ({ x: v.X / SCALE, y: v.Y / SCALE }));
+      const q = fromPath(p);
       if (Math.sign(signedArea(q)) !== sign) q.reverse();
       return q;
     })
     .sort((a, b) => Math.abs(signedArea(b)) - Math.abs(signedArea(a)));
+}
+
+const toPath   = pts => pts.map(p => ({ X: Math.round(p.x * SCALE), Y: Math.round(p.y * SCALE) }));
+const fromPath = p => p.map(v => ({ x: v.X / SCALE, y: v.Y / SCALE }));
+
+/**
+ * Différence booléenne : zones couvertes par `subject` et non par `clip`.
+ * Renvoie tous les contours du résultat (extérieurs et trous), chacun fermé.
+ */
+export function differencePolygons(subject, clip) {
+  const subj = subject.filter(p => p.length >= 3);
+  if (!subj.length) return [];
+  const C = clipper();
+  const c = new C.Clipper();
+  c.AddPaths(subj.map(toPath), C.PolyType.ptSubject, true);
+  const cl = clip.filter(p => p.length >= 3);
+  if (cl.length) c.AddPaths(cl.map(toPath), C.PolyType.ptClip, true);
+  const solution = new C.Paths();
+  c.Execute(C.ClipType.ctDifference, solution, C.PolyFillType.pftNonZero, C.PolyFillType.pftNonZero);
+  return solution.filter(p => p.length >= 3).map(fromPath);
 }
 
 /** Rétrécit un contour de d mm ; renvoie le plus grand contour obtenu, ou [] s'il disparaît. */
