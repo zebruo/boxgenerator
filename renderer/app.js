@@ -722,9 +722,9 @@ function resizeCanvases() {
 }
 
 function updatePreview() {
-  // Choix « À plat / Assemblé » : seulement pour la boîte à couvercle
+  // Choix « À plat / Assemblé » : boîtes en plusieurs pièces (couvercle, encoches)
   document.querySelectorAll('.lid-layout-ctrl').forEach(el => {
-    el.style.display = state.boxTypeKey === 'lid-box' ? '' : 'none';
+    el.style.display = state.boxTypeKey === 'lid-box' || state.boxTypeKey === 'finger-joint' ? '' : 'none';
   });
   if (state.view === '3d') {
     if (!threePreview) {

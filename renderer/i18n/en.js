@@ -264,7 +264,7 @@ export const en = {
     safe_z:           'Safe Z height between operations',
     arcs:             'Merges segments into G2/G3 arcs: much shorter file. Uncheck if your controller does not support arcs.',
     btn_simulate:     'Simulate machining of the exported file (with the export window options)',
-    lid_layout:       'Lid laid flat next to the body (as machined) or assembled on the body',
+    lid_layout:       'Parts laid flat (as machined) or box assembled',
     btn_3d:           '3D preview',
     btn_2d:           '2D technical views with dimensions',
     z0_level:         'Z0 level: top or bottom of box',

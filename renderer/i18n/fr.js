@@ -264,7 +264,7 @@ export const fr = {
     safe_z:           'Hauteur de survol Z entre opérations',
     arcs:             'Regroupe les segments en arcs G2/G3 : fichier beaucoup plus court. Décochez si votre contrôleur ne gère pas les arcs.',
     btn_simulate:     "Simuler l'usinage du fichier exporté (avec les options de la fenêtre d'export)",
-    lid_layout:       'Couvercle à plat à côté du corps (comme usiné) ou assemblé sur le corps',
+    lid_layout:       'Pièces à plat (comme usinées) ou boîte assemblée',
     btn_3d:           'Prévisualisation 3D',
     btn_2d:           'Vues techniques 2D avec cotes',
     z0_level:         'Niveau Z0 : bas ou haut de la boîte',

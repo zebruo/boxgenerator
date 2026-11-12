@@ -8,6 +8,15 @@ import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 // comme dans la simulation d'usinage.
 const BOX_COLOR = 0xff7518;
 const PHANTOM_COLOR = 0x8e8e96;   // pièces d'illustration (boîte du dessous de l'empilable)
+// Boîte à encoches : une teinte par panneau (tons bois contrastés) pour distinguer les encoches
+const FINGER_COLORS = {
+  bottom: 0xff7518,   // potiron
+  front:  0xe8b04a,   // ocre clair
+  back:   0xb5541c,   // brique
+  left:   0xf3d18b,   // sable
+  right:  0x8a4b2a,   // noyer
+  lid:    0xffa860,   // abricot
+};
 
 /**
  * Prévisualisation 3D WebGL avec Three.js.
@@ -129,11 +138,16 @@ export class ThreePreview {
     const _rimH = boxParams.rimHeight ?? 8;
     // Compartiments (cloisons) : mêmes contours que le G-code (découpés par la cavité)
     const cells = this._compartments(shapePts, bb, boxTypeKey, boxParams, machineParams);
-    let layW = W, layD = D;   // emprise de ce qui est affiché (corps + couvercle côte à côte)
-    let lidLay = null;        // boîte à couvercle : disposition (à plat / assemblé) et hauteur visible
+    let layW = W, layD = D;   // emprise de ce qui est affiché (pièces côte à côte à plat)
+    // Boîtes en plusieurs pièces (couvercle, encoches) : disposition (à plat / assemblée) et
+    // hauteur visible
+    let lidLay = null;
     switch (boxTypeKey) {
       case 'open-tray':    this._buildOpenTray(shapePts, W, D, H, wt, bFl, cells); break;
-      case 'finger-joint': this._buildFingerBox(shapePts, H, boxParams);        break;
+      case 'finger-joint':
+        lidLay = this._buildFingerBox(shapePts, H, boxParams);
+        layW = lidLay.W; layD = lidLay.D;
+        break;
       case 'lid-box': {
         const _r = boxParams.rabbet ?? 3; const _bFll = boxParams.lidBottomThickness ?? bFl;
         lidLay = this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells);
@@ -232,33 +246,47 @@ export class ThreePreview {
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys);
 
-    const fj   = new FingerJointBox();
-    const pane = rel => this._shape(fj._toPoints(rel));
-    const wood = this._mat(BOX_COLOR, { roughness: 0.7 });
-    // m : matrice local (x, y, z extrudé) → monde ; rotations pures (déterminant +1)
-    const place = (shape, m, mat = wood) => {
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false });
-      geo.applyMatrix4(m);
-      this._mesh(geo, mat);
-    };
+    const fj = new FingerJointBox();
+    // Une teinte par panneau (tons bois contrastés) pour bien distinguer les encoches
+    const mat = (key, extra = {}) => this._mat(FINGER_COLORS[key], { roughness: 0.7, ...extra });
     const M = (...e) => new THREE.Matrix4().set(...e, 0, 0, 0, 1);
+    // m : matrice local (x, y, z extrudé) → monde ; rotations pures (déterminant +1)
+    const place = (pts2, m, material) => {
+      const geo = new THREE.ExtrudeGeometry(this._shape(pts2), { depth: t, bevelEnabled: false });
+      geo.applyMatrix4(m);
+      this._mesh(geo, material);
+    };
 
-    const front = pane(withLid ? fj._frontWithTop(W, H, fw, t, bl) : fj._frontWithoutTop(W, H, fw, t, bl));
-    const side  = pane(withLid ? fj._sideWithTop(D, H, fw, t, bl)  : fj._sideWithoutTop(D, H, fw, t, bl));
-    const floor = pane(fj._bottom(W, D, fw, t, bl));
+    // ── À plat : panneaux disposés comme dans le G-code (brut = plaque d'épaisseur t) ──
+    if (this.lidLayout !== 'assembled') {
+      const fakeShape = { getBoundingBox: () => ({ width: W, height: D }) };
+      const prm  = { ...boxParams, height: H };
+      const keys = { 'Fond': 'bottom', 'Couvercle': 'lid', 'Paroi avant': 'front',
+                     'Paroi arrière': 'back', 'Côté gauche': 'left', 'Côté droit': 'right' };
+      for (const p of fj._buildGCodeLayout(fakeShape, prm)) {
+        place(fj._toPoints(p.rel, p.ox, p.oy), new THREE.Matrix4(), mat(keys[p.label] ?? 'bottom'));
+      }
+      const bbG = fj.getGCodeBoundingBox(fakeShape, prm);
+      return { W: bbG.maxX, D: bbG.maxY, assembled: false, height: t };
+    }
 
-    place(floor, M(1, 0, 0, 0,   0, 1, 0, 0,   0, 0, 1, 0));                 // fond
+    // ── Assemblée ───────────────────────────────────────────────────────────
+    const front = fj._toPoints(withLid ? fj._frontWithTop(W, H, fw, t, bl) : fj._frontWithoutTop(W, H, fw, t, bl));
+    const side  = fj._toPoints(withLid ? fj._sideWithTop(D, H, fw, t, bl)  : fj._sideWithoutTop(D, H, fw, t, bl));
+    const floor = fj._toPoints(fj._bottom(W, D, fw, t, bl));
+
+    place(floor, M(1, 0, 0, 0,   0, 1, 0, 0,   0, 0, 1, 0), mat('bottom'));                 // fond
     // avant / arrière : (x, y, z) → (x, z [+ D−t], H − y)
-    place(front, M(1, 0, 0, 0,   0, 0, 1, 0,       0, -1, 0, H));
-    place(front, M(1, 0, 0, 0,   0, 0, 1, D - t,   0, -1, 0, H));
+    place(front, M(1, 0, 0, 0,   0, 0, 1, 0,       0, -1, 0, H), mat('front'));
+    place(front, M(1, 0, 0, 0,   0, 0, 1, D - t,   0, -1, 0, H), mat('back'));
     // gauche / droit : (x, y, z) → (t − z | W − z, x, H − y)
-    place(side,  M(0, 0, -1, t,  1, 0, 0, 0,   0, -1, 0, H));
-    place(side,  M(0, 0, -1, W,  1, 0, 0, 0,   0, -1, 0, H));
+    place(side,  M(0, 0, -1, t,  1, 0, 0, 0,   0, -1, 0, H), mat('left'));
+    place(side,  M(0, 0, -1, W,  1, 0, 0, 0,   0, -1, 0, H), mat('right'));
     // couvercle, légèrement transparent pour voir l'intérieur
     if (withLid) {
-      place(pane(fj._bottom(W, D, fw, t, bl)), M(1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, H - t),
-        this._mat(BOX_COLOR, { roughness: 0.7, transparent: true, opacity: 0.55 }));
+      place(floor, M(1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, H - t), mat('lid', { transparent: true, opacity: 0.55 }));
     }
+    return { W, D, assembled: true, height: H };
   }
 
   _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6, cells = null) {
