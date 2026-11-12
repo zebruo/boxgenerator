@@ -137,7 +137,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .param-row input[type=number] {
   background: var(--bg-dark); border: 1px solid var(--border);
   border-radius: var(--radius-sm); color: var(--text);
-  padding: 4px 6px; font-size: 12px; width: 100%; text-align: right;
+  padding: 3px 4px 3px 6px; font-size: 12px; line-height: 18px; width: 100%; text-align: right;
   outline: none;
 }
 .param-row input[type=number]:focus { border-color: var(--accent); }
