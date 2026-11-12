@@ -37,9 +37,10 @@ function lsSet(key, val) { try { localStorage.setItem(key, val); } catch { /* st
 const COMMON = /* glsl */`
   uniform sampler2D uHeight, uFloor, uMask;
   uniform vec2 uSize;
-  uniform float uTop, uBottom, uPartOnly;
+  uniform float uCell, uTop, uBottom, uPartOnly;
   uniform vec3 uColor, uViewFlip, uCam;
   varying vec3 vPos;
+  varying vec2 vCellPos;
   varying float vVis;
   vec2 tc(vec2 c) { return (clamp(c, vec2(0.0), uSize - 1.0) + 0.5) / uSize; }
   float Hs(vec2 c) { return texture2D(uHeight, tc(c)).r; }
@@ -49,10 +50,24 @@ const COMMON = /* glsl */`
   }`;
 
 // Fragment seulement (dFdx/dFdy n'existent pas dans un vertex shader)
+// Les flancs sont des escaliers de cases : leur normale de triangle alterne entre X et Y
+// (rayures sur les parois courbes). Pour un flanc, on prend donc la direction de la pente
+// de la matière, lissée sur 5 × 3 cases, qui suit la vraie courbure de la paroi.
 const FRAG_COMMON = COMMON + /* glsl */`
+  float G(vec2 c);   // surface (dessus ou dessous) : définie par chaque shader
   vec3 faceNormal() {
     vec3 n = normalize(cross(dFdx(vPos), dFdy(vPos)));
-    return dot(n, uCam - vPos) < 0.0 ? -n : n;
+    n = dot(n, uCam - vPos) < 0.0 ? -n : n;
+    if (abs(n.z) > 0.6) return n;                    // surface plane ou en pente douce : normale exacte
+    vec2 c = floor(vCellPos + 0.5), g = vec2(0.0);
+    for (int k = -1; k <= 1; k++) {
+      float fk = float(k);
+      g.x += G(c + vec2(2.0, fk)) - G(c - vec2(2.0, fk));
+      g.y += G(c + vec2(fk, 2.0)) - G(c - vec2(fk, 2.0));
+    }
+    if (length(g) < 1e-4) return n;
+    vec3 w = normalize(vec3(-g, 0.0));               // horizontale, vers le côté le plus bas
+    return dot(w, n) < 0.0 ? -w : w;                 // du côté visible du triangle
   }
   float light(vec3 n) {
     n = normalize(n * uViewFlip);   // repère du brut → monde (vue face 2 retournée)
@@ -63,7 +78,8 @@ const FRAG_COMMON = COMMON + /* glsl */`
 
 const vert = zExpr => COMMON + /* glsl */`
   void main() {
-    vec2 c = floor(uv * (uSize - 1.0) + 0.5);
+    vCellPos = uv * (uSize - 1.0);
+    vec2 c = floor(vCellPos + 0.5);
     vVis = hiddenCell(c) ? 0.0 : 1.0;
     vPos = vec3(position.xy, ${zExpr});
     gl_Position = projectionMatrix * modelViewMatrix * vec4(vPos, 1.0);
@@ -72,6 +88,7 @@ const vert = zExpr => COMMON + /* glsl */`
 // Dessus de la matière
 const VERT_TOP = vert('max(Hs(c), Fs(c))');
 const FRAG_TOP = FRAG_COMMON + /* glsl */`
+  float G(vec2 c) { return max(Hs(c), Fs(c)); }
   void main() {
     if (vVis < 0.001) discard;                       // triangle entièrement dans une découpe
     float depth = clamp((uTop - vPos.z) / max(uTop - uBottom, 0.001), 0.0, 1.0);
@@ -81,6 +98,7 @@ const FRAG_TOP = FRAG_COMMON + /* glsl */`
 // Dessous de la matière (plat, ou creusé par la face 2)
 const VERT_UNDER = vert('min(Fs(c), Hs(c)) - 0.02');
 const FRAG_UNDER = FRAG_COMMON + /* glsl */`
+  float G(vec2 c) { return min(Fs(c), Hs(c)); }
   void main() {
     if (vVis < 0.001) discard;
     float depth = clamp((vPos.z - uBottom) / max(uTop - uBottom, 0.001), 0.0, 1.0);
@@ -306,7 +324,7 @@ export class SimulationView {
     this.maskTex   = tex(this._partMask(), THREE.UnsignedByteType);
     this.uniforms = {
       uHeight: { value: this.heightTex }, uFloor: { value: this.floorTex }, uMask: { value: this.maskTex },
-      uSize: { value: new THREE.Vector2(nx, ny) },
+      uSize: { value: new THREE.Vector2(nx, ny) }, uCell: { value: this.sim.cell },
       uTop: { value: s.top }, uBottom: { value: s.bottom }, uColor: { value: WOOD },
       uPartOnly: { value: 0 }, uViewFlip: { value: new THREE.Vector3(1, 1, 1) },
       uCam: { value: new THREE.Vector3() },   // caméra dans le repère des maillages (mise à jour à chaque image)
