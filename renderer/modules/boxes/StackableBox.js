@@ -1,5 +1,6 @@
 import { GCodeGenerator } from '../gcode/GCodeGenerator.js';
 import { pocketConcentric } from '../gcode/PocketConcentric.js';
+import { insetPolygon } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
 
 /**
@@ -91,7 +92,15 @@ export class StackableBox {
     gen.emit('');
     gen.comment('Retourner la piece sur les goupilles avant de lancer OP2');
     gen.comment('Z0 inchange \u2014 piece a plat sur le martyre');
+    // Rep\u00e8re lu par la simulation (GCodeProgram) : retournement gauche \u2194 droite, les
+    // goupilles (sym\u00e9triques autour du centre) changent de trou \u2192 miroir X autour du centre
+    gen.comment(`FACE 2 \u2014 piece retournee gauche-droite (miroir X autour de X=${(bb.width / 2 + gen.machine.originX).toFixed(3)})`);
     gen.emit('');
+
+    // OP2 : pièce retournée gauche ↔ droite sur les goupilles → la machine voit la forme en
+    // miroir autour de l'axe des goupilles (X = largeur/2). Sans ce miroir, le dessous ne
+    // tombait juste que pour les formes symétriques gauche/droite.
+    const pts2 = this._mirrorOp2(pts, bb);
 
     // 2a. Rainure languette — fraisage annulaire autour du plot
     // Le plot (languette) = solid inset de (wt + stackGap) depuis le bord exterieur
@@ -102,11 +111,11 @@ export class StackableBox {
     gen.comment("Rainure plot — anneau de " + tongueInset.toFixed(1) + "mm de large");
     const ringContours = [];
     for (let d = toolR; d < tongueInset - toolR * 0.01; d += gen.machine.toolDiameter) {
-      const ringPts = gen.insetContour(pts, d);
+      const ringPts = gen.insetContour(pts2, d);
       if (ringPts.length >= 3) ringContours.push(ringPts);
     }
     // Passe finale au bord exact du plot
-    const finalPts = gen.insetContour(pts, tongueInset);
+    const finalPts = gen.insetContour(pts2, tongueInset);
     if (finalPts.length >= 3) ringContours.push(finalPts);
     gen.cutContoursInterleaved(ringContours, 'outside', entryOpts, t('gcode.op_rim_mill'));
 
@@ -115,16 +124,42 @@ export class StackableBox {
     gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
     const arcDef = shape.getArcDef ? shape.getArcDef() : null;
     if (arcDef) {
-      gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_outer_contour'), tabOpts || null);
+      gen.cutCircleContour(bb.width - arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_outer_contour'), tabOpts || null);
     } else if (tabOpts) {
-      gen.cutContourWithTabs(pts, 'outside', tabOpts, entryOpts, t('gcode.op_outer_contour'));
+      gen.cutContourWithTabs(pts2, 'outside', tabOpts, entryOpts, t('gcode.op_outer_contour'));
     } else {
-      gen.cutContour(pts, 'outside', entryOpts, t('gcode.op_outer_contour'));
+      gen.cutContour(pts2, 'outside', entryOpts, t('gcode.op_outer_contour'));
     }
 
     gen.machine.materialThickness = savedT;
     gen.footer();
     return gen.getCode();
+  }
+
+  /**
+   * Contours théoriques pour la simulation (coordonnées de la forme, repère machine de
+   * chaque face). La pièce est détachée par le contour de l'OP2 (face 2), d'où outer là.
+   */
+  getDrawing(shape, params) {
+    const { wallThickness = 6, clearance = 0.3 } = params;
+    const pts  = shape.getContourPoints();
+    const pts2 = this._mirrorOp2(pts, shape.getBoundingBox());   // repère machine de l'OP2
+    const cavity = insetPolygon(pts, wallThickness);
+    const plot   = insetPolygon(pts2, wallThickness + clearance);
+    return [
+      { pts, face: 1 },
+      ...(cavity.length > 2 ? [{ pts: cavity, face: 1 }] : []),
+      { pts: pts2, face: 2, outer: true },
+      ...(plot.length > 2 ? [{ pts: plot, face: 2 }] : []),
+    ];
+  }
+
+  /**
+   * Forme vue par la machine en OP2 : miroir autour de l'axe des goupilles (X = largeur/2,
+   * milieu des deux trous), sens de parcours inversé pour garder l'orientation du contour.
+   */
+  _mirrorOp2(pts, bb) {
+    return pts.map(p => ({ x: bb.width - p.x, y: p.y })).reverse();
   }
 
   getFlatPanels(shape, params) {
