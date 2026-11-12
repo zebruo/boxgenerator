@@ -17,6 +17,7 @@ function createWindow() {
       nodeIntegration: false
     },
     title: 'Box Generator - CNC',
+    icon: path.join(__dirname, 'renderer', 'assets', 'icon.ico'),
     backgroundColor: '#1a1a2e'
   });
 

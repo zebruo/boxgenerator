@@ -45,8 +45,9 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-panel); border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.logo { display: flex; align-items: center; gap: 8px; }
-.logo-icon { font-size: 20px; }
+/* Texte aligné sur sa ligne de base, logo centré verticalement */
+.logo { display: flex; align-items: baseline; gap: 8px; }
+.logo-icon { width: 26px; height: 26px; align-self: center; display: block; }
 .logo-text { font-size: 16px; font-weight: 700; color: var(--accent); }
 .logo-sub { font-size: 11px; color: var(--text-muted); }
 .header-actions { display: flex; gap: 8px; align-items: center; }
