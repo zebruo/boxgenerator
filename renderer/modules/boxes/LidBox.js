@@ -79,13 +79,6 @@ export class LidBox {
     const stockExtra = Math.max(0, savedT - Math.max(height, lidHeight));
     const bodyT = height    + stockExtra;
     const lidT  = lidHeight + stockExtra;
-    // Z0 en bas du brut (zOffset > 0) : chaque brut a sa propre épaisseur, donc son propre
-    // décalage (le dessus du brut est à son épaisseur). Sans cela, le couvercle plus mince
-    // n'était fraisé que jusqu'à Z = (épaisseur du corps − la sienne) au-dessus de son fond.
-    // Z0 en haut du brut (zOffset = 0) : dessus de chaque brut à Z0, rien à décaler.
-    const zOffBase = gen.machine.zOffset;
-    const zOffFor  = T => (zOffBase > 0 ? zOffBase - (savedT - T) : zOffBase);
-    gen.machine.zOffset = zOffFor(bodyT);
     const fa = machineParams.finishAllowance ?? 0;
     const doPocket = machineParams.pocketConc
       ? (pts, lbl, ds = 0) => pocketConcentric(gen, pts, lbl, ds, fa)
@@ -143,7 +136,6 @@ export class LidBox {
     // ═══════════════════════════════════════════════════════════════════════
     gen.comment('');
     gen.comment('═══ COUVERCLE ═══');
-    gen.machine.zOffset = zOffFor(lidT);   // brut du couvercle (voir ci-dessus)
 
     // Décale le couvercle par rapport au corps
     const lidGap       = 20;
