@@ -1,5 +1,7 @@
 import * as THREE from '../../lib/three.module.js';
 import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
+import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
+import { insetPolygon } from '../gcode/Offset.js';
 
 /**
  * Prévisualisation 3D WebGL avec Three.js.
@@ -118,10 +120,12 @@ export class ThreePreview {
     const bFl = boxParams.bottomThickness ?? bt;
 
     const _rimH = boxParams.rimHeight ?? 8;
+    // Compartiments (cloisons) : mêmes contours que le G-code (découpés par la cavité)
+    const cells = this._compartments(shapePts, bb, boxTypeKey, boxParams, machineParams);
     switch (boxTypeKey) {
-      case 'open-tray':    this._buildOpenTray(shapePts, W, D, H, wt, bFl);   break;
+      case 'open-tray':    this._buildOpenTray(shapePts, W, D, H, wt, bFl, cells); break;
       case 'finger-joint': this._buildFingerBox(shapePts, H, boxParams);        break;
-      case 'lid-box': { const _r = boxParams.rabbet ?? 3; const _bFll = boxParams.lidBottomThickness ?? bFl; this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll); break; }
+      case 'lid-box': { const _r = boxParams.rabbet ?? 3; const _bFll = boxParams.lidBottomThickness ?? bFl; this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells); break; }
       case 'stackable': {
         const _gap = boxParams.clearance ?? 0.3;
         this._buildStackable(shapePts, H, wt, bFl, _rimH, _gap);
@@ -168,29 +172,28 @@ export class ThreePreview {
 
   // ─── Construction des géométries ──────────────────────────────────────────
 
-  _buildOpenTray(pts, W, D, H, wt, bt) {
+  _buildOpenTray(pts, W, D, H, wt, bt, cells = null) {
     // Fond (forme réelle, épaisseur bt)
     const bottomShape = this._shape(pts);
     const bottomGeo = new THREE.ExtrudeGeometry(bottomShape, { depth: bt, bevelEnabled: false });
     this._mesh(bottomGeo, this._mat(0x7a4a1a, { roughness: 0.85 }));
 
-    // Parois : forme avec trou (outer - inner) extrudée de bt à H
+    // Parois (et cloisons) : forme percée de la cavité — ou des compartiments — extrudée de bt à H
+    const innerPts = this._offsetPts(pts, -wt);  // offset négatif = vers l'intérieur (CCW)
+    const holes    = cells ?? [innerPts];
     const wallShape = this._shape(pts);
-    const innerPts  = this._offsetPts(pts, -wt);  // offset négatif = vers l'intérieur (CCW)
-    const hole = new THREE.Path();
-    innerPts.forEach((p, i) => i === 0 ? hole.moveTo(p.x, p.y) : hole.lineTo(p.x, p.y));
-    hole.closePath();
-    wallShape.holes = [hole];
+    wallShape.holes = holes.map(h => this._path(h));
 
     const wallGeo = new THREE.ExtrudeGeometry(wallShape, { depth: H - bt, bevelEnabled: false });
     const wallMesh = this._mesh(wallGeo, this._mat(0xb06030, { roughness: 0.75 }));
     wallMesh.position.z = bt;
 
-    // Plancher intérieur (ShapeGeometry, légèrement au-dessus du fond)
-    const floorShape = this._shape(innerPts);
-    const floorGeo   = new THREE.ShapeGeometry(floorShape);
-    const floorMesh  = this._mesh(floorGeo, this._mat(0x1a0f08, { roughness: 0.95, side: THREE.FrontSide }));
-    floorMesh.position.z = bt + 0.5;
+    // Plancher intérieur de chaque compartiment (légèrement au-dessus du fond)
+    for (const h of holes) {
+      const floorMesh = this._mesh(new THREE.ShapeGeometry(this._shape(h)),
+        this._mat(0x1a0f08, { roughness: 0.95, side: THREE.FrontSide }));
+      floorMesh.position.z = bt + 0.5;
+    }
   }
 
   _buildFingerBox(pts, H, boxParams = {}) {
@@ -234,11 +237,12 @@ export class ThreePreview {
     }
   }
 
-  _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6) {
+  _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6, cells = null) {
     const gap = 2; // espace visuel corps ↔ couvercle
 
     // ── CORPS (z : 0 → H) ──────────────────────────────────────────────────
     const innerPts = this._offsetPts(pts, -wt);
+    const holes    = cells ?? [innerPts];   // cavité, ou compartiments s'il y a des cloisons
 
     // Fond (pleine forme, épaisseur bFl)
     this._mesh(
@@ -246,24 +250,34 @@ export class ThreePreview {
       this._mat(0x8a3a0a, { roughness: 0.85 })
     );
 
-    // Parois creuses : de bFl à H-rD (s'arrête avant la rainure pour éviter le Z-fighting)
+    // Parois (et cloisons) : de bFl à H-rD (s'arrête avant la rainure pour éviter le Z-fighting).
+    // Feuillure intérieure (rs=0) : le G-code abaisse aussi les cloisons de rD ; feuillure
+    // extérieure (rs=1) : les cloisons montent jusqu'en haut (bloc ajouté plus bas).
     const wallShape = this._shape(pts);
-    const wallHole  = new THREE.Path();
-    innerPts.forEach((p, i) => i === 0 ? wallHole.moveTo(p.x, p.y) : wallHole.lineTo(p.x, p.y));
-    wallHole.closePath();
-    wallShape.holes = [wallHole];
+    wallShape.holes = holes.map(h => this._path(h));
     const wallMesh = this._mesh(
       new THREE.ExtrudeGeometry(wallShape, { depth: Math.max(0.1, H - rD - bFl), bevelEnabled: false }),
       this._mat(0xb04a10, { roughness: 0.7 })
     );
     wallMesh.position.z = bFl;
+    if (cells && rs === 1) {
+      const partShape = this._shape(innerPts);
+      partShape.holes = cells.map(h => this._path(h));
+      const partTop = this._mesh(
+        new THREE.ExtrudeGeometry(partShape, { depth: rD, bevelEnabled: false }),
+        this._mat(0xb04a10, { roughness: 0.7 })
+      );
+      partTop.position.z = H - rD;
+    }
 
-    // Face intérieure du fond (visuel cavité)
-    const floorMesh = this._mesh(
-      new THREE.ShapeGeometry(this._shape(innerPts)),
-      this._mat(0x080f25, { roughness: 0.95, side: THREE.FrontSide })
-    );
-    floorMesh.position.z = bFl + 0.5;
+    // Face intérieure du fond (visuel cavité), par compartiment
+    for (const h of holes) {
+      const floorMesh = this._mesh(
+        new THREE.ShapeGeometry(this._shape(h)),
+        this._mat(0x080f25, { roughness: 0.95, side: THREE.FrontSide })
+      );
+      floorMesh.position.z = bFl + 0.5;
+    }
 
     // Feuillure corps — élargie par le jeu mécanique
     // Cas 0 : rainure intérieure — anneau entre (wt-r-jeu) et wt, largeur r+jeu, profondeur rD
@@ -407,6 +421,24 @@ export class ThreePreview {
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  /** Crée un THREE.Path (trou) depuis un tableau de {x, y}. */
+  _path(pts) {
+    const p = new THREE.Path();
+    pts.forEach((q, i) => i === 0 ? p.moveTo(q.x, q.y) : p.lineTo(q.x, q.y));
+    p.closePath();
+    return p;
+  }
+
+  /** Compartiments des cloisons (plateau, corps de la boîte à couvercle), ou null. */
+  _compartments(pts, bb, boxTypeKey, boxParams, machineParams) {
+    const n = boxParams.partitions ?? 0;
+    if (n <= 0 || (boxTypeKey !== 'open-tray' && boxTypeKey !== 'lid-box')) return null;
+    const wt = boxParams.wallThickness ?? 6;
+    return buildPartitionContours(bb.width, bb.height, wt, n,
+      boxParams.partitionDir === 'horizontal' ? 'horizontal' : 'vertical', machineParams.toolDiameter ?? 3.175,
+      { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(pts, wt) });
+  }
 
   /** Crée un THREE.Shape depuis un tableau de {x, y}. */
   _shape(pts) {

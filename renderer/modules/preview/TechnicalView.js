@@ -1,4 +1,6 @@
 import { t } from '../i18n.js';
+import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
+import { insetPolygon } from '../gcode/Offset.js';
 
 /**
  * TechnicalView — 4 vues orthogonales 2D avec cotes éditables
@@ -140,7 +142,15 @@ export class TechnicalView {
     // Scale commun = le plus petit des deux pour cohérence visuelle entre vues
     const sc = Math.min(scTop, scElev);
 
-    const nfo = { shape, bb, W, D, H, wt, bt, bFl, bFll, lidH, r, rD, rim, rimH, rs, jeu, sc, totalH, boxTypeKey, boxParams };
+    // Compartiments (cloisons) : mêmes contours que le G-code (découpés par la cavité)
+    const nParts = boxParams.partitions ?? 0;
+    const partDir = boxParams.partitionDir === 'horizontal' ? 'horizontal' : 'vertical';
+    const cells = nParts > 0 && (boxTypeKey === 'open-tray' || boxTypeKey === 'lid-box')
+      ? buildPartitionContours(W, D, wt, nParts, partDir, machineParams.toolDiameter ?? 3.175,
+          { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(shape.getContourPoints(), wt) })
+      : null;
+
+    const nfo = { shape, bb, W, D, H, wt, bt, bFl, bFll, lidH, r, rD, rim, rimH, rs, jeu, sc, totalH, boxTypeKey, boxParams, cells, nParts, partDir };
 
     if (boxTypeKey === 'finger-joint' && boxType) {
       this._viewFingerJoint(CW, CH, boxType, shape, boxParams);
@@ -174,7 +184,7 @@ export class TechnicalView {
 
   // ── VUE 1 : Dessus ───────────────────────────────────────────────────────
   _viewDessus(ox, oy, qW, qH, nfo, title) {
-    const { shape, bb, W, D, wt, sc, boxTypeKey, boxParams } = nfo;
+    const { shape, bb, W, D, wt, sc, boxTypeKey, boxParams, cells } = nfo;
     this._panelBg(ox, oy, qW, qH, title);
 
     const ctx = this.ctx;
@@ -204,12 +214,13 @@ export class TechnicalView {
     ctx.lineWidth = 1.2 / sc;
     ctx.stroke();
 
-    // Cavité intérieure
+    // Cavité intérieure — ou compartiments s'il y a des cloisons
     if (boxTypeKey !== 'finger-joint') {
       const ip = this._offsetPts(pts, wt);
-      if (ip.length > 2) {
+      for (const poly of cells ?? [ip]) {
+        if (poly.length <= 2) continue;
         ctx.beginPath();
-        ip.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+        poly.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
         ctx.closePath();
         ctx.fillStyle = this.C.inner;
         ctx.fill();
@@ -630,6 +641,26 @@ export class TechnicalView {
     if (H > bFl && W > 2 * wt) {
       ctx.fillStyle = this.C.inner;
       ctx.fillRect(iX, csBot - H * sc, iW, (H - bFl) * sc);
+    }
+
+    // ── Cloisons coupées par le plan de coupe (celles qui divisent la largeur) ──
+    // Hauteur : jusqu'en haut, sauf feuillure intérieure de la boîte à couvercle (le G-code
+    // les abaisse de la profondeur de feuillure).
+    if (nfo.cells && nfo.partDir === 'vertical' && H > bFl) {
+      const n = nfo.nParts;
+      const cellW = (W - 2 * wt - n * wt) / (n + 1);
+      const topH = boxTypeKey === 'lid-box' && rs === 0 ? H - rD : H;
+      ctx.fillStyle = this.C.wood;
+      ctx.strokeStyle = this.C.text;
+      ctx.lineWidth = 1;
+      for (let k = 1; k <= n; k++) {
+        const px = sx + (wt + k * cellW + (k - 1) * wt) * sc;
+        ctx.fillRect(px, csBot - topH * sc, wW, (topH - bFl) * sc);
+        ctx.beginPath();
+        ctx.moveTo(px, csBot - bFl * sc);       ctx.lineTo(px, csBot - topH * sc);
+        ctx.lineTo(px + wW, csBot - topH * sc); ctx.lineTo(px + wW, csBot - bFl * sc);
+        ctx.stroke();
+      }
     }
 
     // ── Rainures feuillure corps (lid-box) — largeur r+jeu pour le jeu mécanique ──
