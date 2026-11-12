@@ -6,7 +6,7 @@ import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 
 // Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
 // comme dans la simulation d'usinage.
-const BOX_COLOR = 0xff7518;
+const BOX_COLOR = 0xd9b26a;   // = --accent2 (sable) du thème sombre
 const PHANTOM_COLOR = 0x8e8e96;   // pièces d'illustration (boîte du dessous de l'empilable)
 // Boîte à encoches : une teinte par panneau (tons bois contrastés) pour distinguer les encoches
 const FINGER_COLORS = {

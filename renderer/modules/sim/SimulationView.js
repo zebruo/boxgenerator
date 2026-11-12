@@ -19,7 +19,7 @@ import { offsetPolygons } from '../gcode/Offset.js';
 
 const KIND_COLORS = { pocket: 0x2f80ed, contour: 0xf2711c, drill: 0x27ae60 };
 const RAPID_COLOR = 0x9aa0a6;
-const WOOD = new THREE.Color(0xd99559);
+const WOOD = new THREE.Color(0xd9b26a);   // = --accent2 (sable), même teinte que l'aperçu 3D
 const SPEEDS = [1, 5, 10, 20, 50, 100, 200, 500];
 
 function lsGet(key, def) { try { return localStorage.getItem(key) ?? def; } catch { return def; } }
