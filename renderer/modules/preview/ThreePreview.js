@@ -208,20 +208,16 @@ export class ThreePreview {
     else if (lidLay) machH = lidLay.height;
     const zOff  = boxTypeKey === 'stackable' ? -_rimH : 0;
     this._buildZ0Gizmo(layW, layD, machH, this.z0Pos, this.z0Level, zOff);
+    // Hauteurs différentes : le G-code garde le brut à la hauteur max pour les deux pièces,
+    // dessus au même niveau (Z0 en haut comme en bas) ; la moins haute est donc remontée
+    // pour que son dessus soit au niveau de celui de la plus haute.
     const pc = lidLay?.pieces;
-    if (pc && Math.abs(pc.H - pc.lidH) > 1e-6) {
-      // Hauteurs différentes : deux bruts à leurs épaisseurs (voir l'avertissement à l'export).
-      // Z0 en haut : le dessus de chaque brut est à Z0, la pièce la moins haute est remontée
-      // pour que le repère soit juste pour les deux ; Z0 en bas : les deux posées à Z = 0.
-      const gap = this.z0Level === 'top' ? Math.abs(pc.H - pc.lidH) : 0;
-      const zBody = pc.H < pc.lidH ? gap : 0, zLid = pc.lidH < pc.H ? gap : 0;
-      for (const m of pc.bodyMeshes) m.position.z += zBody;
-      pc.lid.position.z += zLid;
-      this._buildStock(pc.W, pc.D, pc.H,    this.stockOffset, this.stockSide, zBody, 0,     0);
-      this._buildStock(pc.W, pc.D, pc.lidH, this.stockOffset, this.stockSide, zLid,  pc.dx, pc.dy);
-    } else {
-      this._buildStock(layW, layD, machH, this.stockOffset, this.stockSide, zOff);
+    if (pc) {
+      const gap = Math.abs(pc.H - pc.lidH);
+      if (pc.H < pc.lidH) for (const m of pc.bodyMeshes) m.position.z += gap;
+      else                pc.lid.position.z += gap;
     }
+    this._buildStock(layW, layD, machH, this.stockOffset, this.stockSide, zOff);
   }
 
   /** Cadrage par défaut (vue 3/4 avant-droite) sur la dernière géométrie construite. */
@@ -446,8 +442,8 @@ export class ThreePreview {
     // Emprise totale corps + couvercle (caméra, grille, brut, repère Z0)
     return {
       W: Math.max(W, W + dx), D: Math.max(D, D + dy), assembled: false, height: Math.max(H, lidH),
-      // Pièces séparées (hauteurs différentes → deux bruts) : de quoi les placer chacune
-      pieces: { W, D, dx, dy, H, lidH, bodyMeshes, lid },
+      // Pièces séparées : de quoi remonter la moins haute (hauteurs différentes)
+      pieces: { H, lidH, bodyMeshes, lid },
     };
   }
 
@@ -642,13 +638,13 @@ export class ThreePreview {
   // ─── Stock / brut ──────────────────────────────────────────────────────────
 
   /** Construit le volume brut (wireframe + solide transparent) autour de la boîte. */
-  _buildStock(W, D, H, offset, side = 'top', zOffset = 0, ox = 0, oy = 0) {
+  _buildStock(W, D, H, offset, side = 'top', zOffset = 0) {
     const off = Math.max(0, offset);
     const sw  = W + 2 * off;
     const sd  = D + 2 * off;
     const sh  = H + off;
 
-    const cx = ox + W / 2, cy = oy + D / 2;
+    const cx = W / 2, cy = D / 2;
     // 'top'    : brut de Z=zOffset à Z=zOffset+H+off
     // 'bottom' : brut de Z=zOffset-off à Z=zOffset+H
     const cz = (side === 'bottom' ? (H - off) / 2 : sh / 2) + zOffset;
