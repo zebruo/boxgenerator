@@ -132,13 +132,7 @@ export class LidBox {
     }
 
     gen.machine.materialThickness = bodyT;  // hauteur du corps (+ surplus de brut)
-    if (arcDef) {
-      gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_body_contour'), tabOpts || null);
-    } else if (tabOpts) {
-      gen.cutContourWithTabs(bodyPts, 'outside', tabOpts, entryOpts, t('gcode.op_body_contour'));
-    } else {
-      gen.cutContour(bodyPts, 'outside', entryOpts, t('gcode.op_body_contour'));
-    }
+    gen.cutOutline(bodyPts, 'outside', entryOpts, t('gcode.op_body_contour'), tabOpts, arcDef);
 
     // ═══════════════════════════════════════════════════════════════════════
     // COUVERCLE
@@ -175,13 +169,8 @@ export class LidBox {
       }
       // 2. Contour extérieur (dernière opération)
       gen.machine.materialThickness = lidT;   // hauteur du couvercle (+ surplus de brut)
-      if (arcDef) {
-        gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r - inset0, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts || null);
-      } else if (tabOpts) {
-        gen.cutContourWithTabs(lidPts, 'outside', tabOpts, entryOpts, t('gcode.op_lid_contour'));
-      } else {
-        gen.cutContour(lidPts, 'outside', entryOpts, t('gcode.op_lid_contour'));
-      }
+      gen.cutOutline(lidPts, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts,
+        arcDef && { ...arcDef, r: arcDef.r - inset0 });
     } else {
       // Couvercle plein nominal : taille = corps, lèvre r s'emboîte dans rainure r+jeu
       gen.comment(`Couvercle plein: taille nominale (lèvre ${rabbet}mm, rainure ${rabbet}+${clearance}mm)`);
@@ -200,13 +189,7 @@ export class LidBox {
       }
       // 3. Contour extérieur (dernière opération)
       gen.machine.materialThickness = lidT;   // hauteur du couvercle (+ surplus de brut)
-      if (arcDef) {
-        gen.cutCircleContour(arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts || null);
-      } else if (tabOpts) {
-        gen.cutContourWithTabs(lidPts1, 'outside', tabOpts, entryOpts, t('gcode.op_lid_contour'));
-      } else {
-        gen.cutContour(lidPts1, 'outside', entryOpts, t('gcode.op_lid_contour'));
-      }
+      gen.cutOutline(lidPts1, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts, arcDef);
     }
     gen.machine.originX = savedOriginX;
     gen.machine.originY = savedOriginY;

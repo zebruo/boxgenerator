@@ -294,127 +294,208 @@ export class GCodeGenerator {
     return { exitPt, arcPts };
   }
 
+  // ─── Briques communes aux contours ──────────────────────────────────────
+
+  /** Passes en Z : nombre et pas pour atteindre `depth` (épaisseur du brut par défaut). */
+  _passPlan(depth = this.machine.materialThickness) {
+    const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
+    return { depth, passes, stepZ: depth / passes };
+  }
+
+  /** Réglages d'entrée d'outil (valeurs par défaut comprises) et libellé correspondant. */
+  _entrySettings(entryOpts = {}) {
+    const td = this.machine.toolDiameter;
+    const e = {
+      entry:      entryOpts.entry      ?? 'plunge',
+      rampLen:    entryOpts.rampLen    ?? td,
+      helixR:     entryOpts.helixR     ?? td * 0.5,
+      helixTurns: entryOpts.helixTurns ?? 1,
+      leadInR:    entryOpts.leadIn     ?? false,
+      leadOutR:   entryOpts.leadOut    ?? false,
+      fa:         entryOpts.finishAllowance ?? 0,
+      dogbone:    !!entryOpts.dogbone,
+    };
+    e.label = (e.entry === 'ramp'  ? `, ramp ${e.rampLen}mm`
+             : e.entry === 'helix' ? `, helix R${e.helixR}mm×${e.helixTurns}t`
+             : '') + (e.leadInR ? `, lead-in R${e.leadInR}mm` : '');
+    return e;
+  }
+
+  /** Réglages des tabs : largeur saisie = pont de matière réel ; la fraise mord de son rayon
+   *  de chaque côté, donc l'outil reste relevé sur largeur + Ø. tabZ = sommet des tabs. */
+  _tabSettings(tabOpts, depth) {
+    const count = tabOpts.count ?? 4, width = tabOpts.width ?? 8, height = tabOpts.height ?? 2;
+    return { count, width, height, path: width + this.machine.toolDiameter, z: -(depth - height) };
+  }
+
+  /**
+   * Trajets d'outil d'un contour : ébauche (décalée de r + surépaisseur) et, s'il y a une
+   * surépaisseur, finition (décalée de r). Départ au milieu du côté le plus long de
+   * l'ébauche, même index pour la finition. `rough` / `exact` sont les trajets nets
+   * (lead-in, centre d'hélice) ; `cut` / `cutFin` reçoivent en plus les dogbones éventuels.
+   */
+  _contourPaths(points, side, fa, dogbone) {
+    const r    = this.machine.toolDiameter / 2;
+    const sign = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
+    const finish = fa > 0 && sign !== 0;
+    const exactRaw = sign !== 0 ? this._offsetContourDist(points, sign * r) : points;
+    const roughRaw = finish ? this._offsetContourDist(points, sign * (r + fa)) : exactRaw;
+    const entryIdx = sign !== 0 ? this._maxSegIdx(roughRaw) : -1;
+    const rough = entryIdx >= 0 ? this._reorderAt(roughRaw, entryIdx) : roughRaw;
+    const exact = finish ? this._reorderAt(exactRaw, entryIdx) : rough;
+    const bones = pts => dogbone ? this._insertDogbones(pts) : pts;
+    return { rough, exact, cut: bones(rough), cutFin: finish ? bones(exact) : null };
+  }
+
+  /**
+   * Descente de l'outil jusqu'à z au début du trajet `cut`, selon le mode d'entrée
+   * (plongée, rampe, hélice centrée sur `rough`) ; lead-in éventuel jusqu'à cut[0].
+   */
+  _enterContour(cut, rough, z, e, leadIn) {
+    if (e.entry === 'helix') {
+      const cx = rough.reduce((s, p) => s + p.x, 0) / rough.length;
+      const cy = rough.reduce((s, p) => s + p.y, 0) / rough.length;
+      this.rapidTo(cx + e.helixR, cy);
+      this._helixIn(cx, cy, e.helixR, z, e.helixTurns);
+      if (leadIn) {
+        this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
+        this.lineTo(cut[0].x, cut[0].y);
+      } else {
+        this.rapidTo(cut[0].x, cut[0].y);
+      }
+    } else if (e.entry === 'ramp') {
+      this.rapidTo(cut[0].x, cut[0].y);
+      this._rampIn(cut, z, e.rampLen);
+      if (leadIn) {
+        this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
+        this.lineTo(cut[0].x, cut[0].y);
+      }
+    } else if (leadIn) {
+      this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
+      this.plungeTo(z);
+      this.lineTo(cut[0].x, cut[0].y);
+    } else {
+      this.rapidTo(cut[0].x, cut[0].y);
+      this.plungeTo(z);
+    }
+  }
+
+  /** Tour complet du contour fermé depuis pts[0] (l'outil est déjà en pts[0]). */
+  _loop(pts) {
+    for (let i = 1; i < pts.length; i++) this.lineTo(pts[i].x, pts[i].y);
+    this.lineTo(pts[0].x, pts[0].y);
+  }
+
+  /** Longueur de chaque segment du contour fermé et périmètre. */
+  _segLengths(pts) {
+    const n = pts.length, segLengths = [];
+    let perimeter = 0;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      segLengths.push(len);
+      perimeter += len;
+    }
+    return { segLengths, perimeter };
+  }
+
   // ─── Opérations de haut niveau ───────────────────────────────────────────
 
   /**
-   * Fraise un profil fermé (liste de points) avec compensation d'outil.
-   * @param {Array<{x,y}>} points  - contour fermé
-   * @param {string}       side    - 'outside' | 'inside' | 'center'
-   * @param {string}       label
+   * Contour extérieur d'une pièce : vrais arcs G2/G3 si la forme est un cercle (`arc`),
+   * sinon contour polygonal, avec tabs si `tabOpts`. Point d'entrée unique des boîtes.
+   * @param {{x,y}[]}            points
+   * @param {{cx,cy,r}|null}     arc     cercle exact (repère du programme) ou null
    */
+  cutOutline(points, side, entryOpts, label, tabOpts = null, arc = null) {
+    if (arc) this.cutCircleContour(arc.cx, arc.cy, arc.r, side, entryOpts, label, tabOpts || null);
+    else     this.cutContour(points, side, entryOpts, label, tabOpts || null);
+  }
+
   /**
-   * Fraise un profil fermé avec compensation d'outil, entrée progressive et lead-in/out.
+   * Fraise un profil fermé avec compensation d'outil, entrée progressive, lead-in/out,
+   * surépaisseur de finition et, si `tabOpts`, tabs de maintien.
    *
-   * @param {Array<{x,y}>} points   - contour fermé
-   * @param {string}       side     - 'outside' | 'inside' | 'center'
+   * @param {Array<{x,y}>} points    - contour fermé (non décalé)
+   * @param {string}       side      - 'outside' | 'inside' | 'center'
    * @param {Object}       entryOpts - options d'entrée
    *   entry   {'plunge'|'ramp'|'helix'} : mode d'entrée outil (défaut 'plunge')
    *   rampLen {number} : longueur rampe mm (défaut 1 × ⌀outil), pour 'ramp'
    *   helixR  {number} : rayon hélice mm (défaut 0.5 × ⌀outil), pour 'helix'
    *   helixTurns {number} : tours d'hélice (défaut 1)
    *   leadIn  {number|false} : rayon arc lead-in mm, false = désactivé (défaut false)
-   *   leadOut {number|false} : rayon arc lead-out mm (défaut = leadIn)
+   *   leadOut {number|false} : rayon arc lead-out mm, finition seulement (défaut false)
+   *   finishAllowance {number} : surépaisseur enlevée par une passe à pleine profondeur
+   *   dogbone {boolean} : dégagements dans les coins intérieurs (boîte à encoches)
    * @param {string}       label
+   * @param {Object|null}  tabOpts   - { count, width, height } : tabs au milieu des portions
+   *   droites (voir _placeTabs) ; l'outil se relève à leur sommet sur les passes plus basses
    */
-  cutContour(points, side = 'outside', entryOpts = {}, label = 'Contour') {
+  cutContour(points, side = 'outside', entryOpts = {}, label = 'Contour', tabOpts = null) {
     if (points.length < 2) return;
 
-    const entry      = entryOpts.entry      ?? 'plunge';
-    const rampLen    = entryOpts.rampLen    ?? this.machine.toolDiameter;
-    const helixR     = entryOpts.helixR     ?? this.machine.toolDiameter * 0.5;
-    const helixTurns = entryOpts.helixTurns ?? 1;
-    const leadInR    = entryOpts.leadIn     ?? false;
-    const leadOutR   = entryOpts.leadOut    ?? false;
-    const fa         = entryOpts.finishAllowance ?? 0;
+    const e = this._entrySettings(entryOpts);
+    const { rough, exact, cut, cutFin } = this._contourPaths(points, side, e.fa, e.dogbone);
+    const { depth, passes, stepZ } = this._passPlan();
+    const leadIn = e.leadInR ? this._leadArc(rough, e.leadInR, 'in') : null;
 
-    // Contour exact (passe de finition) et contour de décharge (ébauche)
-    const r    = this.machine.toolDiameter / 2;
-    const sign = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
-    const ptsExactRaw = sign !== 0 ? this._offsetContourDist(points, sign * r) : points;
-    const ptsRoughRaw = (fa > 0 && sign !== 0) ? this._offsetContourDist(points, sign * (r + fa)) : ptsExactRaw;
-    // Démarrage au milieu du côté le plus long — index calculé sur le rough et réutilisé pour le finish
-    const entryIdx = sign !== 0 ? this._maxSegIdx(ptsRoughRaw) : -1;
-    const ptsRough = entryIdx >= 0 ? this._reorderAt(ptsRoughRaw, entryIdx) : ptsRoughRaw;
-    const ptsExact = (fa > 0 && sign !== 0) ? this._reorderAt(ptsExactRaw, entryIdx) : ptsRough;
-    const cPts     = entryOpts.dogbone ? this._insertDogbones(ptsRough) : ptsRough;
-    const cPtsFin  = (fa > 0 && sign !== 0) ? (entryOpts.dogbone ? this._insertDogbones(ptsExact) : ptsExact) : null;
-
-    const depth  = this.machine.materialThickness;
-    const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
-    const stepZ  = depth / passes;
-
-    const entryLabel = entry === 'ramp'  ? `, ramp ${rampLen}mm`
-                     : entry === 'helix' ? `, helix R${helixR}mm×${helixTurns}t`
-                     : '';
-    const leadLabel  = leadInR ? `, lead-in R${leadInR}mm` : '';
-    const faLabel    = fa > 0  ? `, finition +${fa}mm`     : '';
-    this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}${faLabel}) ───`);
-
-    let leadIn  = leadInR  ? this._leadArc(ptsRough, leadInR, 'in') : null;
+    // Tabs : centres le long du trajet, événements « relever / redescendre »
+    let tab = null, segLengths = null, perimeter = 0, centers = [], tabEv = null;
+    if (tabOpts) {
+      tab = this._tabSettings(tabOpts, depth);
+      ({ segLengths, perimeter } = this._segLengths(cut));
+      centers = this._placeTabs(cut, segLengths, perimeter, tab.count, tab.path);
+      tabEv = this._tabEvents(centers, tab.path, perimeter);
+      const skipped = tab.count - centers.length;
+      this.comment(`─── ${label} (${side}${e.label}, ${centers.length} tabs ${tab.width}×${tab.height}mm${skipped ? `, ${skipped} évité(s) sur angles` : ''}) ───`);
+    } else {
+      this.comment(`─── ${label} (${side}${e.label}${e.fa > 0 ? `, finition +${e.fa}mm` : ''}) ───`);
+    }
 
     for (let pass = 1; pass <= passes; pass++) {
       const z = -(stepZ * pass);
-      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}`);
+      // Tabs actifs dès que la passe descend sous leur sommet (pas seulement la dernière)
+      const tabsOn = !!tab && z < tab.z - 1e-9;
+      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${tabsOn ? ' [tabs actifs]' : ''}`);
       this.rapidZ(this.machine.safeZ);
-
-      if (entry === 'helix') {
-        const cx = ptsRough.reduce((s, p) => s + p.x, 0) / ptsRough.length;
-        const cy = ptsRough.reduce((s, p) => s + p.y, 0) / ptsRough.length;
-        this.rapidTo(cx + helixR, cy);
-        this._helixIn(cx, cy, helixR, z, helixTurns);
-        if (leadIn) {
-          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          this.lineTo(cPts[0].x, cPts[0].y);
-        } else {
-          this.rapidTo(cPts[0].x, cPts[0].y);
-        }
-
-      } else if (entry === 'ramp') {
-        this.rapidTo(cPts[0].x, cPts[0].y);
-        this._rampIn(cPts, z, rampLen);
-        if (leadIn) {
-          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          this.lineTo(cPts[0].x, cPts[0].y);
-        }
-
-      } else {
-        if (leadIn) {
-          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          this.plungeTo(z);
-          this.lineTo(cPts[0].x, cPts[0].y);
-        } else {
-          this.rapidTo(cPts[0].x, cPts[0].y);
-          this.plungeTo(z);
-        }
-      }
-
-      for (let i = 1; i < cPts.length; i++) this.lineTo(cPts[i].x, cPts[i].y);
-      this.lineTo(cPts[0].x, cPts[0].y);
-
-      this._emitOvercut(cPts);
+      // Départ dans un tab : on n'entre qu'au sommet du tab (ne pas le percer)
+      this._enterContour(cut, rough, tabsOn && tabEv.startInTab ? tab.z : z, e, leadIn);
+      // Sous le sommet des tabs : remontée à tab.z au passage de chaque tab. Si la boucle
+      // finit dans un tab, l'outil est à tab.z et le dépassement final passe au-dessus.
+      if (tabsOn) this._cutLoopWithTabs(cut, segLengths, tabEv.events, z, tab.z);
+      else        this._loop(cut);
+      this._emitOvercut(cut);
     }
 
-    // ── Passe de finition paroi ──────────────────────────────────────────────
-    if (cPtsFin) {
-      const leadInFin  = leadInR  ? this._leadArc(ptsExact, leadInR, 'in') : null;
-      const leadOutFin = leadOutR ? this._leadOutArc(ptsExact, leadOutR)   : null;
+    // ── Passe de finition paroi, à pleine profondeur ────────────────────────
+    if (cutFin) {
       const z = -depth;
-      this.comment(`Passe finition paroi — Z=${z.toFixed(3)}`);
-      this.rapidZ(this.machine.safeZ);
-      if (leadInFin) {
-        this.rapidTo(leadInFin.approachPt.x, leadInFin.approachPt.y);
-        this.plungeTo(z);
-        for (const p of leadInFin.arcPts) this.lineTo(p.x, p.y);
+      if (tab) {
+        // Tabs reportés sur le trajet de finition (positions mises à l'échelle du périmètre)
+        const fin = this._segLengths(cutFin);
+        const finEv = this._tabEvents(centers.map(c => c * fin.perimeter / perimeter), tab.path, fin.perimeter);
+        this.comment(`Passe finition paroi — Z=${z.toFixed(3)} [tabs actifs]`);
+        this.rapidZ(this.machine.safeZ);
+        this.rapidTo(cutFin[0].x, cutFin[0].y);
+        this.plungeTo(finEv.startInTab ? tab.z : z);
+        this._cutLoopWithTabs(cutFin, fin.segLengths, finEv.events, z, tab.z);
+        this._emitOvercut(cutFin);
       } else {
-        this.rapidTo(cPtsFin[0].x, cPtsFin[0].y);
-        this.plungeTo(z);
-      }
-      for (let i = 1; i < cPtsFin.length; i++) this.lineTo(cPtsFin[i].x, cPtsFin[i].y);
-      this.lineTo(cPtsFin[0].x, cPtsFin[0].y);
-      if (leadOutFin) {
-        for (const p of leadOutFin.arcPts) this.lineTo(p.x, p.y);
-      } else {
-        this._emitOvercut(cPtsFin);
+        const leadInFin  = e.leadInR  ? this._leadArc(exact, e.leadInR, 'in') : null;
+        const leadOutFin = e.leadOutR ? this._leadOutArc(exact, e.leadOutR)   : null;
+        this.comment(`Passe finition paroi — Z=${z.toFixed(3)}`);
+        this.rapidZ(this.machine.safeZ);
+        if (leadInFin) {
+          this.rapidTo(leadInFin.approachPt.x, leadInFin.approachPt.y);
+          this.plungeTo(z);
+          for (const p of leadInFin.arcPts) this.lineTo(p.x, p.y);
+        } else {
+          this.rapidTo(cutFin[0].x, cutFin[0].y);
+          this.plungeTo(z);
+        }
+        this._loop(cutFin);
+        if (leadOutFin) for (const p of leadOutFin.arcPts) this.lineTo(p.x, p.y);
+        else            this._emitOvercut(cutFin);
       }
     }
 
@@ -455,9 +536,7 @@ export class GCodeGenerator {
     const allPts    = paired.map(p => p.rough);
     const allPtsFin = paired.some(p => p.fin) ? paired.map(p => p.fin).filter(Boolean) : null;
 
-    const depth  = this.machine.materialThickness;
-    const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
-    const stepZ  = depth / passes;
+    const { depth, passes, stepZ } = this._passPlan();
 
     this.comment(`─── ${label} (${side}, ${allPts.length} anneaux fusionnés) ───`);
 
@@ -468,8 +547,7 @@ export class GCodeGenerator {
         this.rapidZ(this.machine.safeZ);
         this.rapidTo(pts[0].x, pts[0].y);
         this.plungeTo(z);
-        for (let i = 1; i < pts.length; i++) this.lineTo(pts[i].x, pts[i].y);
-        this.lineTo(pts[0].x, pts[0].y);
+        this._loop(pts);
       }
     }
 
@@ -480,8 +558,7 @@ export class GCodeGenerator {
         this.rapidZ(this.machine.safeZ);
         this.rapidTo(pts[0].x, pts[0].y);
         this.plungeTo(zFin);
-        for (let i = 1; i < pts.length; i++) this.lineTo(pts[i].x, pts[i].y);
-        this.lineTo(pts[0].x, pts[0].y);
+        this._loop(pts);
         this._emitOvercut(pts);
       }
     }
@@ -519,18 +596,13 @@ export class GCodeGenerator {
       ? (side === 'outside' ? r_off + fa : Math.max(toolR * 0.5, r_off - fa))
       : r_off;
 
-    const depth  = this.machine.materialThickness;
-    const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
-    const stepZ  = depth / passes;
+    const { depth, passes, stepZ } = this._passPlan();
 
-    const hasTabs   = !!tabOpts;
-    const tabCount  = hasTabs ? (tabOpts.count  ?? 4)   : 0;
-    const tabWidth  = hasTabs ? (tabOpts.width  ?? 8) : 0;
-    const tabHeight = hasTabs ? (tabOpts.height ?? 2) : 0;
-    // Largeur saisie = pont de matière réel ; la fraise mord de son rayon de chaque côté,
-    // donc l'outil reste au-dessus du tab sur largeur + Ø
-    const tabPath   = tabWidth + this.machine.toolDiameter;
-    const tabZ      = -(depth - tabHeight);
+    const hasTabs = !!tabOpts;
+    const tab = hasTabs ? this._tabSettings(tabOpts, depth) : null;
+    const tabCount = hasTabs ? tab.count : 0, tabWidth = hasTabs ? tab.width : 0, tabHeight = hasTabs ? tab.height : 0;
+    const tabPath  = hasTabs ? tab.path : this.machine.toolDiameter;
+    const tabZ     = hasTabs ? tab.z : -depth;
 
     const leadInR  = entryOpts.leadIn  ?? false;
     const leadOutR = entryOpts.leadOut ?? false;
@@ -683,71 +755,20 @@ export class GCodeGenerator {
   }
 
   /**
-   * Fraise un contour fermé avec tabs (ponts de maintien).
-   *
+   * Abscisses curvilignes des centres de tabs le long du contour fermé `pts`.
    * Les tabs sont placés au milieu des portions droites du contour (les plus longues,
    * réparties au mieux), jamais dans un angle ou un arrondi ; à défaut de portion droite
-   * (cercle, ovale), ils sont répartis uniformément sur le périmètre.
-   * Sur les passes intermédiaires, le contour est fraisé normalement.
-   * Sur la dernière passe, l'outil remonte à tabZ au passage de chaque tab.
-   *
-   * @param {Array<{x,y}>} points   - contour fermé (non offsetté)
-   * @param {string}       side     - 'outside' | 'inside' | 'center'
-   * @param {Object}       tabOpts  - options des tabs
-   *   count  {number} : nombre de tabs (défaut 4)
-   *   width  {number} : largeur du pont de matière en mm (défaut 8) ; trajet relevé = width + Ø
-   *   height {number} : hauteur résiduelle du tab en mm (défaut 2)
-   * @param {string}       label
+   * (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre.
+   * Peut en renvoyer moins que `count` si le contour n'a pas assez de portions droites.
+   * @param {number} width - longueur relevée d'un tab sur le trajet (pont + Ø)
    */
-  /**
-   * Identique à cutContour mais avec tabs sur la dernière passe.
-   * Accepte les mêmes entryOpts que cutContour.
-   */
-  cutContourWithTabs(points, side = 'outside', tabOpts = {}, entryOpts = {}, label = 'Contour (tabs)') {
-    if (points.length < 2) return;
-
-    const tabCount  = tabOpts.count  ?? 4;
-    const tabWidth  = tabOpts.width  ?? 8;
-    const tabHeight = tabOpts.height ?? 2;
-    // Largeur saisie = pont de matière réel ; la fraise mord de son rayon de chaque côté,
-    // donc l'outil reste au-dessus du tab sur largeur + Ø
-    const tabPath   = tabWidth + this.machine.toolDiameter;
-
-    const fa       = entryOpts.finishAllowance ?? 0;
-    const toolR    = this.machine.toolDiameter / 2;
-    const sign     = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
-    const ptsExactRaw = sign !== 0 ? this._offsetContourDist(points, sign * toolR) : points;
-    const ptsRoughRaw = (fa > 0 && sign !== 0) ? this._offsetContourDist(points, sign * (toolR + fa)) : ptsExactRaw;
-    // Démarrage au milieu du côté le plus long — index calculé sur le rough et réutilisé pour le finish
-    const entryIdx = sign !== 0 ? this._maxSegIdx(ptsRoughRaw) : -1;
-    const ptsRough = entryIdx >= 0 ? this._reorderAt(ptsRoughRaw, entryIdx) : ptsRoughRaw;
-    const ptsExact = (fa > 0 && sign !== 0) ? this._reorderAt(ptsExactRaw, entryIdx) : ptsRough;
-    const pts      = entryOpts.dogbone ? this._insertDogbones(ptsRough) : ptsRough;
-    const ptsFin   = (fa > 0 && sign !== 0) ? (entryOpts.dogbone ? this._insertDogbones(ptsExact) : ptsExact) : null;
-
-    const depth  = this.machine.materialThickness;
-    const passes = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
-    const stepZ  = depth / passes;
-    // Z de la surface supérieure des tabs (matière résiduelle non coupée)
-    const tabZ   = -(depth - tabHeight);
-
-    // ── Longueurs cumulées des segments ─────────────────────────────────────
+  _placeTabs(pts, segLengths, perimeter, count, width) {
     const n = pts.length;
-    const segLengths = [];
-    let perimeter = 0;
-    for (let i = 0; i < n; i++) {
-      const a   = pts[i];
-      const b   = pts[(i + 1) % n];
-      const len = Math.hypot(b.x - a.x, b.y - a.y);
-      segLengths.push(len);
-      perimeter += len;
-    }
-
     // ── Positions curvilignes des centres de tabs ────────────────────────────
     // Répartition uniforme, premier tab à la moitié de l'intervalle
     const tabCenters = [];
-    for (let t = 0; t < tabCount; t++) {
-      tabCenters.push((perimeter / tabCount) * (t + 0.5));
+    for (let t = 0; t < count; t++) {
+      tabCenters.push((perimeter / count) * (t + 0.5));
     }
 
     // ── Placement des tabs aux milieux des segments droits ───────────────────
@@ -785,7 +806,7 @@ export class GCodeGenerator {
         const s   = sorted[i];
         const e   = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + perimeter;
         const len = e - s;
-        if (len > tabPath + 2 * CORNER_CLEAR)
+        if (len > width + 2 * CORNER_CLEAR)
           segs.push({ center: ((s + e) / 2) % perimeter, len });
       }
       return segs;
@@ -807,7 +828,7 @@ export class GCodeGenerator {
         safeTabCenters.push(segs[0].center);
         used[0] = true;
       }
-      while (safeTabCenters.length < tabCount) {
+      while (safeTabCenters.length < count) {
         let best = -1, bestMinDist = -1;
         for (let i = 0; i < segs.length; i++) {
           if (used[i]) continue;
@@ -823,104 +844,7 @@ export class GCodeGenerator {
         used[best] = true;
       }
     }
-    const skippedTabs = tabCount - safeTabCenters.length;
-
-    const entry      = entryOpts.entry      ?? 'plunge';
-    const rampLen    = entryOpts.rampLen    ?? this.machine.toolDiameter;
-    const helixR     = entryOpts.helixR     ?? this.machine.toolDiameter * 0.5;
-    const helixTurns = entryOpts.helixTurns ?? 1;
-    const leadInR    = entryOpts.leadIn     ?? false;
-
-    const leadIn  = leadInR  ? this._leadArc(pts, leadInR, 'in') : null;
-
-    const entryLabel = entry === 'ramp'  ? `, ramp ${rampLen}mm`
-                     : entry === 'helix' ? `, helix R${helixR}mm×${helixTurns}t`
-                     : '';
-    const leadLabel  = leadInR ? `, lead-in R${leadInR}mm` : '';
-    this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}, ${safeTabCenters.length} tabs ${tabWidth}×${tabHeight}mm${skippedTabs ? `, ${skippedTabs} évité(s) sur angles` : ''}) ───`);
-
-    const tabEv = this._tabEvents(safeTabCenters, tabPath, perimeter);
-
-    for (let pass = 1; pass <= passes; pass++) {
-      const z      = -(stepZ * pass);
-      // Tabs actifs dès que la passe descend sous leur sommet (pas seulement la dernière)
-      const tabsOn = z < tabZ - 1e-9;
-      // Départ dans un tab : on n'entre qu'au sommet du tab (ne pas le percer)
-      const zIn    = tabsOn && tabEv.startInTab ? tabZ : z;
-
-      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${tabsOn ? ' [tabs actifs]' : ''}`);
-      this.rapidZ(this.machine.safeZ);
-
-      // ── Entrée outil ───────────────────────────────────────────────────
-      if (entry === 'helix') {
-        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-        this.rapidTo(cx + helixR, cy);
-        this._helixIn(cx, cy, helixR, zIn, helixTurns);
-        if (leadIn) {
-          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          this.lineTo(pts[0].x, pts[0].y);
-        } else {
-          this.rapidTo(pts[0].x, pts[0].y);
-        }
-      } else if (entry === 'ramp') {
-        this.rapidTo(pts[0].x, pts[0].y);
-        this._rampIn(pts, zIn, rampLen);
-        if (leadIn) {
-          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          this.lineTo(pts[0].x, pts[0].y);
-        }
-      } else {
-        if (leadIn) {
-          this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-          this.plungeTo(zIn);
-          this.lineTo(pts[0].x, pts[0].y);
-        } else {
-          this.rapidTo(pts[0].x, pts[0].y);
-          this.plungeTo(zIn);
-        }
-      }
-
-      if (!tabsOn) {
-        // Passes au-dessus des tabs : contour normal
-        for (let i = 1; i < n; i++) this.lineTo(pts[i].x, pts[i].y);
-        this.lineTo(pts[0].x, pts[0].y);
-      } else {
-        // Passes sous le sommet des tabs : remontée à tabZ au passage de chaque tab.
-        // Si la boucle finit dans un tab, l'outil est à tabZ et le dépassement final
-        // passe au-dessus du tab sans l'entamer.
-        this._cutLoopWithTabs(pts, segLengths, tabEv.events, z, tabZ);
-      }
-      this._emitOvercut(pts);
-    }
-
-    // ── Passe de finition paroi ────────────────────────────────────────────
-    if (ptsFin) {
-      const nFin = ptsFin.length;
-      const finSegLengths = [];
-      let finPerimeter = 0;
-      for (let i = 0; i < nFin; i++) {
-        const a = ptsFin[i], b = ptsFin[(i + 1) % nFin];
-        const len = Math.hypot(b.x - a.x, b.y - a.y);
-        finSegLengths.push(len);
-        finPerimeter += len;
-      }
-      // Mise à l'échelle des positions de tabs vers le nouveau périmètre
-      const finTabCenters = safeTabCenters.map(c => c * finPerimeter / perimeter);
-
-      const zFin  = -depth;
-      const finEv = this._tabEvents(finTabCenters, tabPath, finPerimeter);
-
-      this.comment(`Passe finition paroi — Z=${zFin.toFixed(3)} [tabs actifs]`);
-      this.rapidZ(this.machine.safeZ);
-      this.rapidTo(ptsFin[0].x, ptsFin[0].y);
-      this.plungeTo(finEv.startInTab ? tabZ : zFin);
-      this._cutLoopWithTabs(ptsFin, finSegLengths, finEv.events, zFin, tabZ);
-      this._emitOvercut(ptsFin);
-    }
-
-    this.rapidZ(this.machine.safeZ);
-    this.comment('');
+    return safeTabCenters;
   }
 
   /**

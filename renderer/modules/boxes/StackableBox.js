@@ -120,14 +120,9 @@ export class StackableBox {
     // 2b. Contour exterieur — EN DERNIER (tabs maintiennent la piece)
     // Épaisseur totale = hauteur corps + hauteur plot (pièce retournée)
     gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
-    const arcDef = shape.getArcDef ? shape.getArcDef() : null;
-    if (arcDef) {
-      gen.cutCircleContour(bb.width - arcDef.cx, arcDef.cy, arcDef.r, 'outside', entryOpts, t('gcode.op_outer_contour'), tabOpts || null);
-    } else if (tabOpts) {
-      gen.cutContourWithTabs(pts2, 'outside', tabOpts, entryOpts, t('gcode.op_outer_contour'));
-    } else {
-      gen.cutContour(pts2, 'outside', entryOpts, t('gcode.op_outer_contour'));
-    }
+    const arcDef = shape.getArcDef?.() ?? null;   // cercle exact, en miroir comme pts2
+    gen.cutOutline(pts2, 'outside', entryOpts, t('gcode.op_outer_contour'), tabOpts,
+      arcDef && { ...arcDef, cx: bb.width - arcDef.cx });
 
     gen.machine.materialThickness = savedT;
     gen.footer();

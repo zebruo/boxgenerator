@@ -229,8 +229,7 @@ export class FingerJointBox {
 
     for (const panel of layout) {
       const pts = this._toPoints(panel.rel, panel.ox, panel.oy);
-      if (tabOpts) gen.cutContourWithTabs(pts, 'outside', tabOpts, entryOpts, t(panel.label));
-      else         gen.cutContour(pts, 'outside', entryOpts, t(panel.label));
+      gen.cutOutline(pts, 'outside', entryOpts, t(panel.label), tabOpts);
     }
 
     gen.machine.materialThickness = savedT;
