@@ -64,10 +64,10 @@ export class TechnicalView {
     woodLt:  '#d8b878',
     inner:   '#d6d6d6',
     rabbet:  '#008f70',
-    dim:     '#cc6200',
+    dim:     '#9a6a00',
     dimLine: '#959595',
     text:    '#1c1c1c',
-    title:   '#c4670a',
+    title:   '#008f70',
     divider: '#c2c2c2',
   };
 

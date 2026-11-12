@@ -9,9 +9,10 @@
   --bg-panel:   #252525;
   --bg-card:    #2d2d2d;
   --bg-hover:   #383838;
-  --accent:     #f08a24;
-  --accent2:    #d9b26a;
+  --accent:     #4affcc;
+  --accent2:    #2bb39a;
   --accent3:    #4affcc;
+  --on-accent:  #0d1f1a;   /* texte sur fond accent (vert d'eau clair) */
   --text:       #e0e0e0;
   --text-muted: #8c8c8c;
   --border:     #3a3a3a;
@@ -26,9 +27,10 @@
   --bg-panel:   #e4e4e4;
   --bg-card:    #d8d8d8;
   --bg-hover:   #cbcbcb;
-  --accent:     #c4670a;
-  --accent2:    #8f6a1e;
+  --accent:     #008f70;
+  --accent2:    #00705a;
   --accent3:    #008f70;
+  --on-accent:  #ffffff;
   --text:       #1c1c1c;
   --text-muted: #5c5c5c;
   --border:     #bcbcbc;
@@ -59,7 +61,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 }
 .btn:hover { opacity: .85; }
 .btn:active { transform: scale(.97); }
-.btn-primary  { background: var(--accent);  color: #fff; }
+.btn-primary  { background: var(--accent);  color: var(--on-accent); }
 .btn-secondary { background: var(--bg-card); color: var(--text); border: 1px solid var(--border); }
 .btn-accent   { background: var(--accent3); color: #000; }
 
@@ -172,7 +174,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-card); border: 1px solid var(--border);
   color: var(--text-muted); cursor: pointer; font-size: 11px; font-weight: 600;
 }
-.view-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.view-btn.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 /* ── Contrôles 3D (Z0 + brut) ───────────────────────────────────────── */
 .toolbar-3d-extra { display: flex; align-items: center; gap: 6px; }
@@ -186,7 +188,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-card); color: var(--text-muted); font-size: 11px; cursor: pointer;
 }
 .lid-layout-btn:hover  { border-color: var(--accent2); color: var(--accent2); }
-.lid-layout-btn.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+.lid-layout-btn.active { background: var(--accent2); border-color: var(--accent2); color: var(--on-accent); }
 .xray-label input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
 
 .z0-grid {
@@ -203,7 +205,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   align-items: center; justify-content: center; padding: 0; line-height: 1;
 }
 .z0-btn:hover { border-color: var(--accent); color: var(--accent); }
-.z0-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.z0-btn.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 .z0-level { display: flex; flex-direction: column; gap: 2px; }
 .z0-lvl-btn {
@@ -213,7 +215,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   align-items: center; justify-content: center; padding: 0; line-height: 1;
 }
 .z0-lvl-btn:hover,  .stock-side-btn:hover  { border-color: var(--accent2); color: var(--accent2); }
-.z0-lvl-btn.active, .stock-side-btn.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+.z0-lvl-btn.active, .stock-side-btn.active { background: var(--accent2); border-color: var(--accent2); color: var(--on-accent); }
 .stock-side-btn {
   width: 18px; height: 18px; border: 1px solid var(--border);
   background: var(--bg-card); color: var(--text-muted); border-radius: 3px;
@@ -271,7 +273,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 
 /* Coloration G-code */
 .gcode-viewer .gc-move   { color: #4affcc; }
-.gcode-viewer .gc-rapid  { color: #ff9f4a; }
+.gcode-viewer .gc-rapid  { color: #ffcc33; }
 .gcode-viewer .gc-comment { color: #6e6e6e; }
 .gcode-viewer .gc-cmd    { color: #c04aff; }
 .gcode-viewer .gc-feed   { color: #4a9eff; }
@@ -403,7 +405,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   color: var(--text-muted); cursor: pointer; transition: all .12s;
 }
 .export-modal .entry-mode-btn:hover { border-color: var(--accent); color: var(--accent); }
-.export-modal .entry-mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.export-modal .entry-mode-btn.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .export-modal .entry-fields {
   display: flex; align-items: center; gap: 7px; padding-left: 0;
   font-size: 11px; min-height: 24px;
@@ -747,7 +749,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   color: var(--text-muted); cursor: pointer; transition: all .12s;
 }
 .cp-pill:hover  { border-color: var(--accent); color: var(--accent); }
-.cp-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cp-pill.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
 /* Sliders machine */
 .cp-slider-row {
@@ -829,7 +831,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 /* Avertissements */
 .cp-warn { font-size: 11px; padding: 5px 8px; border-radius: var(--radius-sm); margin-top: 3px; }
 .cp-warn-info { background: color-mix(in srgb, var(--accent) 10%, transparent);  color: var(--accent);  border-left: 2px solid var(--accent); }
-.cp-warn-warn { background: rgba(255,159,74,.12); color: var(--accent2); border-left: 2px solid var(--accent2); }
+.cp-warn-warn { background: rgba(255,204,51,.12); color: #ffcc33; border-left: 2px solid #ffcc33; }
 
 /* Bouton "Calculer paramètres" dans le panneau */
 .btn-calc-params {
@@ -842,7 +844,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 
 [data-theme="light"] .gcode-viewer { color: var(--text-muted); }
 [data-theme="light"] .gcode-viewer .gc-move    { color: #008f70; }
-[data-theme="light"] .gcode-viewer .gc-rapid   { color: #b85000; }
+[data-theme="light"] .gcode-viewer .gc-rapid   { color: #9a6a00; }
 [data-theme="light"] .gcode-viewer .gc-comment { color: #8c8c8c; }
 [data-theme="light"] .gcode-viewer .gc-cmd     { color: #7722aa; }
 [data-theme="light"] .gcode-viewer .gc-feed    { color: #1a6fcc; }
@@ -865,7 +867,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-card); color: var(--text); border: 1px solid var(--border); cursor: pointer;
 }
 .sim-btn:hover { background: var(--bg-hover); }
-.sim-play { background: var(--accent); color: #fff; border-color: var(--accent); }
+.sim-play { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .sim-close { margin-left: auto; }
 
 /* Barre de lecture : en bas au centre, ligne de temps fine en dessous */
