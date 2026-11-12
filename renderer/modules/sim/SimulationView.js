@@ -38,7 +38,7 @@ function lsSet(key, val) { try { localStorage.setItem(key, val); } catch { /* st
 const COMMON = /* glsl */`
   uniform sampler2D uHeight, uFloor, uMask;
   uniform vec2 uSize;
-  uniform float uCell, uTop, uBottom, uPartOnly;
+  uniform float uCell, uTop, uBottom, uPartOnly, uReach, uOutZ;
   uniform vec3 uColor, uViewFlip, uCam;
   varying vec3 vPos;
   varying vec2 vCellPos;
@@ -46,9 +46,25 @@ const COMMON = /* glsl */`
   vec2 tc(vec2 c) { return (clamp(c, vec2(0.0), uSize - 1.0) + 0.5) / uSize; }
   float Hs(vec2 c) { return texture2D(uHeight, tc(c)).r; }
   float Fs(vec2 c) { return texture2D(uFloor,  tc(c)).r; }
-  bool hiddenCell(vec2 c) {
-    return Fs(c) >= Hs(c) - 0.001 || (uPartOnly > 0.5 && texture2D(uMask, tc(c)).r < 0.5);
-  }`;
+  float Ms(vec2 c) { return texture2D(uMask, tc(c)).r; }
+  // « Pièce finie seule » : uMask = 1 dans le contour de la pièce, 0,5 dans la marge autour
+  // (matière de la pièce qui dépasse un peu du contour théorique), 0 ailleurs. Dans la marge,
+  // une case bien moins épaisse que la pièce juste à côté est un reste de tab : masquée.
+  bool tabStub(vec2 c) {
+    float thick = Hs(c) - Fs(c);
+    for (int k = 0; k < 8; k++) {
+      float a = float(k) * 0.785398;
+      vec2 n = c + floor(vec2(cos(a), sin(a)) * uReach + 0.5);
+      if (Ms(n) > 0.75 && Hs(n) - Fs(n) > thick + 0.3) return true;
+    }
+    return false;
+  }
+  bool outsidePart(vec2 c) {
+    if (uPartOnly < 0.5) return false;
+    float m = Ms(c);
+    return m < 0.25 || (m < 0.75 && tabStub(c));
+  }
+  bool hiddenCell(vec2 c) { return Fs(c) >= Hs(c) - 0.001 || outsidePart(c); }`;
 
 // Fragment seulement (dFdx/dFdy n'existent pas dans un vertex shader)
 // Les flancs sont des escaliers de cases : leur normale de triangle alterne entre X et Y
@@ -77,12 +93,17 @@ const FRAG_COMMON = COMMON + /* glsl */`
                 + 0.12 * max(dot(n, vec3(0.0, 0.0, -1.0)), 0.0);   // un peu de lumière par-dessous
   }`;
 
+// Hors pièce (« Pièce finie seule »), le sommet est placé comme si le contour extérieur avait
+// tout traversé (uOutZ : fond du brut si ce contour est usiné par la face 1, dessus s'il l'est
+// par la face 2) : les flancs de la pièce sont alors entiers partout, même là où la case
+// voisine est un tab (sinon ils s'arrêtaient à la hauteur du tab : petit rebord).
 const vert = zExpr => COMMON + /* glsl */`
   void main() {
     vCellPos = uv * (uSize - 1.0);
     vec2 c = floor(vCellPos + 0.5);
-    vVis = hiddenCell(c) ? 0.0 : 1.0;
-    vPos = vec3(position.xy, ${zExpr});
+    bool out_ = outsidePart(c);
+    vVis = (out_ || hiddenCell(c)) ? 0.0 : 1.0;
+    vPos = vec3(position.xy, out_ ? uOutZ : ${zExpr});
     gl_Position = projectionMatrix * modelViewMatrix * vec4(vPos, 1.0);
   }`;
 
@@ -361,6 +382,9 @@ export class SimulationView {
       uSize: { value: new THREE.Vector2(nx, ny) }, uCell: { value: this.sim.cell },
       uTop: { value: s.top }, uBottom: { value: s.bottom }, uColor: { value: WOOD },
       uPartOnly: { value: 0 }, uViewFlip: { value: new THREE.Vector3(1, 1, 1) },
+      // distance (en cases) à laquelle on cherche la pièce depuis la marge : au-delà de la marge
+      uReach: { value: Math.ceil(this._maskGrow() / this.sim.cell) + 2 },
+      uOutZ: { value: (this.drawing.find(d => d.outer)?.face ?? 1) === 2 ? s.top : s.bottom },
       uCam: { value: new THREE.Vector3() },   // caméra dans le repère des maillages (mise à jour à chaque image)
     };
 
@@ -409,35 +433,42 @@ export class SimulationView {
   }
 
   /**
-   * Masque des cases appartenant à une pièce (intérieur des contours « outer »).
-   * Les contours sont élargis d'un peu moins d'un demi-rayon de fraise : la matière de la
-   * pièce peut dépasser légèrement le contour théorique (ex. cercle dessiné en polygone,
-   * usiné en vrai cercle) ; sans cette marge, cette mince bande masquée faisait disparaître
-   * des morceaux de flanc. La chute, au-delà de la rainure (largeur Ø), reste masquée.
+   * Masque des cases appartenant à une pièce (intérieur des contours « outer ») : 255 dans le
+   * contour, 128 dans une marge d'un peu moins d'un demi-rayon de fraise autour, 0 ailleurs.
+   * La matière de la pièce peut dépasser légèrement le contour théorique (ex. cercle dessiné
+   * en polygone, usiné en vrai cercle) : la marge la garde, sans quoi des morceaux de flanc
+   * disparaissaient. Les restes de tabs, eux aussi dans la marge, sont masqués par le shader
+   * (bien moins épais que la pièce voisine). La chute, au-delà de la rainure, reste masquée.
    */
   _partMask() {
     const { nx, ny, x0, y0, cell } = this.sim;
     const mask = new Uint8Array(nx * ny);
-    const grow = Math.min(0.6, this.toolR * 0.5);
-    const polys = this._outerPolys().flatMap(p => offsetPolygons(p, grow, { join: 'round' }));
-    if (!polys.length) { mask.fill(255); return mask; }
-    for (let j = 0; j < ny; j++) {
-      const y = y0 + j * cell;
-      for (const poly of polys) {
-        const xs = [];
-        for (let i = 0, k = poly.length - 1; i < poly.length; k = i++) {
-          const a = poly[i], b = poly[k];
-          if ((a.y > y) !== (b.y > y)) xs.push(a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y));
-        }
-        xs.sort((p, q) => p - q);
-        for (let k = 0; k + 1 < xs.length; k += 2) {
-          const i0 = Math.max(0, Math.ceil((xs[k] - x0) / cell)), i1 = Math.min(nx - 1, Math.floor((xs[k + 1] - x0) / cell));
-          for (let i = i0; i <= i1; i++) mask[j * nx + i] = 255;
+    const outer = this._outerPolys();
+    if (!outer.length) { mask.fill(255); return mask; }
+    const fill = (polys, val) => {
+      for (let j = 0; j < ny; j++) {
+        const y = y0 + j * cell;
+        for (const poly of polys) {
+          const xs = [];
+          for (let i = 0, k = poly.length - 1; i < poly.length; k = i++) {
+            const a = poly[i], b = poly[k];
+            if ((a.y > y) !== (b.y > y)) xs.push(a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y));
+          }
+          xs.sort((p, q) => p - q);
+          for (let k = 0; k + 1 < xs.length; k += 2) {
+            const i0 = Math.max(0, Math.ceil((xs[k] - x0) / cell)), i1 = Math.min(nx - 1, Math.floor((xs[k + 1] - x0) / cell));
+            for (let i = i0; i <= i1; i++) mask[j * nx + i] = val;
+          }
         }
       }
-    }
+    };
+    fill(outer.flatMap(p => offsetPolygons(p, this._maskGrow(), { join: 'round' })), 128);
+    fill(outer, 255);
     return mask;
   }
+
+  /** Largeur de la marge du masque de pièce (mm). */
+  _maskGrow() { return Math.min(0.6, this.toolR * 0.5); }
 
   _buildPaths() {
     const feed = [], feedCol = [], rapid = [];
