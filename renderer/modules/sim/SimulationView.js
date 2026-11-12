@@ -54,6 +54,28 @@ const FRAG = /* glsl */`
     gl_FragColor = vec4(uColor * (1.0 - 0.28 * depth) * d, 1.0);
   }`;
 
+// Dessous du brut : plein là où il reste de la matière jusqu'au fond, ajouré là où la
+// découpe traverse (on voit alors la rainure et les tabs par en dessous).
+const VERT_BOTTOM = /* glsl */`
+  uniform vec2 uSize;
+  varying vec2 vCell;
+  void main() {
+    vCell = uv * (uSize - 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }`;
+
+const FRAG_BOTTOM = /* glsl */`
+  uniform sampler2D uHeight;
+  uniform vec2 uSize;
+  uniform float uBottom;
+  uniform vec3 uColor;
+  varying vec2 vCell;
+  void main() {
+    vec2 c = clamp(floor(vCell + 0.5), vec2(0.0), uSize - 1.0);
+    if (texture2D(uHeight, (c + 0.5) / uSize).r <= uBottom + 0.001) discard;
+    gl_FragColor = vec4(uColor * 0.62, 1.0);
+  }`;
+
 export class SimulationView {
   /**
    * @param {HTMLElement} host   conteneur (zone d'aperçu) dans lequel le panneau se superpose
@@ -226,14 +248,13 @@ export class SimulationView {
     this.heightTex.needsUpdate = true;
     const w = this.sim.x1 - this.sim.x0, d = this.sim.y1 - this.sim.y0;
     const geo = new THREE.PlaneGeometry(w, d, nx - 1, ny - 1);
-    const mat = new THREE.ShaderMaterial({
-      vertexShader: VERT, fragmentShader: FRAG,
-      uniforms: {
-        uHeight: { value: this.heightTex }, uSize: { value: new THREE.Vector2(nx, ny) },
-        uCell: { value: this.sim.cell }, uTop: { value: s.top }, uBottom: { value: s.bottom },
-        uColor: { value: WOOD },
-      },
-    });
+    const uniforms = {
+      uHeight: { value: this.heightTex }, uSize: { value: new THREE.Vector2(nx, ny) },
+      uCell: { value: this.sim.cell }, uTop: { value: s.top }, uBottom: { value: s.bottom },
+      uColor: { value: WOOD },
+    };
+    // DoubleSide : par une découpe traversante, on voit les flancs de la rainure et les tabs
+    const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms, side: THREE.DoubleSide });
     this.surface = new THREE.Mesh(geo, mat);
     this.surface.position.set((this.sim.x0 + this.sim.x1) / 2, (this.sim.y0 + this.sim.y1) / 2, 0);
     this.surface.frustumCulled = false;
@@ -253,8 +274,12 @@ export class SimulationView {
     wall(w, 0, cx, this.sim.y1);
     wall(d, Math.PI / 2, this.sim.x0, cy);
     wall(d, Math.PI / 2, this.sim.x1, cy);
-    const under = new THREE.Mesh(new THREE.PlaneGeometry(w, d), sideMat);
-    under.position.set(cx, cy, s.bottom);
+    // Dessous : même grille de cases que la surface, ajouré là où la découpe traverse
+    const under = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, d),
+      new THREE.ShaderMaterial({ vertexShader: VERT_BOTTOM, fragmentShader: FRAG_BOTTOM, uniforms, side: THREE.DoubleSide }),
+    );
+    under.position.set(cx, cy, s.bottom - 0.02);   // juste sous la surface (pas de scintillement)
     sides.add(under);
     this.sides = sides;
     this.scene.add(sides);
