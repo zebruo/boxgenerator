@@ -29,32 +29,32 @@ export class TechnicalView {
     this.canvas.addEventListener('mousemove', e => this._onHover(e));
 
     this.C = {
-      bg:      '#2a2a2a',
-      panel:   '#262626',
+      bg:      '#333333',
+      panel:   '#2e2e2e',
       wood:    '#7a5230',
       woodLt:  '#a06840',
-      inner:   '#333333',
+      inner:   '#3d3d3d',
       rabbet:  '#2ab87a',
       dim:     '#f0c040',
       dimLine: '#6a6a6a',
       text:    '#c4c4c4',
       title:   '#7c7c7c',
-      divider: '#3a3a3a',
+      divider: '#444444',
     };
   }
 
   static COLORS_DARK = {
-    bg:      '#2a2a2a',
-    panel:   '#262626',
+    bg:      '#333333',
+    panel:   '#2e2e2e',
     wood:    '#7a5230',
     woodLt:  '#a06840',
-    inner:   '#333333',
+    inner:   '#3d3d3d',
     rabbet:  '#2ab87a',
     dim:     '#f0c040',
     dimLine: '#6a6a6a',
     text:    '#c4c4c4',
     title:   '#7c7c7c',
-    divider: '#3a3a3a',
+    divider: '#444444',
   };
 
   static COLORS_LIGHT = {
@@ -67,7 +67,7 @@ export class TechnicalView {
     dim:     '#cc6200',
     dimLine: '#959595',
     text:    '#1c1c1c',
-    title:   '#1a6fcc',
+    title:   '#c4670a',
     divider: '#c2c2c2',
   };
 
