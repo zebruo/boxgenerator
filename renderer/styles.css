@@ -21,9 +21,11 @@
   --radius-sm:  4px;
   --font:       'Segoe UI', system-ui, sans-serif;
   --font-mono:  'Consolas', 'Fira Code', monospace;
+  color-scheme: dark;   /* flèches des champs numériques, listes et barres de défilement natives */
 }
 
 [data-theme="light"] {
+  color-scheme: light;
   --bg-dark:    #efefef;
   --bg-panel:   #e4e4e4;
   --bg-card:    #d8d8d8;
@@ -139,6 +141,10 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   outline: none;
 }
 .param-row input[type=number]:focus { border-color: var(--accent); }
+/* Flèches natives : visibles seulement au survol ou à la saisie, à la couleur du thème */
+.param-row input[type=number]::-webkit-inner-spin-button { opacity: 0; margin-left: 2px; cursor: pointer; }
+.param-row input[type=number]:hover::-webkit-inner-spin-button,
+.param-row input[type=number]:focus::-webkit-inner-spin-button { opacity: .8; }
 .param-row input[type=number][readonly] {
   color: var(--text-muted); cursor: default; border-style: dashed;
 }
