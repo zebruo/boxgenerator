@@ -127,7 +127,7 @@ export class SimulationView {
         <label class="sim-lbl">${t('sim.speed')} <select class="sim-speed">${speedOpts}</select></label>
         <label class="sim-lbl"><input type="checkbox" class="sim-show-tool" checked> ${t('sim.tool')}</label>
         <label class="sim-lbl"><input type="checkbox" class="sim-show-paths" checked> ${t('sim.paths')}</label>
-        <label class="sim-lbl"><input type="checkbox" class="sim-show-rapids"> ${t('sim.rapids')}</label>
+        <label class="sim-lbl" title="${t('sim.rapids_tip')}"><input type="checkbox" class="sim-show-rapids"> ${t('sim.rapids')}</label>
         <button class="sim-btn sim-close" title="${t('sim.close')}"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="sim-stage">
