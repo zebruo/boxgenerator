@@ -29,58 +29,62 @@ function lsSet(key, val) { try { localStorage.setItem(key, val); } catch { /* st
 // Une case est vide quand dessous ≥ dessus. uViewFlip retourne les normales quand la scène
 // est retournée (vue face 2 : (−1,1,−1) autour de l'axe Y, (1,−1,−1) autour de l'axe X)
 // pour garder l'éclairage venant d'en haut.
+// Chaque sommet de la grille prend la hauteur de sa case ; vVis = 0 si la case est vide
+// (traversée) ou hors pièce (« Pièce finie seule »). Un triangle n'est masqué que si ses
+// trois sommets le sont : les flancs (un sommet sur la matière, les autres dans la
+// découpe) restent entiers. La normale vient du triangle lui-même (dérivées écran),
+// tournée vers la caméra (uCam, repère du maillage).
 const COMMON = /* glsl */`
   uniform sampler2D uHeight, uFloor, uMask;
   uniform vec2 uSize;
-  uniform float uCell, uTop, uBottom, uPartOnly;
-  uniform vec3 uColor, uViewFlip;
-  varying vec2 vCell;
+  uniform float uTop, uBottom, uPartOnly;
+  uniform vec3 uColor, uViewFlip, uCam;
+  varying vec3 vPos;
+  varying float vVis;
   vec2 tc(vec2 c) { return (clamp(c, vec2(0.0), uSize - 1.0) + 0.5) / uSize; }
   float Hs(vec2 c) { return texture2D(uHeight, tc(c)).r; }
   float Fs(vec2 c) { return texture2D(uFloor,  tc(c)).r; }
-  float light(vec3 n) {
-    n = normalize(n * uViewFlip);
-    return 0.38 + 0.55 * max(dot(n, normalize(vec3(0.35, -0.55, 0.75))), 0.0)
-                + 0.18 * max(dot(n, normalize(vec3(-0.5, 0.45, 0.6))), 0.0);
-  }
-  bool hidden(vec2 c) {
+  bool hiddenCell(vec2 c) {
     return Fs(c) >= Hs(c) - 0.001 || (uPartOnly > 0.5 && texture2D(uMask, tc(c)).r < 0.5);
   }`;
 
-// Dessus de la matière
-const VERT_TOP = COMMON + /* glsl */`
-  void main() {
-    vCell = uv * (uSize - 1.0);
-    vec2 c = floor(vCell + 0.5);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position.xy, max(Hs(c), Fs(c)), 1.0);
+// Fragment seulement (dFdx/dFdy n'existent pas dans un vertex shader)
+const FRAG_COMMON = COMMON + /* glsl */`
+  vec3 faceNormal() {
+    vec3 n = normalize(cross(dFdx(vPos), dFdy(vPos)));
+    return dot(n, uCam - vPos) < 0.0 ? -n : n;
+  }
+  float light(vec3 n) {
+    n = normalize(n * uViewFlip);   // repère du brut → monde (vue face 2 retournée)
+    return 0.38 + 0.55 * max(dot(n, normalize(vec3(0.35, -0.55, 0.75))), 0.0)
+                + 0.18 * max(dot(n, normalize(vec3(-0.5, 0.45, 0.6))), 0.0)
+                + 0.12 * max(dot(n, vec3(0.0, 0.0, -1.0)), 0.0);   // un peu de lumière par-dessous
   }`;
-const FRAG_TOP = COMMON + /* glsl */`
-  float H(vec2 c) { return max(Hs(c), Fs(c)); }
+
+const vert = zExpr => COMMON + /* glsl */`
   void main() {
-    vec2 c = floor(vCell + 0.5);
-    if (hidden(c)) discard;                          // découpe traversante ou hors pièce
-    vec3 n = vec3((H(c - vec2(1.0, 0.0)) - H(c + vec2(1.0, 0.0))) / (2.0 * uCell),
-                  (H(c - vec2(0.0, 1.0)) - H(c + vec2(0.0, 1.0))) / (2.0 * uCell), 1.0);
-    float depth = clamp((uTop - Hs(c)) / max(uTop - uBottom, 0.001), 0.0, 1.0);
-    gl_FragColor = vec4(uColor * (1.0 - 0.28 * depth) * light(n), 1.0);
+    vec2 c = floor(uv * (uSize - 1.0) + 0.5);
+    vVis = hiddenCell(c) ? 0.0 : 1.0;
+    vPos = vec3(position.xy, ${zExpr});
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(vPos, 1.0);
+  }`;
+
+// Dessus de la matière
+const VERT_TOP = vert('max(Hs(c), Fs(c))');
+const FRAG_TOP = FRAG_COMMON + /* glsl */`
+  void main() {
+    if (vVis < 0.001) discard;                       // triangle entièrement dans une découpe
+    float depth = clamp((uTop - vPos.z) / max(uTop - uBottom, 0.001), 0.0, 1.0);
+    gl_FragColor = vec4(uColor * (1.0 - 0.28 * depth) * light(faceNormal()), 1.0);
   }`;
 
 // Dessous de la matière (plat, ou creusé par la face 2)
-const VERT_UNDER = COMMON + /* glsl */`
+const VERT_UNDER = vert('min(Fs(c), Hs(c)) - 0.02');
+const FRAG_UNDER = FRAG_COMMON + /* glsl */`
   void main() {
-    vCell = uv * (uSize - 1.0);
-    vec2 c = floor(vCell + 0.5);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position.xy, min(Fs(c), Hs(c)) - 0.02, 1.0);
-  }`;
-const FRAG_UNDER = COMMON + /* glsl */`
-  float F(vec2 c) { return min(Fs(c), Hs(c)); }
-  void main() {
-    vec2 c = floor(vCell + 0.5);
-    if (hidden(c)) discard;
-    vec3 n = vec3((F(c + vec2(1.0, 0.0)) - F(c - vec2(1.0, 0.0))) / (2.0 * uCell),
-                  (F(c + vec2(0.0, 1.0)) - F(c - vec2(0.0, 1.0))) / (2.0 * uCell), -1.0);
-    float depth = clamp((Fs(c) - uBottom) / max(uTop - uBottom, 0.001), 0.0, 1.0);
-    gl_FragColor = vec4(uColor * 0.85 * (1.0 - 0.28 * depth) * light(n), 1.0);
+    if (vVis < 0.001) discard;
+    float depth = clamp((vPos.z - uBottom) / max(uTop - uBottom, 0.001), 0.0, 1.0);
+    gl_FragColor = vec4(uColor * 0.85 * (1.0 - 0.28 * depth) * light(faceNormal()), 1.0);
   }`;
 
 export class SimulationView {
@@ -302,9 +306,10 @@ export class SimulationView {
     this.maskTex   = tex(this._partMask(), THREE.UnsignedByteType);
     this.uniforms = {
       uHeight: { value: this.heightTex }, uFloor: { value: this.floorTex }, uMask: { value: this.maskTex },
-      uSize: { value: new THREE.Vector2(nx, ny) }, uCell: { value: this.sim.cell },
+      uSize: { value: new THREE.Vector2(nx, ny) },
       uTop: { value: s.top }, uBottom: { value: s.bottom }, uColor: { value: WOOD },
       uPartOnly: { value: 0 }, uViewFlip: { value: new THREE.Vector3(1, 1, 1) },
+      uCam: { value: new THREE.Vector3() },   // caméra dans le repère des maillages (mise à jour à chaque image)
     };
 
     // Dessus et dessous : grilles de sommets déplacés par les textures (vus des deux côtés)
@@ -523,6 +528,9 @@ export class SimulationView {
       this._lastVersion = this.sim.version;
     }
     this.controls.update();
+    // Caméra dans le repère des maillages de surface (normales tournées vers elle)
+    this.surface.updateWorldMatrix(true, false);
+    this.surface.worldToLocal(this.uniforms.uCam.value.copy(this.camera.position));
     this.renderer.render(this.scene, this.camera);
   }
 
