@@ -208,7 +208,20 @@ export class ThreePreview {
     else if (lidLay) machH = lidLay.height;
     const zOff  = boxTypeKey === 'stackable' ? -_rimH : 0;
     this._buildZ0Gizmo(layW, layD, machH, this.z0Pos, this.z0Level, zOff);
-    this._buildStock(layW, layD, machH, this.stockOffset, this.stockSide, zOff);
+    const pc = lidLay?.pieces;
+    if (pc && Math.abs(pc.H - pc.lidH) > 1e-6) {
+      // Hauteurs différentes : deux bruts à leurs épaisseurs (voir l'avertissement à l'export).
+      // Z0 en haut : le dessus de chaque brut est à Z0, la pièce la moins haute est remontée
+      // pour que le repère soit juste pour les deux ; Z0 en bas : les deux posées à Z = 0.
+      const gap = this.z0Level === 'top' ? Math.abs(pc.H - pc.lidH) : 0;
+      const zBody = pc.H < pc.lidH ? gap : 0, zLid = pc.lidH < pc.H ? gap : 0;
+      for (const m of pc.bodyMeshes) m.position.z += zBody;
+      pc.lid.position.z += zLid;
+      this._buildStock(pc.W, pc.D, pc.H,    this.stockOffset, this.stockSide, zBody, 0,     0);
+      this._buildStock(pc.W, pc.D, pc.lidH, this.stockOffset, this.stockSide, zLid,  pc.dx, pc.dy);
+    } else {
+      this._buildStock(layW, layD, machH, this.stockOffset, this.stockSide, zOff);
+    }
   }
 
   /** Cadrage par défaut (vue 3/4 avant-droite) sur la dernière géométrie construite. */
@@ -318,6 +331,7 @@ export class ThreePreview {
     // Emprise de la forme (même boîte englobante que le G-code pour la disposition du couvercle)
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys);
+    const firstBodyMesh = this.meshes.length;   // les meshes du corps sont ajoutés jusqu'au couvercle
 
     // ── CORPS (z : 0 → H) ──────────────────────────────────────────────────
     const innerPts = this._offsetPts(pts, -wt);
@@ -396,6 +410,7 @@ export class ThreePreview {
     const mirror   = p2 => p2.map(p => ({ x: W - p.x, y: p.y }));
     const lidOuter = mirror(rs === 0 ? this._offsetPts(pts, -(wt - r)) : pts);
     const lidCav   = mirror(innerPts);
+    const bodyMeshes = this.meshes.slice(firstBodyMesh);
     const lid = new THREE.Group();
     const wood = this._mat(BOX_COLOR, { roughness: 0.7 });   // opaque : X-Ray pour voir l'intérieur
     const add  = (geo, mat, z0 = 0) => { const m = this._mesh(geo, mat); m.position.z = z0; lid.add(m); };
@@ -429,7 +444,11 @@ export class ThreePreview {
     }
     lid.position.set(dx, dy, 0);
     // Emprise totale corps + couvercle (caméra, grille, brut, repère Z0)
-    return { W: Math.max(W, W + dx), D: Math.max(D, D + dy), assembled: false, height: Math.max(H, lidH) };
+    return {
+      W: Math.max(W, W + dx), D: Math.max(D, D + dy), assembled: false, height: Math.max(H, lidH),
+      // Pièces séparées (hauteurs différentes → deux bruts) : de quoi les placer chacune
+      pieces: { W, D, dx, dy, H, lidH, bodyMeshes, lid },
+    };
   }
 
   _buildStackable(pts, H, wt, bFl, rimH, gap) {
@@ -623,13 +642,13 @@ export class ThreePreview {
   // ─── Stock / brut ──────────────────────────────────────────────────────────
 
   /** Construit le volume brut (wireframe + solide transparent) autour de la boîte. */
-  _buildStock(W, D, H, offset, side = 'top', zOffset = 0) {
+  _buildStock(W, D, H, offset, side = 'top', zOffset = 0, ox = 0, oy = 0) {
     const off = Math.max(0, offset);
     const sw  = W + 2 * off;
     const sd  = D + 2 * off;
     const sh  = H + off;
 
-    const cx = W / 2, cy = D / 2;
+    const cx = ox + W / 2, cy = oy + D / 2;
     // 'top'    : brut de Z=zOffset à Z=zOffset+H+off
     // 'bottom' : brut de Z=zOffset-off à Z=zOffset+H
     const cz = (side === 'bottom' ? (H - off) / 2 : sh / 2) + zOffset;
