@@ -152,8 +152,8 @@ export class ThreePreview {
       visH = lidLay.height;   // côte à côte : la plus haute des deux ; assemblée : boîte fermée
       visZCenter = visH / 2;
     } else if (boxTypeKey === 'stackable') {
-      visH = 2 * H + _rimH;
-      visZCenter = H / 2 - _rimH;
+      visH = 2 * H + 2 * _rimH;   // boîte usinée + boîte du dessous, chacune avec son plot
+      visZCenter = -_rimH;        // milieu entre H (haut) et −(H + 2·rimH) (bas)
     } else {
       visH = H;
       visZCenter = H / 2;
@@ -430,8 +430,16 @@ export class ThreePreview {
       plugMesh.position.z = -rimH;
     }
 
-    // 3. Boîte fantôme en dessous (Z=-(rimH+H) → -rimH), semi-transparente
+    // 3. Boîte fantôme en dessous (Z=-(rimH+H) → -rimH), semi-transparente — même pièce,
+    //    donc avec son plot (piètement) sous elle (Z=-(2·rimH+H) → -(rimH+H))
     buildHollow(-(rimH + H), true);
+    if (plugPts.length >= 3) {
+      const ghostPlug = this._mesh(
+        new THREE.ExtrudeGeometry(this._shape(plugPts), { depth: rimH, bevelEnabled: false }),
+        this._mat(PHANTOM_COLOR, { roughness: 0.75, transparent: true, opacity: 0.35 })
+      );
+      ghostPlug.position.z = -(2 * rimH + H);
+    }
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
