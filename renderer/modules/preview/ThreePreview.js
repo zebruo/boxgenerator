@@ -19,6 +19,7 @@ export class ThreePreview {
     this.z0Level     = 'top'; // 'bottom' (Z=0) | 'top' (Z=visH)
     this.stockOffset = 0;        // mm ajouté sur chaque côté XY en Z
     this.stockSide   = 'top';   // 'top' | 'bottom'
+    this.lidLayout   = 'flat';  // boîte à couvercle : 'flat' (comme usinée) | 'assembled'
     this._gizmos     = [];
     this._xray       = false;
     this._setup();
@@ -123,13 +124,14 @@ export class ThreePreview {
     // Compartiments (cloisons) : mêmes contours que le G-code (découpés par la cavité)
     const cells = this._compartments(shapePts, bb, boxTypeKey, boxParams, machineParams);
     let layW = W, layD = D;   // emprise de ce qui est affiché (corps + couvercle côte à côte)
+    let lidLay = null;        // boîte à couvercle : disposition (à plat / assemblé) et hauteur visible
     switch (boxTypeKey) {
       case 'open-tray':    this._buildOpenTray(shapePts, W, D, H, wt, bFl, cells); break;
       case 'finger-joint': this._buildFingerBox(shapePts, H, boxParams);        break;
       case 'lid-box': {
         const _r = boxParams.rabbet ?? 3; const _bFll = boxParams.lidBottomThickness ?? bFl;
-        const lay = this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells);
-        layW = lay.W; layD = lay.D;
+        lidLay = this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells);
+        layW = lidLay.W; layD = lidLay.D;
         break;
       }
       case 'stackable': {
@@ -141,8 +143,8 @@ export class ThreePreview {
 
     // Positionner la caméra au centre de la géométrie visible
     let visH, visZCenter;
-    if (boxTypeKey === 'lid-box') {
-      visH = Math.max(H, boxParams.lidHeight ?? 15);   // corps et couvercle côte à côte
+    if (lidLay) {
+      visH = lidLay.height;   // côte à côte : la plus haute des deux ; assemblée : boîte fermée
       visZCenter = visH / 2;
     } else if (boxTypeKey === 'stackable') {
       visH = 2 * H + _rimH;
@@ -163,7 +165,11 @@ export class ThreePreview {
 
     // Gizmo Z0 et brut — top par défaut au sommet de la boîte (Z=H) ; boîte à couvercle :
     // brut commun aux deux pièces (épaisseur = la plus haute), comme le G-code
-    const machH = boxTypeKey === 'stackable' ? H + _rimH : boxTypeKey === 'lid-box' ? visH : H;
+    // Vue assemblée : ni brut ni repère Z0 (ils décrivent la disposition d'usinage)
+    if (lidLay?.assembled) return;
+    let machH = H;
+    if (boxTypeKey === 'stackable') machH = H + _rimH;
+    else if (lidLay) machH = lidLay.height;
     const zOff  = boxTypeKey === 'stackable' ? -_rimH : 0;
     this._buildZ0Gizmo(layW, layD, machH, this.z0Pos, this.z0Level, zOff);
     this._buildStock(layW, layD, machH, this.stockOffset, this.stockSide, zOff);
@@ -319,38 +325,48 @@ export class ThreePreview {
     const lidGap = 20;
     const useVertical = Math.max(W, 2 * D + lidGap) < Math.max(2 * W + lidGap, D);
     const dx = useVertical ? 0 : W + lidGap, dy = useVertical ? D + lidGap : 0;
-    const place = p2 => p2.map(p => ({ x: W - p.x + dx, y: p.y + dy }));
+    const assembled = this.lidLayout === 'assembled';
 
-    const lidOuter = place(rs === 0 ? this._offsetPts(pts, -(wt - r)) : pts);
-    const lidCav   = place(innerPts);
-    const wood  = this._mat(0xb04a10, { roughness: 0.7 });
-    const ring  = (outer, inner, z0, depth) => {
+    // Couvercle tel qu'usiné (miroir x → W − x, posé à plat, ouverture vers le haut, z 0 → lidH),
+    // construit dans un groupe qu'on place ensuite à plat ou assemblé.
+    const mirror   = p2 => p2.map(p => ({ x: W - p.x, y: p.y }));
+    const lidOuter = mirror(rs === 0 ? this._offsetPts(pts, -(wt - r)) : pts);
+    const lidCav   = mirror(innerPts);
+    const lid = new THREE.Group();
+    const opt = assembled ? { transparent: true, opacity: 0.8 } : {};   // assemblé : on devine l'emboîtement
+    const wood = this._mat(0xb04a10, { roughness: 0.7, ...opt });
+    const add  = (geo, mat, z0 = 0) => { const m = this._mesh(geo, mat); m.position.z = z0; lid.add(m); };
+    const ring = (outer, inner, z0, depth) => {
       if (depth <= 0.05) return;
       const s = this._shape(outer);
       s.holes = [this._path(inner)];
-      this._mesh(new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false }), wood).position.z = z0;
+      add(new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false }), wood, z0);
     };
 
-    // Fond du couvercle
-    this._mesh(
-      new THREE.ExtrudeGeometry(this._shape(lidOuter), { depth: bFll, bevelEnabled: false }),
-      this._mat(0x8a3a0a, { roughness: 0.85 })
-    );
+    add(new THREE.ExtrudeGeometry(this._shape(lidOuter), { depth: bFll, bevelEnabled: false }),
+      this._mat(0x8a3a0a, { roughness: 0.85, ...opt }));                       // fond du couvercle
     if (rs === 0) {
       ring(lidOuter, lidCav, bFll, lidH - bFll);
     } else {
-      const lidRab = place(this._offsetPts(pts, -r));
+      const lidRab = mirror(this._offsetPts(pts, -r));
       ring(lidOuter, lidRab, bFll, lidH - bFll);       // bord extérieur, pleine hauteur
       ring(lidRab, lidCav, bFll, lidH - rD - bFll);    // sous la feuillure
     }
-    // Fond de la cavité du couvercle
-    this._mesh(
-      new THREE.ShapeGeometry(this._shape(lidCav)),
-      this._mat(0x080f25, { roughness: 0.95, side: THREE.FrontSide })
-    ).position.z = bFll + 0.5;
+    add(new THREE.ShapeGeometry(this._shape(lidCav)),
+      this._mat(0x080f25, { roughness: 0.95, side: THREE.FrontSide, ...opt }), bFll + 0.5);   // fond de cavité
 
+    this.scene.add(lid);
+    this.meshes.push(lid);
+    if (assembled) {
+      // Retourné gauche ↔ droite (annule le miroir de l'usinage : x → W − x) et posé sur le
+      // corps, lèvre engagée de rD dans la feuillure : z → (H − rD + lidH) − z
+      lid.rotation.y = Math.PI;
+      lid.position.set(W, 0, H - rD + lidH);
+      return { W, D, assembled: true, height: H - rD + lidH };
+    }
+    lid.position.set(dx, dy, 0);
     // Emprise totale corps + couvercle (caméra, grille, brut, repère Z0)
-    return { W: Math.max(W, W + dx), D: Math.max(D, D + dy) };
+    return { W: Math.max(W, W + dx), D: Math.max(D, D + dy), assembled: false, height: Math.max(H, lidH) };
   }
 
   _buildStackable(pts, H, wt, bFl, rimH, gap) {
@@ -444,6 +460,7 @@ export class ThreePreview {
     this._xray = enabled;
     this.meshes.forEach(m => {
       const mat = m.material;
+      if (!mat) return;   // groupe (ex. couvercle) : ses maillages sont traités individuellement
       if (enabled) {
         mat.transparent = true;
         mat.opacity     = 0.22;

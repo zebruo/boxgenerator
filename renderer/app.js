@@ -165,6 +165,14 @@ function bindEvents() {
     });
   });
 
+  // Boîte à couvercle : à plat (comme usinée) / assemblée
+  document.querySelectorAll('.lid-layout-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.lid-layout-btn').forEach(b => b.classList.toggle('active', b === btn));
+      if (threePreview) { threePreview.lidLayout = btn.dataset.layout; updatePreview(); }
+    });
+  });
+
   // Mode X-Ray
   document.getElementById('xray-toggle').addEventListener('change', e => {
     if (threePreview) threePreview.setXRay(e.target.checked);
@@ -714,6 +722,10 @@ function resizeCanvases() {
 }
 
 function updatePreview() {
+  // Choix « À plat / Assemblé » : seulement pour la boîte à couvercle
+  document.querySelectorAll('.lid-layout-ctrl').forEach(el => {
+    el.style.display = state.boxTypeKey === 'lid-box' ? '' : 'none';
+  });
   if (state.view === '3d') {
     if (!threePreview) {
       threePreview = new ThreePreview(canvas2d);

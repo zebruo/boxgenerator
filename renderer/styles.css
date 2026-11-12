@@ -176,6 +176,13 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .ctrl-sep { color: var(--border); font-size: 14px; user-select: none; }
 .ctrl-label-sm { font-size: 10px; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
 .xray-label { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+.lid-layout { display: flex; gap: 2px; }
+.lid-layout-btn {
+  height: 20px; padding: 0 8px; border: 1px solid var(--border); border-radius: 3px;
+  background: var(--bg-card); color: var(--text-muted); font-size: 11px; cursor: pointer;
+}
+.lid-layout-btn:hover  { border-color: var(--accent2); color: var(--accent2); }
+.lid-layout-btn.active { background: var(--accent2); border-color: var(--accent2); color: #fff; }
 .xray-label input[type="checkbox"] { accent-color: #4a9eff; cursor: pointer; }
 
 .z0-grid {
