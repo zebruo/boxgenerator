@@ -1,4 +1,4 @@
-import { ShapeBase } from './ShapeBase.js';
+import { ShapeBase, arcSegments } from './ShapeBase.js';
 
 export class Circle extends ShapeBase {
   defaultParams() {
@@ -11,8 +11,9 @@ export class Circle extends ShapeBase {
     ];
   }
 
-  getContourPoints(segments = 64) {
+  getContourPoints() {
     const r = this.params.diameter / 2;
+    const segments = arcSegments(r, 2 * Math.PI, undefined, 32);   // écart corde/arc ≤ 0,01 mm
     const pts = [];
     for (let i = 0; i < segments; i++) {
       const a = (2 * Math.PI * i) / segments;

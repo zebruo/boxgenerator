@@ -7,7 +7,7 @@ Application desktop de génération de boîtes paramétriques avec export G-code
 ## Fonctionnalités
 
 - **4 types de boîtes** : Plateau ouvert, Boîte finger joint, Boîte à couvercle (feuillure), Boîte empilable
-- **7 profils de forme** : Rectangle, Cercle, Ovale, Hexagone, Polygone, Bean, et toutes variantes arrondies
+- **6 profils de forme** : Rectangle, Cercle, Ovale, Polygone (dont hexagone), Bean, et toutes variantes arrondies
 - **Export G-code** compatible Grbl, Mach3 et LinuxCNC
 - **Export SVG** compatible Fusion 360, Inkscape et autres logiciels CAO
 - **Prévisualisation 2D/3D** avec vue isométrique Three.js
@@ -36,7 +36,7 @@ Application desktop de génération de boîtes paramétriques avec export G-code
 
 ## Formes
 
-Rectangle, Cercle, Ovale, Hexagone (régulier avec recalcul automatique des dimensions à la rotation), Polygone (N côtés), Bean (forme organique asymétrique).
+Rectangle, Cercle, Ovale, Polygone (N côtés, emprise exacte quel que soit le rayon de coin), Bean (forme organique asymétrique).
 
 Toutes les formes supportent un rayon de coin. Les formes non rectangulaires n'affichent pas les panneaux de parois qui n'ont pas de sens.
 
@@ -97,7 +97,7 @@ BoxGenerator/
     ├── app.js           — Contrôleur principal, état, événements, calcul origine G-code
     ├── styles.css
     └── modules/
-        ├── shapes/      — ShapeBase, Rectangle, Circle, Oval, Hexagon, Polygon, Bean
+        ├── shapes/      — ShapeBase, Rectangle, Circle, Oval, Polygon, Bean
         ├── boxes/       — OpenTray, FingerJointBox, LidBox, StackableBox
         └── gcode/       — GCodeGenerator, PocketConcentric
 ```

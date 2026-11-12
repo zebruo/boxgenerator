@@ -27,7 +27,6 @@ export const en = {
     rectangle: 'Rectangle',
     circle:    'Circle',
     oval:      'Oval',
-    hexagon:   'Hexagon',
     polygon:   'Polygon',
     bean:      'Bean',
   },
@@ -40,7 +39,6 @@ export const en = {
     diameter:       'Diameter',
     sides:          'Sides',
     rotation:       'Rotation',
-    ratio_long_larg:'Ratio L/W',
     ratio_larg_long:'Ratio W/L',
     // ── Boxes ──
     height:              'Height',
@@ -124,7 +122,7 @@ export const en = {
   warn: {
     tool_too_large:    '⚠ Tool Ø{{td}}mm ≥ rabbet+clearance ({{ringW}}mm) — use Ø < {{ringW}}mm',
     bean_ratio:        '⚠ Ratio outside recommended CNC range (0.5 – 1.5)',
-    hexagon_irregular: 'Irregular hexagon — the 6 sides are not equal.\nFor equal sides: Ratio L/W = {{ratio}}',
+    radius_clamped: 'Radius too large for these dimensions — limited to {{value}} mm (half the smallest dimension).',
     finger_too_narrow: '⚠ Tab too narrow ({{tw}}mm) for material thickness ({{t}}mm) — increase finger width',
     finger_too_few:    '⚠ No tabs possible on this edge ({{L}}mm) — decrease finger width',
   },
@@ -188,7 +186,7 @@ export const en = {
     skin:            'Allowance',
     tip_finish:      'Wall finishing pass (contours + pockets).\nRoughing passes leave a skin of N mm on the walls.\nOne final pass at full depth removes it cleanly, eliminating corner dwell marks.\nTypical value: 0.2–0.3 mm.',
     tip_leadin_r:    'Lead-in/out arc radius = 0.4 × tool Ø = {{val}}mm by default.\nThe arc must fit in the clearance space around the contour.',
-    tip_concentric:  'Concentric path (ring by ring).\n✔ Recommended for convex shapes (rectangle, circle, oval, hexagon).\n✔ Better pocket wall finish.\n✗ Avoid for deeply concave shapes.',
+    tip_concentric:  'Concentric path (ring by ring).\n✔ Recommended for convex shapes (rectangle, circle, oval, polygon).\n✔ Better pocket wall finish.\n✗ Avoid for deeply concave shapes.',
     tip_raster:      'Horizontal zig-zag raster, line by line.\n✔ Universal: works for all shapes.\n✔ Ideal for concave shapes (C, U, L).\n✗ May leave slight marks on pocket walls.',
   },
 

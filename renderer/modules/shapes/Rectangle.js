@@ -6,10 +6,13 @@ export class Rectangle extends ShapeBase {
   }
 
   getParamDescriptors() {
+    const { length: L, width: W, cornerRadius: r } = this.params;
+    const rMax = Math.min(L, W) / 2;
     return [
       { id: 'length',       label: 'param.length',        min: 10, max: 2000, step: 1,   unit: 'mm' },
       { id: 'width',        label: 'param.width',         min: 10, max: 2000, step: 1,   unit: 'mm' },
-      { id: 'cornerRadius', label: 'param.corner_radius', min: 0,  max: 50,   step: 0.5, unit: 'mm' }
+      { id: 'cornerRadius', label: 'param.corner_radius', min: 0,  max: 50,   step: 0.5, unit: 'mm',
+        warn: r > rMax, warnTip: 'warn.radius_clamped|' + +rMax.toFixed(2) }
     ];
   }
 
@@ -24,34 +27,22 @@ export class Rectangle extends ShapeBase {
     }
   }
 
-  getContourPoints(segments = 8) {
+  getContourPoints() {
     const { length: L, width: W, cornerRadius: r } = this.params;
     // L (Longueur) → axe X (horizontal), W (Largeur) → axe Y (profondeur)
     const rc = Math.min(r, L / 2, W / 2);
-    const pts = [];
 
-    if (rc <= 0) {
+    if (!(rc > 0)) {
       return [
         { x: 0, y: 0 }, { x: L, y: 0 },
         { x: L, y: W }, { x: 0, y: W }
       ];
     }
-
-    // Coins arrondis: 4 arcs de quart de cercle
-    const corners = [
-      { cx: L - rc, cy: rc,     startAngle: -Math.PI / 2, endAngle: 0 },
-      { cx: L - rc, cy: W - rc, startAngle: 0,            endAngle: Math.PI / 2 },
-      { cx: rc,     cy: W - rc, startAngle: Math.PI / 2,  endAngle: Math.PI },
-      { cx: rc,     cy: rc,     startAngle: Math.PI,       endAngle: 3 * Math.PI / 2 }
-    ];
-
-    for (const c of corners) {
-      for (let i = 0; i <= segments; i++) {
-        const a = c.startAngle + (c.endAngle - c.startAngle) * (i / segments);
-        pts.push({ x: c.cx + rc * Math.cos(a), y: c.cy + rc * Math.sin(a) });
-      }
-    }
-    return pts;
+    // Coins arrondis : rectangle intérieur agrandi de rc (départ en (L − rc, 0), comme avant).
+    // rc = W/2 → oblong ; rc = L/2 = W/2 → cercle.
+    return this._roundOutward([
+      { x: L - rc, y: rc }, { x: L - rc, y: W - rc }, { x: rc, y: W - rc }, { x: rc, y: rc },
+    ], rc);
   }
 
   getSVGPath() {

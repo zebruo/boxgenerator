@@ -44,7 +44,7 @@ export function showHelpModal(machine = {}) {
           </dd>
           <dt>Forme du contour</dt>
           <dd>Définit le plan de base de la boîte :
-            <strong>Rectangle</strong>, <strong>Cercle</strong>, <strong>Ovale</strong>, <strong>Hexagone</strong>, <strong>Polygone</strong> (N côtés), <strong>Haricot</strong>. Tous les panneaux et contours sont calculés à partir de cette forme.
+            <strong>Rectangle</strong>, <strong>Cercle</strong>, <strong>Ovale</strong>, <strong>Polygone</strong> (N côtés), <strong>Haricot</strong>. Tous les panneaux et contours sont calculés à partir de cette forme.
             <br><br>
             <strong>Haricot</strong> — contour organique à zone concave, défini par une courbe de Bézier cubique fixe mise à l'échelle selon la <em>Longueur</em> (axe Y) et la <em>Largeur</em> (axe X).
             Le profil ne se paramètre pas : seules les dimensions globales changent.
@@ -167,7 +167,7 @@ export function showHelpModal(machine = {}) {
         <h4>Stratégie poche</h4>
         <dl class="help-dl">
           <dt>Concentrique (défaut)</dt>
-          <dd>L'outil part du centre et trace des anneaux concentriques vers la paroi. La paroi est atteinte lors du dernier anneau, qui constitue la passe de finition. Résultat propre pour les formes convexes (rectangle, cercle, ovale, hexagone). Un overcut de ½ ⌀outil sur le dernier anneau élimine la marque de fermeture sur la paroi.</dd>
+          <dd>L'outil part du centre et trace des anneaux concentriques vers la paroi. La paroi est atteinte lors du dernier anneau, qui constitue la passe de finition. Résultat propre pour les formes convexes (rectangle, cercle, ovale, polygone). Un overcut de ½ ⌀outil sur le dernier anneau élimine la marque de fermeture sur la paroi.</dd>
           <dt>Raster (zig-zag)</dt>
           <dd>Balayage horizontal ligne par ligne. Universel — fonctionne pour toutes les formes y compris les profils concaves (haricot, C, U). Peut laisser de légères stries sur les parois ; à utiliser quand la forme est trop concave pour la stratégie concentrique.</dd>
         </dl>
@@ -234,7 +234,7 @@ export function showHelpModal(machine = {}) {
             <dt>Cavité</dt><dd>Poche intérieure depuis le dessus jusqu'à l'épaisseur de fond.</dd>
             <dt>Cloisons</dt><dd>Divise la cavité en <strong>N+1 compartiments</strong> en conservant des cloisons à la même épaisseur que les parois. Direction au choix : <em>perpendiculaires à X</em> (cloisons verticales) ou <em>perpendiculaires à Y</em> (cloisons horizontales). Disponible uniquement pour la forme Rectangle. Un avertissement s'affiche si les compartiments sont trop étroits pour la fraise (min. 3 × ⌀outil).</dd>
             <dt>Contour</dt><dd>Découpe extérieure en pleine épaisseur matière.</dd>
-            <dt>Usage</dt><dd>Rangements, bacs, tiroirs, organiseurs. Compatible toutes formes (rectangle, ovale, hexagone…).</dd>
+            <dt>Usage</dt><dd>Rangements, bacs, tiroirs, organiseurs. Compatible toutes formes (rectangle, ovale, polygone…).</dd>
           </dl>
         </section>
 
@@ -306,14 +306,9 @@ export function showHelpModal(machine = {}) {
                 <td>Ellipse lisse. Aucun coin vif — très favorable à la CNC.</td>
               </tr>
               <tr>
-                <td><strong>Hexagone</strong></td>
-                <td>Diamètre, Rayon de coin</td>
-                <td>6 coins — arrondir pour éviter que la fraise ne bloque. Orienter à plat ou en pointe.</td>
-              </tr>
-              <tr>
                 <td><strong>Polygone</strong></td>
-                <td>Diamètre, Nb côtés, Rayon de coin</td>
-                <td>Plus le nombre de côtés est faible, plus les coins sont aigus — augmenter le rayon en conséquence.</td>
+                <td>Longueur, Largeur, Nb côtés, Rayon de coin, Rotation</td>
+                <td>Plus le nombre de côtés est faible, plus les coins sont aigus — augmenter le rayon en conséquence. L'emprise reste exactement Longueur × Largeur quel que soit le rayon. Hexagone : 6 côtés.</td>
               </tr>
               <tr>
                 <td><strong>Haricot</strong></td>

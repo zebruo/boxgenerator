@@ -1,4 +1,4 @@
-import { ShapeBase } from './ShapeBase.js';
+import { ShapeBase, DEFLECTION } from './ShapeBase.js';
 
 export class Oval extends ShapeBase {
   defaultParams() {
@@ -12,20 +12,36 @@ export class Oval extends ShapeBase {
     ];
   }
 
-  getContourPoints(deflection = 0.01) {
+  getContourPoints(deflection = DEFLECTION) {
     const rx = this.params.length / 2;
     const ry = this.params.width / 2;
-    // Rayon de courbure minimal de l'ellipse = (petit axe)² / grand axe
-    // C'est là où la courbure est la plus forte → le plus de segments nécessaires
-    const rMin     = Math.min(rx, ry) ** 2 / Math.max(rx, ry);
-    const theta    = 2 * Math.acos(1 - deflection / rMin);
-    const segments = Math.max(32, Math.ceil(2 * Math.PI / theta));
-    const pts = [];
-    for (let i = 0; i < segments; i++) {
-      const a = (2 * Math.PI * i) / segments;
-      pts.push({ x: rx + rx * Math.cos(a), y: ry + ry * Math.sin(a) });
-    }
-    return pts;
+    const at = a => ({ x: rx + rx * Math.cos(a), y: ry + ry * Math.sin(a) });
+    // Écart entre l'arc d'ellipse [a, b] et sa corde, mesuré en trois points intérieurs
+    const sag = (a, b) => {
+      const p = at(a), q = at(b), dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy) || 1;
+      let d = 0;
+      for (const f of [0.25, 0.5, 0.75]) {
+        const m = at(a + (b - a) * f);
+        d = Math.max(d, Math.abs((m.x - p.x) * dy - (m.y - p.y) * dx) / l);
+      }
+      return d;
+    };
+    // Subdivision adaptative : segments courts aux extrémités (forte courbure), longs sur les
+    // flancs ; un seul quadrant calculé puis reporté par symétrie (contour symétrique).
+    const q1 = [0];
+    const split = (a, b, depth) => {
+      if (depth < 16 && sag(a, b) > deflection) { const c = (a + b) / 2; split(a, c, depth + 1); split(c, b, depth + 1); }
+      else q1.push(b);
+    };
+    const N0 = 4;   // découpage initial du quadrant
+    for (let i = 0; i < N0; i++) split(Math.PI / 2 * i / N0, Math.PI / 2 * (i + 1) / N0, 0);
+    const angles = [
+      ...q1,                                                   // 0 → π/2
+      ...q1.slice(0, -1).reverse().map(a => Math.PI - a),       // → π
+      ...q1.slice(1).map(a => Math.PI + a),                     // → 3π/2
+      ...q1.slice(1, -1).reverse().map(a => 2 * Math.PI - a),   // → 2π (exclu)
+    ];
+    return angles.map(at);
   }
 
   getSVGPath() {

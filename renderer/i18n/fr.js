@@ -27,7 +27,6 @@ export const fr = {
     rectangle: 'Rectangle',
     circle:    'Cercle',
     oval:      'Ovale',
-    hexagon:   'Hexagone',
     polygon:   'Polygone',
     bean:      'Haricot',
   },
@@ -40,7 +39,6 @@ export const fr = {
     diameter:       'Diamètre',
     sides:          'Côtés',
     rotation:       'Rotation',
-    ratio_long_larg:'Ratio Long/Larg',
     ratio_larg_long:'Ratio Larg/Long',
     // ── Boîtes ──
     height:              'Hauteur',
@@ -124,7 +122,7 @@ export const fr = {
   warn: {
     tool_too_large:    '⚠ Fraise Ø{{td}}mm ≥ feuillure+jeu ({{ringW}}mm) — utiliser Ø < {{ringW}}mm',
     bean_ratio:        '⚠ Ratio hors plage CNC recommandée (0.5 – 1.5)',
-    hexagon_irregular: 'Hexagone irrégulier — les 6 côtés ne sont pas égaux.\nPour des côtés égaux : Ratio L/l = {{ratio}}',
+    radius_clamped: 'Rayon trop grand pour ces dimensions — limité à {{value}} mm (moitié de la plus petite cote).',
     finger_too_narrow: '⚠ Encoche trop étroite ({{tw}}mm) pour l\'épaisseur matière ({{t}}mm) — augmenter la largeur d\'encoche',
     finger_too_few:    '⚠ Aucune encoche possible sur ce bord ({{L}}mm) — réduire la largeur d\'encoche',
   },
@@ -188,7 +186,7 @@ export const fr = {
     skin:            'Surépaisseur',
     tip_finish:      'Passe de finition paroi (contours + poches).\nLes passes de décharge laissent une peau de N mm sur les parois.\nUne passe supplémentaire à la profondeur finale les élimine proprement, en supprimant les marques d\'angle.\nValeur typique : 0.2–0.3 mm.',
     tip_leadin_r:    'Rayon arc lead-in/out = 0.4 × Ø outil = {{val}}mm par défaut.\nL\'arc doit tenir dans l\'espace libre autour du contour.',
-    tip_concentric:  'Chemin concentrique (anneau par anneau).\n✔ Recommandé pour les formes convexes (rectangle, cercle, ovale, hexagone).\n✔ Meilleure finition des parois de poche.\n✗ À éviter pour les formes très concaves.',
+    tip_concentric:  'Chemin concentrique (anneau par anneau).\n✔ Recommandé pour les formes convexes (rectangle, cercle, ovale, polygone).\n✔ Meilleure finition des parois de poche.\n✗ À éviter pour les formes très concaves.',
     tip_raster:      'Balayage horizontal zig-zag, ligne par ligne.\n✔ Universel : fonctionne pour toutes les formes.\n✔ Idéal pour les formes concaves (C, U, L).\n✗ Peut laisser de légères stries sur les parois de poche.',
   },
 

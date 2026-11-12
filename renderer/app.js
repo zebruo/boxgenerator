@@ -5,7 +5,6 @@ import { TechnicalView }  from './modules/preview/TechnicalView.js';
 import { Rectangle }      from './modules/shapes/Rectangle.js';
 import { Circle }         from './modules/shapes/Circle.js';
 import { Oval }           from './modules/shapes/Oval.js';
-import { Hexagon }        from './modules/shapes/Hexagon.js';
 import { Polygon }        from './modules/shapes/Polygon.js';
 import { Bean }           from './modules/shapes/Bean.js';
 import { OpenTray }       from './modules/boxes/OpenTray.js';
@@ -50,7 +49,6 @@ const SHAPES = {
   rectangle: Rectangle,
   circle:    Circle,
   oval:      Oval,
-  hexagon:   Hexagon,
   polygon:   Polygon,
   bean:      Bean
 };
@@ -353,7 +351,7 @@ function renderShapeParams() {
         const val = parseFloat(e.target.value);
         if (state.shape.params.hasOwnProperty(d.id)) {
           state.shape.updateParam(d.id, val);
-          // Synchronise les inputs liés (ex: longueur/largeur/côté de l'hexagone)
+          // Synchronise les inputs liés (ex: longueur/largeur du rectangle)
           for (const [pid, pval] of Object.entries(state.shape.params)) {
             const inp = document.querySelector(`[data-param="${pid}"]`);
             if (inp && inp !== e.target) inp.value = typeof pval === 'number' ? +pval.toFixed(2) : pval;
@@ -380,6 +378,7 @@ function renderShapeParams() {
 
     paramsContainer.appendChild(row);
   }
+  updateShapeInputWarnings();
   updateBeanRatio();
   updatePinDepthWarning();
   updateRabbetToolWarning();
@@ -411,7 +410,7 @@ function updateShapeInputWarnings() {
     if (d.warn && d.warnTip) {
       // Format: 'i18n.key|interpolation_value' pour les clés avec variables
       const [key, val] = d.warnTip.split('|');
-      el.title = val ? t(key, { ratio: val }) : t(key);
+      el.title = val ? t(key, { ratio: val, value: val }) : t(key);
     } else {
       el.title = '';
     }

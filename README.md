@@ -7,7 +7,7 @@ A desktop application for generating parametric boxes and trays with CNC G-code 
 ## Features
 
 - **4 box types** : Open Tray, Finger Joint Box, Lid Box (rabbet lid), Stackable Box
-- **7 shape profiles** : Rectangle, Circle, Oval, Hexagon, Polygon, Bean, and any rounded variant
+- **6 shape profiles** : Rectangle, Circle, Oval, Polygon (including hexagon), Bean, and any rounded variant
 - **G-code export** compatible with Grbl, Mach3 and LinuxCNC
 - **SVG export** compatible with Fusion 360, Inkscape and other CAD tools
 - **2D/3D preview** with Three.js isometric view
@@ -36,7 +36,7 @@ A desktop application for generating parametric boxes and trays with CNC G-code 
 
 ## Shapes
 
-Rectangle, Circle, Oval, Hexagon (regular with auto-adjusted dimensions on rotation), Polygon (N sides), Bean (asymmetric organic shape).
+Rectangle, Circle, Oval, Polygon (N sides, exact footprint whatever the corner radius), Bean (asymmetric organic shape).
 
 All shapes support corner radius. Non-rectangular shapes automatically omit wall panels where they make no sense.
 
@@ -97,7 +97,7 @@ BoxGenerator/
     ├── app.js           — Main controller, state, events, G-code origin computation
     ├── styles.css
     └── modules/
-        ├── shapes/      — ShapeBase, Rectangle, Circle, Oval, Hexagon, Polygon, Bean
+        ├── shapes/      — ShapeBase, Rectangle, Circle, Oval, Polygon, Bean
         ├── boxes/       — OpenTray, FingerJointBox, LidBox, StackableBox
         └── gcode/       — GCodeGenerator, PocketConcentric
 ```

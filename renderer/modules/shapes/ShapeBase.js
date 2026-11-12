@@ -55,57 +55,59 @@ export class ShapeBase {
   }
 
   /**
-   * Arrondit les sommets d'un polygone convexe avec un rayon r.
-   * Pour chaque sommet, calcule les points tangents et génère un arc.
-   * @param {{x,y}[]} pts  - sommets du polygone
-   * @param {number}  r    - rayon de coin souhaité (mm)
-   * @param {number}  segs - nb de segments par arc
+   * Polygone convexe aux coins arrondis de rayon r, d'emprise EXACTE : le contour est le
+   * polygone de base (CCW, éventuellement dégénéré en segment ou en point) agrandi de r avec
+   * des raccords ronds. Chaque coin est un arc de rayon r exactement, tangent aux côtés, et
+   * l'emprise vaut celle de la base + 2r dans chaque direction.
+   * @param {{x,y}[]} base - sommets du polygone de base (CCW)
+   * @param {number}  r    - rayon des coins (mm, > 0)
    * @returns {{x,y}[]}
    */
-  _roundedPolygon(pts, r, segs = 6) {
-    const n = pts.length;
-    const result = [];
+  _roundOutward(base, r) {
+    const b = dedupePoints(base);
+    if (b.length < 2) {                       // base réduite à un point : cercle
+      const c = b[0] ?? { x: 0, y: 0 }, n = arcSegments(r, 2 * Math.PI, DEFLECTION, 32);
+      return Array.from({ length: n }, (_, i) => {
+        const a = -Math.PI / 2 + 2 * Math.PI * i / n;
+        return { x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) };
+      });
+    }
+    // Direction (angle) de la normale extérieure du côté a → c (polygone CCW)
+    const normal = (a, c) => Math.atan2(-(c.x - a.x), c.y - a.y);
+    const n = b.length, out = [];
     for (let i = 0; i < n; i++) {
-      const prev = pts[(i - 1 + n) % n];
-      const curr = pts[i];
-      const next = pts[(i + 1) % n];
-
-      // Vecteurs unitaires depuis curr vers les voisins
-      const e1x = prev.x - curr.x, e1y = prev.y - curr.y;
-      const l1 = Math.hypot(e1x, e1y) || 1;
-      const e2x = next.x - curr.x, e2y = next.y - curr.y;
-      const l2 = Math.hypot(e2x, e2y) || 1;
-
-      // Angle intérieur au sommet
-      const dot  = Math.max(-1, Math.min(1, (e1x * e2x + e1y * e2y) / (l1 * l2)));
-      const phi  = Math.acos(dot);
-      if (phi < 1e-6 || Math.PI - phi < 1e-6) { result.push(curr); continue; }
-      const halfPhi = phi / 2;
-
-      // Distance tangente depuis le sommet (clampée à la moitié de chaque arête)
-      const t  = Math.min(r / Math.tan(halfPhi), l1 / 2, l2 / 2);
-      const rc = t * Math.tan(halfPhi);  // rayon réel (peut être < r si clampé)
-
-      const T1 = { x: curr.x + (e1x / l1) * t, y: curr.y + (e1y / l1) * t };
-      const T2 = { x: curr.x + (e2x / l2) * t, y: curr.y + (e2y / l2) * t };
-
-      // Centre de l'arc (sur la bissectrice, à l'intérieur du polygone)
-      const bx = e1x / l1 + e2x / l2, by = e1y / l1 + e2y / l2;
-      const bl = Math.hypot(bx, by) || 1;
-      const C  = { x: curr.x + (bx / bl) * (rc / Math.sin(halfPhi)),
-                   y: curr.y + (by / bl) * (rc / Math.sin(halfPhi)) };
-
-      // Arc du plus court chemin de T1 à T2
-      const a1 = Math.atan2(T1.y - C.y, T1.x - C.x);
-      let   dA = Math.atan2(T2.y - C.y, T2.x - C.x) - a1;
-      if (dA >  Math.PI) dA -= 2 * Math.PI;
-      if (dA < -Math.PI) dA += 2 * Math.PI;
-
+      const prev = b[(i - 1 + n) % n], v = b[i], next = b[(i + 1) % n];
+      const a0 = normal(prev, v);
+      let dA = normal(v, next) - a0;
+      dA = Math.atan2(Math.sin(dA), Math.cos(dA));   // (−π, π]
+      if (dA < -1e-9) dA += 2 * Math.PI;             // demi-tour d'une base dégénérée : +π
+      const segs = dA > 1e-9 ? arcSegments(r, dA) : 0;
       for (let j = 0; j <= segs; j++) {
-        const a = a1 + dA * (j / segs);
-        result.push({ x: C.x + rc * Math.cos(a), y: C.y + rc * Math.sin(a) });
+        const a = a0 + (segs ? dA * j / segs : 0);
+        out.push({ x: v.x + r * Math.cos(a), y: v.y + r * Math.sin(a) });
       }
     }
-    return result;
+    return dedupePoints(out);
   }
+}
+
+/** Écart maximal (mm) toléré entre une courbe et sa polyligne (même valeur pour toutes les formes). */
+export const DEFLECTION = 0.01;
+
+/** Nombre de segments pour qu'un arc de rayon r et d'ouverture sweep (rad) reste à ≤ tol de sa corde. */
+export function arcSegments(r, sweep, tol = DEFLECTION, min = 1) {
+  if (!(r > tol)) return Math.max(min, Math.ceil(Math.abs(sweep) / (Math.PI / 2)));
+  const step = 2 * Math.acos(1 - tol / r);
+  return Math.max(min, Math.ceil(Math.abs(sweep) / step));
+}
+
+/** Retire les points consécutifs confondus (y compris le dernier s'il répète le premier). */
+export function dedupePoints(pts, eps = 1e-6) {
+  const out = [];
+  for (const p of pts) {
+    const q = out[out.length - 1];
+    if (!q || Math.hypot(p.x - q.x, p.y - q.y) > eps) out.push(p);
+  }
+  while (out.length > 1 && Math.hypot(out[0].x - out[out.length - 1].x, out[0].y - out[out.length - 1].y) <= eps) out.pop();
+  return out;
 }

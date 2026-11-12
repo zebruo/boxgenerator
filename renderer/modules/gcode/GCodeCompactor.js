@@ -4,7 +4,7 @@
  * 1. Regroupement en arcs : les suites de G1 dans un même plan Z, à la même avance,
  *    dont les points suivent un cercle (écart ≤ tol), sont remplacées par un seul G2/G3.
  *    Garde-fou : la flèche de chaque segment doit aussi rester ≤ tol, pour qu'un polygone
- *    (hexagone…) dont les sommets sont sur un cercle ne soit jamais transformé en cercle.
+ *    (polygone…) dont les sommets sont sur un cercle ne soit jamais transformé en cercle.
  * 2. Mots modaux : X, Y, Z et F ne sont écrits que lorsqu'ils changent.
  *
  * L'état modal et la position connue sont réinitialisés à chaque marqueur de section
