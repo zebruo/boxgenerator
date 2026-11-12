@@ -48,10 +48,10 @@ export class ThreePreview {
     this.camera.position.set(300, -300, 250);
 
     // Lumières
-    const ambient = new THREE.AmbientLight(0xffffff, 0.75);   // neutre : la teinte des pièces reste fidèle
+    const ambient = new THREE.AmbientLight(0xffffff, 0.55);   // neutre : la teinte des pièces reste fidèle
     this.scene.add(ambient);
 
-    const sun = new THREE.DirectionalLight(0xffffff, 1.7);
+    const sun = new THREE.DirectionalLight(0xffffff, 1.3);
     sun.position.set(300, -200, 500);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -60,11 +60,11 @@ export class ThreePreview {
     sc.left = -400; sc.right = 400; sc.top = 400; sc.bottom = -400;
     this.scene.add(sun);
 
-    const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.35);
     fill.position.set(-300, 300, 100);
     this.scene.add(fill);
 
-    const rim = new THREE.DirectionalLight(0xffffff, 0.2);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.15);
     rim.position.set(0, 0, -300);
     this.scene.add(rim);
 
