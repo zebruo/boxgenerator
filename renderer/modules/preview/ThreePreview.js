@@ -122,10 +122,16 @@ export class ThreePreview {
     const _rimH = boxParams.rimHeight ?? 8;
     // Compartiments (cloisons) : mêmes contours que le G-code (découpés par la cavité)
     const cells = this._compartments(shapePts, bb, boxTypeKey, boxParams, machineParams);
+    let layW = W, layD = D;   // emprise de ce qui est affiché (corps + couvercle côte à côte)
     switch (boxTypeKey) {
       case 'open-tray':    this._buildOpenTray(shapePts, W, D, H, wt, bFl, cells); break;
       case 'finger-joint': this._buildFingerBox(shapePts, H, boxParams);        break;
-      case 'lid-box': { const _r = boxParams.rabbet ?? 3; const _bFll = boxParams.lidBottomThickness ?? bFl; this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells); break; }
+      case 'lid-box': {
+        const _r = boxParams.rabbet ?? 3; const _bFll = boxParams.lidBottomThickness ?? bFl;
+        const lay = this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells);
+        layW = lay.W; layD = lay.D;
+        break;
+      }
       case 'stackable': {
         const _gap = boxParams.clearance ?? 0.3;
         this._buildStackable(shapePts, H, wt, bFl, _rimH, _gap);
@@ -136,7 +142,7 @@ export class ThreePreview {
     // Positionner la caméra au centre de la géométrie visible
     let visH, visZCenter;
     if (boxTypeKey === 'lid-box') {
-      visH = H + (boxParams.lidHeight ?? 15) + 2;
+      visH = Math.max(H, boxParams.lidHeight ?? 15);   // corps et couvercle côte à côte
       visZCenter = visH / 2;
     } else if (boxTypeKey === 'stackable') {
       visH = 2 * H + _rimH;
@@ -145,21 +151,22 @@ export class ThreePreview {
       visH = H;
       visZCenter = H / 2;
     }
-    const maxDim = Math.max(W, D, visH);
+    const maxDim = Math.max(layW, layD, visH);
     const dist   = maxDim * 1.9;
-    this.camera.position.set(W / 2 + dist * 0.7, D / 2 - dist * 0.7, visZCenter + dist * 0.55);
-    this.controls.target.set(W / 2, D / 2, visZCenter);
+    this.camera.position.set(layW / 2 + dist * 0.7, layD / 2 - dist * 0.7, visZCenter + dist * 0.55);
+    this.controls.target.set(layW / 2, layD / 2, visZCenter);
     this.controls.update();
 
     // Grille sous la boîte (Z=0 = sol, grille à Z=-1)
     const gridZ = boxTypeKey === 'stackable' ? -(H + _rimH) - 1 : -1;
-    this.grid.position.set(W / 2, D / 2, gridZ);
+    this.grid.position.set(layW / 2, layD / 2, gridZ);
 
-    // Gizmo Z0 et brut — top par défaut au sommet de la boîte (Z=H)
-    const machH = boxTypeKey === 'stackable' ? H + _rimH : H;
+    // Gizmo Z0 et brut — top par défaut au sommet de la boîte (Z=H) ; boîte à couvercle :
+    // brut commun aux deux pièces (épaisseur = la plus haute), comme le G-code
+    const machH = boxTypeKey === 'stackable' ? H + _rimH : boxTypeKey === 'lid-box' ? visH : H;
     const zOff  = boxTypeKey === 'stackable' ? -_rimH : 0;
-    this._buildZ0Gizmo(W, D, machH, this.z0Pos, this.z0Level, zOff);
-    this._buildStock(W, D, machH, this.stockOffset, this.stockSide, zOff);
+    this._buildZ0Gizmo(layW, layD, machH, this.z0Pos, this.z0Level, zOff);
+    this._buildStock(layW, layD, machH, this.stockOffset, this.stockSide, zOff);
   }
 
   dispose() {
@@ -238,7 +245,9 @@ export class ThreePreview {
   }
 
   _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6, cells = null) {
-    const gap = 2; // espace visuel corps ↔ couvercle
+    // Emprise de la forme (même boîte englobante que le G-code pour la disposition du couvercle)
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys);
 
     // ── CORPS (z : 0 → H) ──────────────────────────────────────────────────
     const innerPts = this._offsetPts(pts, -wt);
@@ -299,67 +308,49 @@ export class ThreePreview {
       this._mat(0xb04a10, { roughness: 0.7 })
     );
     topWallMesh.position.z = H - rD;
-    const grooveShape = this._shape(grooveOuter);
-    const grooveHole  = new THREE.Path();
-    grooveInner.forEach((p, i) => i === 0 ? grooveHole.moveTo(p.x, p.y) : grooveHole.lineTo(p.x, p.y));
-    grooveHole.closePath();
-    grooveShape.holes = [grooveHole];
-    const grooveMesh = this._mesh(
-      new THREE.ExtrudeGeometry(grooveShape, { depth: rD, bevelEnabled: false }),
-      this._mat(0x1e1e35, { roughness: 0.95 })
-    );
-    grooveMesh.position.z = H - rD;
+    // La rainure de feuillure (grooveOuter → grooveInner) reste vide : vraie marche, comme usinée
 
-    // ── COUVERCLE (z : H+gap → H+gap+lidH) ─────────────────────────────────
-    // Taille nominale — la lèvre r s'emboîte dans la rainure r+jeu (jeu = dans la rainure corps)
-    // Cas 0 : couvercle réduit (inset wt-r) — lèvre largeur r, profondeur rD
-    // Cas 1 : couvercle plein (taille corps) — lèvre largeur r, profondeur rD
-    const lidZ      = H + gap;
-    const lidOuter  = rs === 0 ? this._offsetPts(pts, -(wt - r)) : pts;
-    const lidInner  = rs === 0 ? innerPts                         : this._offsetPts(pts, -r);
+    // ── COUVERCLE — disposé comme à l'usinage (G-code, simulation) ──────────
+    // À côté du corps (même règle que LidBox : à droite, ou au-dessus si la forme est
+    // allongée), en miroir (x → W − x), posé à plat, ouverture vers le haut.
+    // Cas 0 : couvercle réduit (inset wt−r) : la lèvre (largeur r) est la paroi du bac.
+    // Cas 1 : couvercle plein (taille corps) : feuillure intérieure (inset r, profondeur rD)
+    //         au-dessus de la cavité.
+    const lidGap = 20;
+    const useVertical = Math.max(W, 2 * D + lidGap) < Math.max(2 * W + lidGap, D);
+    const dx = useVertical ? 0 : W + lidGap, dy = useVertical ? D + lidGap : 0;
+    const place = p2 => p2.map(p => ({ x: W - p.x + dx, y: p.y + dy }));
 
-    // Cavité intérieure du couvercle = même espace que le corps
-    const lidInnerWall = innerPts;
+    const lidOuter = place(rs === 0 ? this._offsetPts(pts, -(wt - r)) : pts);
+    const lidCav   = place(innerPts);
+    const wood  = this._mat(0xb04a10, { roughness: 0.7 });
+    const ring  = (outer, inner, z0, depth) => {
+      if (depth <= 0.05) return;
+      const s = this._shape(outer);
+      s.holes = [this._path(inner)];
+      this._mesh(new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false }), wood).position.z = z0;
+    };
 
-    // Parois creuses couvercle (lidOuter − lidInnerWall) de rD à lidH−bFll
-    const wallDepthLid = lidH - rD - bFll;
-    if (wallDepthLid > 0.5) {
-      const lidWallShape = this._shape(lidOuter);
-      const lidWallHole  = new THREE.Path();
-      lidInnerWall.forEach((p, i) => i === 0 ? lidWallHole.moveTo(p.x, p.y) : lidWallHole.lineTo(p.x, p.y));
-      lidWallHole.closePath();
-      lidWallShape.holes = [lidWallHole];
-      const lidWallMesh = this._mesh(
-        new THREE.ExtrudeGeometry(lidWallShape, { depth: wallDepthLid, bevelEnabled: false }),
-        this._mat(0x20c080, { roughness: 0.6, transparent: true, opacity: 0.82 })
-      );
-      lidWallMesh.position.z = lidZ + rD;
-
-      // Face intérieure du plafond (fond de cavité visible)
-      const lidFloorMesh = this._mesh(
-        new THREE.ShapeGeometry(this._shape(lidInnerWall)),
-        this._mat(0x050e08, { roughness: 0.95, side: THREE.FrontSide })
-      );
-      lidFloorMesh.position.z = lidZ + rD + wallDepthLid + 0.5;
-    }
-    // Plafond couvercle (solid, épaisseur bFll)
-    const ceilMesh = this._mesh(
+    // Fond du couvercle
+    this._mesh(
       new THREE.ExtrudeGeometry(this._shape(lidOuter), { depth: bFll, bevelEnabled: false }),
-      this._mat(0x20c080, { roughness: 0.6, transparent: true, opacity: 0.82 })
+      this._mat(0x8a3a0a, { roughness: 0.85 })
     );
-    ceilMesh.position.z = lidZ + lidH - bFll;
+    if (rs === 0) {
+      ring(lidOuter, lidCav, bFll, lidH - bFll);
+    } else {
+      const lidRab = place(this._offsetPts(pts, -r));
+      ring(lidOuter, lidRab, bFll, lidH - bFll);       // bord extérieur, pleine hauteur
+      ring(lidRab, lidCav, bFll, lidH - rD - bFll);    // sous la feuillure
+    }
+    // Fond de la cavité du couvercle
+    this._mesh(
+      new THREE.ShapeGeometry(this._shape(lidCav)),
+      this._mat(0x080f25, { roughness: 0.95, side: THREE.FrontSide })
+    ).position.z = bFll + 0.5;
 
-    // Lèvres (anneau lidOuter − trou lidInner), profondeur rD → s'emboîtent dans les rainures
-    const lipShape = this._shape(lidOuter);
-    const lipHole  = new THREE.Path();
-    lidInner.forEach((p, i) => i === 0 ? lipHole.moveTo(p.x, p.y) : lipHole.lineTo(p.x, p.y));
-    lipHole.closePath();
-    lipShape.holes = [lipHole];
-    const lipMesh = this._mesh(
-      new THREE.ExtrudeGeometry(lipShape, { depth: rD, bevelEnabled: false }),
-      this._mat(0x18a070, { roughness: 0.6, transparent: true, opacity: 0.9 })
-    );
-    lipMesh.position.z = lidZ;
+    // Emprise totale corps + couvercle (caméra, grille, brut, repère Z0)
+    return { W: Math.max(W, W + dx), D: Math.max(D, D + dy) };
   }
 
   _buildStackable(pts, H, wt, bFl, rimH, gap) {
