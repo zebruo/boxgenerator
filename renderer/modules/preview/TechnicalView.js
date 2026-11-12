@@ -2,6 +2,9 @@ import { t } from '../i18n.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { insetPolygon } from '../gcode/Offset.js';
 
+// Pièce d'illustration (boîte du dessous de l'empilable) : gris, comme dans l'aperçu 3D
+const GHOST = '#8e8e96';
+
 /**
  * TechnicalView — 4 vues orthogonales 2D avec cotes éditables
  *
@@ -117,7 +120,20 @@ export class TechnicalView {
     const qW = Math.floor(CW / 2);
     const qH = Math.floor(CH / 2);
 
-    const totalH = boxTypeKey === 'lid-box' ? H + lidH + 2 : boxTypeKey === 'stackable' ? 2 * H + rimH : H;
+    // Compartiments (cloisons) : mêmes contours que le G-code (découpés par la cavité)
+    const nParts = boxParams.partitions ?? 0;
+    const partDir = boxParams.partitionDir === 'horizontal' ? 'horizontal' : 'vertical';
+    const cells = nParts > 0 && (boxTypeKey === 'open-tray' || boxTypeKey === 'lid-box')
+      ? buildPartitionContours(W, D, wt, nParts, partDir, machineParams.toolDiameter ?? 3.175,
+          { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(shape.getContourPoints(), wt) })
+      : null;
+
+    // Modèle en couches (élévations et coupe) : étendue verticale réelle de ce qui est dessiné
+    const layers = boxTypeKey === 'finger-joint' ? [] : this._layers(
+      { shape, boxTypeKey, H, wt, bFl, bFll, lidH, r, rD, rimH, rs, jeu, cells });
+    const zMin = layers.length ? Math.min(...layers.map(l => l.z0)) : 0;
+    const zMax = layers.length ? Math.max(...layers.map(l => l.z1)) : H;
+    const totalH = zMax - zMin;
     const pad    = 48;
     const maxWD  = Math.max(W, D) || 1;
 
@@ -142,15 +158,7 @@ export class TechnicalView {
     // Scale commun = le plus petit des deux pour cohérence visuelle entre vues
     const sc = Math.min(scTop, scElev);
 
-    // Compartiments (cloisons) : mêmes contours que le G-code (découpés par la cavité)
-    const nParts = boxParams.partitions ?? 0;
-    const partDir = boxParams.partitionDir === 'horizontal' ? 'horizontal' : 'vertical';
-    const cells = nParts > 0 && (boxTypeKey === 'open-tray' || boxTypeKey === 'lid-box')
-      ? buildPartitionContours(W, D, wt, nParts, partDir, machineParams.toolDiameter ?? 3.175,
-          { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(shape.getContourPoints(), wt) })
-      : null;
-
-    const nfo = { shape, bb, W, D, H, wt, bt, bFl, bFll, lidH, r, rD, rim, rimH, rs, jeu, sc, totalH, boxTypeKey, boxParams, cells, nParts, partDir };
+    const nfo = { shape, bb, W, D, H, wt, bt, bFl, bFll, lidH, r, rD, rim, rimH, rs, jeu, sc, totalH, boxTypeKey, boxParams, cells, nParts, partDir, layers, zMin, zMax };
 
     if (boxTypeKey === 'finger-joint' && boxType) {
       this._viewFingerJoint(CW, CH, boxType, shape, boxParams);
@@ -191,20 +199,22 @@ export class TechnicalView {
     const pts = shape.getContourPoints();
     const cx  = ox + qW / 2;
     const cy  = oy + qH / 2 + 10;
-    // Origine de translation : centre du canvas − centre du bb
+    // Origine de translation : centre du canvas − centre du bb. Axe Y vers le HAUT, comme
+    // le G-code et l'aperçu 3D (le canvas a son Y vers le bas : on le retourne).
     const sx  = cx - (bb.minX + bb.maxX) * sc / 2;
-    const sy  = cy - (bb.minY + bb.maxY) * sc / 2;
+    const sy  = cy + (bb.minY + bb.maxY) * sc / 2;
+    const toX = x => sx + x * sc, toY = y => sy - y * sc;
 
     // Ancres réelles de la forme en coordonnées canvas
-    const shapeL = sx + bb.minX * sc;
-    const shapeR = sx + bb.maxX * sc;
-    const shapeT = sy + bb.minY * sc;
-    const shapeB = sy + bb.maxY * sc;
+    const shapeL = toX(bb.minX);
+    const shapeR = toX(bb.maxX);
+    const shapeT = toY(bb.maxY);
+    const shapeB = toY(bb.minY);
 
     // Forme extérieure
     ctx.save();
     ctx.translate(sx, sy);
-    ctx.scale(sc, sc);
+    ctx.scale(sc, -sc);
     ctx.beginPath();
     pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
     ctx.closePath();
@@ -229,7 +239,62 @@ export class TechnicalView {
         ctx.stroke();
       }
     }
+
+    // Boîte à couvercle réduit : contour du couvercle (posé dessus), en pointillés
+    if (boxTypeKey === 'lid-box' && (boxParams.rabbetSide ?? 0) === 0 && nfo.lidH > 0) {
+      const lid = insetPolygon(pts, wt - (boxParams.rabbet ?? 0));
+      if (lid.length > 2) {
+        ctx.beginPath();
+        lid.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+        ctx.closePath();
+        ctx.strokeStyle = this.C.rabbet;
+        ctx.lineWidth = 1 / sc;
+        ctx.setLineDash([4 / sc, 3 / sc]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
     ctx.restore();
+
+    // Plan de coupe A-A (horizontal, au milieu) : trait mixte, flèches vers le sens de vue
+    {
+      const yA = toY((bb.minY + bb.maxY) / 2);
+      const xa = shapeL - 16, xb = shapeR + 16;
+      ctx.save();
+      ctx.strokeStyle = this.C.dim;
+      ctx.fillStyle = this.C.dim;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([12, 3, 2, 3]);
+      ctx.beginPath(); ctx.moveTo(xa, yA); ctx.lineTo(xb, yA); ctx.stroke();
+      ctx.setLineDash([]);
+      for (const x of [xa, xb]) {
+        ctx.beginPath(); ctx.moveTo(x, yA); ctx.lineTo(x, yA - 12); ctx.stroke();
+        this._arrV(x, yA - 12, -1);   // pointe vers le haut : coupe vue depuis l'avant
+        ctx.font = 'bold 10px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('A', x, yA - 14);
+      }
+      ctx.restore();
+    }
+
+    // Rayon de coin : repère sur le coin le plus proche du haut-droit de la forme
+    const cr = shape.params?.cornerRadius ?? 0;
+    if (cr > 0 && boxTypeKey !== 'finger-joint') {
+      const near = pts.reduce((best, p) =>
+        (Math.hypot(p.x - bb.maxX, p.y - bb.maxY) < Math.hypot(best.x - bb.maxX, best.y - bb.maxY) ? p : best), pts[0]);
+      const px = toX(near.x), py = toY(near.y);
+      ctx.save();
+      ctx.strokeStyle = this.C.dimLine;
+      ctx.fillStyle = this.C.text;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 14, py - 14); ctx.lineTo(px + 22, py - 14); ctx.stroke();
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(t('view.corner_r', { val: cr.toFixed(1) }), px + 24, py - 14);
+      ctx.restore();
+    }
 
     // W (longueur) — dessous, lignes d'attache depuis le bord inférieur
     this._dimH(shapeL, shapeR, shapeB + 20,
@@ -280,561 +345,282 @@ export class TechnicalView {
     }
   }
 
-  // ── VUE 2 : Face ─────────────────────────────────────────────────────────
-  _viewFace(ox, oy, qW, qH, nfo, title) {
-    const { W, H, wt, bFl, bFll, lidH, r, rD, rimH, rs, jeu, sc, totalH, boxTypeKey } = nfo;
-    this._panelBg(ox, oy, qW, qH, title);
-
-    const ctx = this.ctx;
-    const cx     = ox + qW / 2;
-    const cy     = oy + qH / 2 + 10;
-    const sx     = cx - W * sc / 2;
-    const sy     = cy + totalH * sc / 2; // bas du corps
-    const csBot = boxTypeKey === 'stackable' && rimH > 0 ? sy - (H + rimH) * sc : sy;
-
-    // Corps
-    ctx.fillStyle = this.C.wood;
-    ctx.fillRect(sx, csBot - H * sc, W * sc, H * sc);
-    ctx.strokeStyle = this.C.text;
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(sx, csBot - H * sc, W * sc, H * sc);
-
-    // Cavité intérieure
-    if (boxTypeKey !== 'finger-joint' && W > 2 * wt && H > bFl) {
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(sx + wt * sc, csBot - H * sc, (W - 2 * wt) * sc, (H - bFl) * sc);
-    }
-
-    // Rainure feuillure corps (lid-box) — largeur r+jeu pour le jeu mécanique
-    if (boxTypeKey === 'lid-box' && r > 0) {
-      const rJ = r + jeu;
-      ctx.fillStyle = this.C.rabbet;
-      ctx.globalAlpha = 0.35;
-      if (rs === 0) {
-        // Cas 0 : rainure intérieure — de (wt-r-jeu) à wt, largeur r+jeu
-        ctx.fillRect(sx + (wt - rJ) * sc, sy - H * sc, rJ * sc, rD * sc);
-        ctx.fillRect(sx + (W - wt) * sc,  sy - H * sc, rJ * sc, rD * sc);
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = this.C.rabbet; ctx.lineWidth = 0.8;
-        ctx.strokeRect(sx + (wt - rJ) * sc, sy - H * sc, rJ * sc, rD * sc);
-        ctx.strokeRect(sx + (W - wt) * sc,  sy - H * sc, rJ * sc, rD * sc);
-      } else {
-        // Cas 1 : rainure extérieure — de 0 à r+jeu, largeur r+jeu
-        ctx.fillRect(sx,                    sy - H * sc, rJ * sc, rD * sc);
-        ctx.fillRect(sx + (W - rJ) * sc,    sy - H * sc, rJ * sc, rD * sc);
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = this.C.rabbet; ctx.lineWidth = 0.8;
-        ctx.strokeRect(sx,                    sy - H * sc, rJ * sc, rD * sc);
-        ctx.strokeRect(sx + (W - rJ) * sc,    sy - H * sc, rJ * sc, rD * sc);
+  // ══ Modèle en couches (élévations et coupe) ═══════════════════════════════
+  /**
+   * Pièces décrites en tranches horizontales, en mm, repère de la forme (Y vers le haut),
+   * z = hauteur depuis le dessous du corps : { z0, z1, outer:[poly], holes:[poly], part }.
+   * part : 'body' | 'lid' | 'ghost'. Mêmes contours que le G-code (décalage Clipper).
+   * Boîte à couvercle : couvercle assemblé (retourné), lèvre engagée de rD dans la feuillure.
+   * Boîte empilable : boîte du dessous (part 'ghost') avec son plot, sous le plot.
+   */
+  _layers({ shape, boxTypeKey, H, wt, bFl, bFll, lidH, r, rD, rimH, rs, jeu, cells }) {
+    const pts = shape.getContourPoints();
+    const ok  = p => p && p.length > 2;
+    const ins = d => (d > 1e-9 ? insetPolygon(pts, d) : pts);
+    const cav = cells ?? [ins(wt)].filter(ok);
+    const L = [];
+    const add = (z0, z1, outer, holes, part = 'body') => {
+      if (z1 - z0 > 1e-6) L.push({ z0, z1, outer: outer.filter(ok), holes: holes.filter(ok), part });
+    };
+    if (boxTypeKey === 'lid-box') {
+      add(0, bFl, [pts], []);
+      add(bFl, H - rD, [pts], cav);
+      // Feuillure : intérieure (rs 0) → tout l'intérieur abaissé de rD (cloisons comprises) ;
+      // extérieure (rs 1) → bord extérieur abaissé de rD
+      if (rs === 0) add(H - rD, H, [pts], [ins(wt - r - jeu)]);
+      else          add(H - rD, H, [ins(r + jeu)], cav);
+      if (lidH > 0) {
+        const zb = H - rD, top = zb + lidH, ceil = top - bFll;
+        if (rs === 0) {
+          const lo = ins(wt - r);
+          add(zb, ceil, [lo], [ins(wt)], 'lid');
+          add(ceil, top, [lo], [], 'lid');
+        } else {
+          add(zb, zb + rD, [pts], [ins(r)], 'lid');
+          add(zb + rD, ceil, [pts], [ins(wt)], 'lid');
+          add(ceil, top, [pts], [], 'lid');
+        }
       }
+    } else if (boxTypeKey === 'stackable') {
+      const plot = ins(wt + jeu);
+      const box = (dz, part) => {
+        add(dz - rimH, dz, [plot], [], part);
+        add(dz, dz + bFl, [pts], [], part);
+        add(dz + bFl, dz + H, [pts], [ins(wt)], part);
+      };
+      box(0, 'body');
+      box(-(H + rimH), 'ghost');
+    } else {
+      add(0, bFl, [pts], []);
+      add(bFl, H, [pts], cav);
     }
-
-    // Couvercle (lid-box) — taille nominale, sans jeu (c'est la rainure qui est plus large)
-    if (boxTypeKey === 'lid-box' && lidH > 0) {
-      const gap  = 2;
-      const lidY = sy - H * sc - gap - lidH * sc;
-      const lidInset = rs === 0 ? (wt - r) * sc : 0;
-      const lidSx    = sx + lidInset;
-      const lidW     = W * sc - 2 * lidInset;
-
-      ctx.fillStyle = this.C.woodLt;
-      ctx.fillRect(lidSx, lidY, lidW, lidH * sc);
-      // Cavité intérieure couvercle (plafond bFll, au-dessus des lèvres)
-      const lidCavHF = lidH - rD - bFll;
-      if (lidCavHF > 0 && W > 2 * wt) {
-        ctx.fillStyle = this.C.inner;
-        ctx.fillRect(sx + wt * sc, lidY + bFll * sc, (W - 2 * wt) * sc, lidCavHF * sc);
-      }
-      ctx.strokeStyle = this.C.text; ctx.lineWidth = 1.2;
-      ctx.strokeRect(lidSx, lidY, lidW, lidH * sc);
-
-      if (r > 0) {
-        ctx.fillStyle = this.C.inner;
-        ctx.fillRect(lidSx + r * sc, lidY + (lidH - rD) * sc, lidW - 2 * r * sc, rD * sc);
-        ctx.strokeStyle = this.C.rabbet; ctx.lineWidth = 0.8;
-        ctx.setLineDash([3, 3]);
-        ctx.strokeRect(lidSx + r * sc, lidY + (lidH - rD) * sc, lidW - 2 * r * sc, rD * sc);
-        ctx.setLineDash([]);
-      }
-
-      // Cote largeur couvercle (seulement si différente de W, i.e. rainure intérieure)
-      if (rs === 0) {
-        const lidRealW = W - 2 * (wt - r);
-        this._dimH(lidSx, lidSx + lidW, lidY - 16,
-          `${lidRealW.toFixed(1)} mm`, null, false, lidRealW, 1, 2000);
-      }
-    }
-
-
-    // Cote jeu assemblage (lid-box) — dessiné après le couvercle pour rester visible
-    if (boxTypeKey === 'lid-box' && r > 0 && jeu > 0) {
-      ctx.save();
-      ctx.fillStyle   = this.C.dim;
-      ctx.font        = '9px monospace';
-      ctx.textAlign   = 'center';
-      ctx.globalAlpha = 0.9;
-      const jeuX = rs === 0
-        ? sx + (wt - r - jeu / 2) * sc
-        : sx + (r + jeu / 2) * sc;
-      ctx.fillText(t('view.clearance', { val: jeu.toFixed(2) }), jeuX, sy - H * sc + rD * sc / 2 + 2);
-      ctx.restore();
-    }
-    // ── Boîte empilable : languette bas + fantôme (face) ─────────────────────
-    if (boxTypeKey === 'stackable' && rimH > 0) {
-      const tongueInset = wt + jeu;
-      const tongueBot   = csBot + rimH * sc;
-      // Rainures latérales (vides — matière fraisée)
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(sx,                          csBot, tongueInset * sc, rimH * sc);
-      ctx.fillRect(sx + (W - tongueInset) * sc, csBot, tongueInset * sc, rimH * sc);
-      // Plot central solide
-      ctx.fillStyle = this.C.wood;
-      ctx.fillRect(sx + tongueInset * sc, csBot, (W - 2 * tongueInset) * sc, rimH * sc);
-      ctx.strokeStyle = this.C.text; ctx.lineWidth = 1;
-      ctx.strokeRect(sx + tongueInset * sc, csBot, (W - 2 * tongueInset) * sc, rimH * sc);
-      const phantomTop = tongueBot;
-      ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle   = this.C.wood;
-      ctx.fillRect(sx, phantomTop, W * sc, H * sc);
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(sx + wt * sc, phantomTop, (W - 2 * wt) * sc, (H - bFl) * sc);
-      ctx.globalAlpha = 0.45;
-      ctx.strokeStyle = this.C.woodLt; ctx.lineWidth = 1;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeRect(sx, phantomTop, W * sc, H * sc);
-      ctx.setLineDash([]);
-      ctx.restore();
-      if (jeu > 0) {
-        ctx.save();
-        ctx.fillStyle = this.C.dim; ctx.font = '9px monospace'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.9;
-        ctx.fillText(t('view.clearance', { val: jeu.toFixed(2) }), sx + (wt + jeu / 2) * sc, csBot + rimH * sc / 2);
-        ctx.restore();
-      }
-      this._dimV(sx - 22, csBot, tongueBot, `H ${rimH.toFixed(1)}`, null, false, rimH);
-    }
-
-    // Cotes (affichage seul) — lignes d'attache depuis les bords de la forme
-    // W (sous le corps)
-    this._dimH(sx, sx + W * sc, sy + 18,
-      `${W.toFixed(1)} mm`, null, false, W, 1, 9999, csBot);
-    // H corps (gauche) — tick partagé en haut avec le couvercle
-    this._dimV(sx - 26, csBot - H * sc, csBot,
-      `${H.toFixed(1)} mm`, null, false, H, 1, 9999, sx);
-    // H couvercle (gauche) — y2 = sy-H*sc : tick partagé |←H→|←lidH→|
-    if (boxTypeKey === 'lid-box' && lidH > 0) {
-      const gap  = 2;
-      const lidY = sy - H * sc - gap - lidH * sc;
-      this._dimV(sx - 26, lidY, sy - H * sc,
-        `${lidH.toFixed(1)} mm`, null, false, lidH);
-    }
+    return L;
   }
 
-  // ── VUE 3 : Côté ─────────────────────────────────────────────────────────
-  _viewCote(ox, oy, qW, qH, nfo, title) {
-    const { D, H, wt, bFl, bFll, lidH, r, rD, rimH, rs, jeu, sc, totalH, boxTypeKey } = nfo;
-    this._panelBg(ox, oy, qW, qH, title);
-
-    const ctx = this.ctx;
-    const cx  = ox + qW / 2;
-    const cy  = oy + qH / 2 + 10;
-    const sx  = cx - D * sc / 2;
-    const sy  = cy + totalH * sc / 2;
-    const csBot = boxTypeKey === 'stackable' && rimH > 0 ? sy - (H + rimH) * sc : sy;
-
-    // Corps
-    ctx.fillStyle = this.C.wood;
-    ctx.fillRect(sx, csBot - H * sc, D * sc, H * sc);
-    ctx.strokeStyle = this.C.text;
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(sx, csBot - H * sc, D * sc, H * sc);
-
-    if (boxTypeKey !== 'finger-joint' && D > 2 * wt && H > bFl) {
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(sx + wt * sc, csBot - H * sc, (D - 2 * wt) * sc, (H - bFl) * sc);
+  /** Intervalles de `poly` sur la ligne (axis 'x' : y = c ; 'y' : x = c), règle pair-impair. */
+  static _cut(poly, axis, c) {
+    const xs = [];
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i], b = poly[j];
+      const [ua, va, ub, vb] = axis === 'x' ? [a.x, a.y, b.x, b.y] : [a.y, a.x, b.y, b.x];
+      if ((va > c) !== (vb > c)) xs.push(ua + (c - va) * (ub - ua) / (vb - va));
     }
-
-    // Rainure feuillure corps côté (lid-box) — largeur r+jeu
-    if (boxTypeKey === 'lid-box' && r > 0) {
-      const rJ = r + jeu;
-      ctx.fillStyle = this.C.rabbet;
-      ctx.globalAlpha = 0.35;
-      if (rs === 0) {
-        // Cas 0 : rainure intérieure — de (wt-r-jeu) à wt, largeur r+jeu
-        ctx.fillRect(sx + (wt - rJ) * sc, sy - H * sc, rJ * sc, rD * sc);
-        ctx.fillRect(sx + (D - wt) * sc,  sy - H * sc, rJ * sc, rD * sc);
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = this.C.rabbet; ctx.lineWidth = 0.8;
-        ctx.strokeRect(sx + (wt - rJ) * sc, sy - H * sc, rJ * sc, rD * sc);
-        ctx.strokeRect(sx + (D - wt) * sc,  sy - H * sc, rJ * sc, rD * sc);
-      } else {
-        // Cas 1 : rainure extérieure — de 0 à r+jeu, largeur r+jeu
-        ctx.fillRect(sx,                   sy - H * sc, rJ * sc, rD * sc);
-        ctx.fillRect(sx + (D - rJ) * sc,   sy - H * sc, rJ * sc, rD * sc);
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = this.C.rabbet; ctx.lineWidth = 0.8;
-        ctx.strokeRect(sx,                   sy - H * sc, rJ * sc, rD * sc);
-        ctx.strokeRect(sx + (D - rJ) * sc,   sy - H * sc, rJ * sc, rD * sc);
-      }
-    }
-
-    // Couvercle (lid-box) — taille nominale, sans jeu
-    if (boxTypeKey === 'lid-box' && lidH > 0) {
-      const gap      = 2;
-      const lidY     = sy - H * sc - gap - lidH * sc;
-      const lidInset = rs === 0 ? (wt - r) * sc : 0;
-      const lidSx    = sx + lidInset;
-      const lidW     = D * sc - 2 * lidInset;
-
-      ctx.fillStyle = this.C.woodLt;
-      ctx.fillRect(lidSx, lidY, lidW, lidH * sc);
-      // Cavité intérieure couvercle (plafond bFll, au-dessus des lèvres)
-      const lidCavHC = lidH - rD - bFll;
-      if (lidCavHC > 0 && D > 2 * wt) {
-        ctx.fillStyle = this.C.inner;
-        ctx.fillRect(sx + wt * sc, lidY + bFll * sc, (D - 2 * wt) * sc, lidCavHC * sc);
-      }
-      ctx.strokeStyle = this.C.text;
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(lidSx, lidY, lidW, lidH * sc);
-
-      if (r > 0) {
-        ctx.fillStyle = this.C.inner;
-        ctx.fillRect(lidSx + r * sc, lidY + (lidH - rD) * sc, lidW - 2 * r * sc, rD * sc);
-        ctx.strokeStyle = this.C.rabbet;
-        ctx.lineWidth = 0.8;
-        ctx.setLineDash([3, 3]);
-        ctx.strokeRect(lidSx + r * sc, lidY + (lidH - rD) * sc, lidW - 2 * r * sc, rD * sc);
-        ctx.setLineDash([]);
-      }
-
-      // Cote profondeur couvercle (seulement si différente de D, i.e. rainure intérieure)
-      if (rs === 0) {
-        const lidRealD = D - 2 * (wt - r);
-        this._dimH(lidSx, lidSx + lidW, lidY - 16,
-          `${lidRealD.toFixed(1)} mm`, null, false, lidRealD, 1, 2000);
-      }
-    }
-
-
-    // Cote jeu assemblage (lid-box) — dessiné après le couvercle pour rester visible
-    if (boxTypeKey === 'lid-box' && r > 0 && jeu > 0) {
-      ctx.save();
-      ctx.fillStyle   = this.C.dim;
-      ctx.font        = '9px monospace';
-      ctx.textAlign   = 'center';
-      ctx.globalAlpha = 0.9;
-      const jeuX = rs === 0
-        ? sx + (wt - r - jeu / 2) * sc
-        : sx + (r + jeu / 2) * sc;
-      ctx.fillText(t('view.clearance', { val: jeu.toFixed(2) }), jeuX, sy - H * sc + rD * sc / 2 + 2);
-      ctx.restore();
-    }
-    // ── Boîte empilable : languette bas + fantôme (côté) ─────────────────────
-    if (boxTypeKey === 'stackable' && rimH > 0) {
-      const tongueInset = wt + jeu;
-      const tongueBot   = csBot + rimH * sc;
-      // Rainures latérales (vides — matière fraisée)
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(sx,                          csBot, tongueInset * sc, rimH * sc);
-      ctx.fillRect(sx + (D - tongueInset) * sc, csBot, tongueInset * sc, rimH * sc);
-      // Plot central solide
-      ctx.fillStyle = this.C.wood;
-      ctx.fillRect(sx + tongueInset * sc, csBot, (D - 2 * tongueInset) * sc, rimH * sc);
-      ctx.strokeStyle = this.C.text; ctx.lineWidth = 1;
-      ctx.strokeRect(sx + tongueInset * sc, csBot, (D - 2 * tongueInset) * sc, rimH * sc);
-      const phantomTop = tongueBot;
-      ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle   = this.C.wood;
-      ctx.fillRect(sx, phantomTop, D * sc, H * sc);
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(sx + wt * sc, phantomTop, (D - 2 * wt) * sc, (H - bFl) * sc);
-      ctx.globalAlpha = 0.45;
-      ctx.strokeStyle = this.C.woodLt; ctx.lineWidth = 1;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeRect(sx, phantomTop, D * sc, H * sc);
-      ctx.setLineDash([]);
-      ctx.restore();
-      if (jeu > 0) {
-        ctx.save();
-        ctx.fillStyle = this.C.dim; ctx.font = '9px monospace'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.9;
-        ctx.fillText(t('view.clearance', { val: jeu.toFixed(2) }), sx + (wt + jeu / 2) * sc, csBot + rimH * sc / 2);
-        ctx.restore();
-      }
-      this._dimV(sx - 22, csBot, tongueBot, `H ${rimH.toFixed(1)}`, null, false, rimH);
-    }
-
-    // Cotes (affichage seul) — lignes d'attache depuis les bords de la forme
-    // D (sous le corps)
-    this._dimH(sx, sx + D * sc, sy + 18,
-      `${D.toFixed(1)} mm`, null, false, D, 1, 9999, csBot);
-    // H (gauche) — tick partagé en haut avec le couvercle
-    this._dimV(sx - 26, csBot - H * sc, csBot,
-      `${H.toFixed(1)} mm`, null, false, H, 1, 9999, sx);
-    // H couvercle (gauche) — y2 = sy-H*sc : tick partagé |←H→|←lidH→|
-    if (boxTypeKey === 'lid-box' && lidH > 0) {
-      const gap  = 2;
-      const lidY = sy - H * sc - gap - lidH * sc;
-      this._dimV(sx - 26, lidY, sy - H * sc,
-        `${lidH.toFixed(1)} mm`, null, false, lidH);
-    }
+    xs.sort((p, q) => p - q);
+    const iv = [];
+    for (let k = 0; k + 1 < xs.length; k += 2) iv.push([xs[k], xs[k + 1]]);
+    return iv;
   }
 
-  // ── VUE 4 : Coupe A-A ────────────────────────────────────────────────────
-  _viewCoupe(ox, oy, qW, qH, nfo, title) {
-    const { W, H, wt, bFl, bFll, lidH, r, rD, rimH, rs, jeu, sc, totalH, boxTypeKey } = nfo;
-    this._panelBg(ox, oy, qW, qH, title);
+  /** Projection de `poly` sur l'axe (étendue min–max). */
+  static _proj(poly, axis) {
+    const v = poly.map(p => (axis === 'x' ? p.x : p.y));
+    return [Math.min(...v), Math.max(...v)];
+  }
 
+  static _union(iv) {
+    const s = iv.filter(([a, b]) => b - a > 1e-9).sort((p, q) => p[0] - q[0]);
+    const out = [];
+    for (const [a, b] of s) {
+      if (out.length && a <= out[out.length - 1][1] + 1e-9) out[out.length - 1][1] = Math.max(out[out.length - 1][1], b);
+      else out.push([a, b]);
+    }
+    return out;
+  }
+
+  /** a − b (intervalles triés, disjoints). */
+  static _sub(a, b) {
+    let res = a.map(i => [...i]);
+    for (const [c, d] of b) {
+      res = res.flatMap(([x, y]) => {
+        if (d <= x || c >= y) return [[x, y]];
+        const parts = [];
+        if (c > x) parts.push([x, c]);
+        if (d < y) parts.push([d, y]);
+        return parts;
+      });
+    }
+    return res.filter(([x, y]) => y - x > 1e-6);
+  }
+
+  /** Motif de hachures (matière coupée), recréé quand le thème change. */
+  _hatch() {
+    if (this._hatchFor === this.C.dimLine && this._hatchPat) return this._hatchPat;
+    const c = document.createElement('canvas');
+    c.width = c.height = 7;
+    const g = c.getContext('2d');
+    g.strokeStyle = this.C.dimLine;
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, 7); g.lineTo(7, 0); g.moveTo(-1, 1); g.lineTo(1, -1); g.moveTo(6, 8); g.lineTo(8, 6); g.stroke();
+    this._hatchPat = this.ctx.createPattern(c, 'repeat');
+    this._hatchFor = this.C.dimLine;
+    return this._hatchPat;
+  }
+
+  /**
+   * Dessine un profil : couches { z0, z1, iv:[[a,b]], part, hidden?:[[a,b]] } (mm).
+   * Remplissage, arêtes visibles (côtés de chaque intervalle + différences entre couches
+   * voisines d'une même pièce), arêtes cachées en pointillés, hachures en coupe.
+   */
+  _drawProfile(prof, map, { hatch = false } = {}) {
     const ctx = this.ctx;
-    const cx     = ox + qW / 2;
-    const cy     = oy + qH / 2 + 10;
-    const sx     = cx - W * sc / 2;
-    const sy     = cy + totalH * sc / 2; // bas
-    const csBot = boxTypeKey === 'stackable' && rimH > 0 ? sy - (H + rimH) * sc : sy;
+    const look = part => part === 'ghost'
+      ? { fill: GHOST, alpha: 0.35, dash: [5, 3], stroke: GHOST }
+      : { fill: part === 'lid' ? this.C.woodLt : this.C.wood, alpha: 1, dash: [], stroke: this.C.text };
+    const rect = (a, b, z0, z1) => [map.u(a), map.z(z1), map.u(b) - map.u(a), map.z(z0) - map.z(z1)];
 
-    const iX  = sx + wt * sc;           // bord intérieur gauche
-    const iW  = (W - 2 * wt) * sc;      // largeur intérieure
-    const rX  = sx + (W - wt) * sc;     // paroi droite X
-    const wW  = wt * sc;                 // épaisseur paroi
-
-    // ── Fond ──
-    ctx.fillStyle = this.C.wood;
-    ctx.fillRect(sx, csBot - bFl * sc, W * sc, bFl * sc);
-    ctx.strokeStyle = this.C.text;
-    ctx.lineWidth = 1;
-    // Contour fond : bords extérieurs + bord sup uniquement entre les parois
-    ctx.beginPath();
-    ctx.moveTo(sx, csBot - bFl * sc);
-    ctx.lineTo(sx, csBot);
-    ctx.lineTo(sx + W * sc, csBot);
-    ctx.lineTo(sx + W * sc, csBot - bFl * sc);
-    ctx.moveTo(sx + wW, csBot - bFl * sc);
-    ctx.lineTo(rX, csBot - bFl * sc);
-    ctx.stroke();
-
-    // ── Paroi gauche ──
-    ctx.fillStyle = this.C.wood;
-    ctx.fillRect(sx, csBot - H * sc, wW, (H - bFl) * sc);
-    ctx.strokeStyle = this.C.text;
-    // 3 côtés seulement : pas de bord bas (jonction fond — même matière)
-    ctx.beginPath();
-    ctx.moveTo(sx,      csBot - bFl * sc);
-    ctx.lineTo(sx,      csBot - H * sc);
-    ctx.lineTo(sx + wW, csBot - H * sc);
-    ctx.lineTo(sx + wW, csBot - bFl * sc);
-    ctx.stroke();
-
-    // ── Paroi droite ──
-    ctx.fillStyle = this.C.wood;
-    ctx.fillRect(rX, csBot - H * sc, wW, (H - bFl) * sc);
-    ctx.strokeStyle = this.C.text;
-    // 3 côtés seulement : pas de bord bas (jonction fond — même matière)
-    ctx.beginPath();
-    ctx.moveTo(rX,      csBot - bFl * sc);
-    ctx.lineTo(rX,      csBot - H * sc);
-    ctx.lineTo(rX + wW, csBot - H * sc);
-    ctx.lineTo(rX + wW, csBot - bFl * sc);
-    ctx.stroke();
-
-    // ── Cavité intérieure ──
-    if (H > bFl && W > 2 * wt) {
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(iX, csBot - H * sc, iW, (H - bFl) * sc);
-    }
-
-    // ── Cloisons coupées par le plan de coupe (celles qui divisent la largeur) ──
-    // Hauteur : jusqu'en haut, sauf feuillure intérieure de la boîte à couvercle (le G-code
-    // les abaisse de la profondeur de feuillure).
-    if (nfo.cells && nfo.partDir === 'vertical' && H > bFl) {
-      const n = nfo.nParts;
-      const cellW = (W - 2 * wt - n * wt) / (n + 1);
-      const topH = boxTypeKey === 'lid-box' && rs === 0 ? H - rD : H;
-      ctx.fillStyle = this.C.wood;
-      ctx.strokeStyle = this.C.text;
-      ctx.lineWidth = 1;
-      for (let k = 1; k <= n; k++) {
-        const px = sx + (wt + k * cellW + (k - 1) * wt) * sc;
-        ctx.fillRect(px, csBot - topH * sc, wW, (topH - bFl) * sc);
-        ctx.beginPath();
-        ctx.moveTo(px, csBot - bFl * sc);       ctx.lineTo(px, csBot - topH * sc);
-        ctx.lineTo(px + wW, csBot - topH * sc); ctx.lineTo(px + wW, csBot - bFl * sc);
-        ctx.stroke();
-      }
-    }
-
-    // ── Rainures feuillure corps (lid-box) — largeur r+jeu pour le jeu mécanique ──
-    if (boxTypeKey === 'lid-box' && r > 0) {
-      const rJ = r + jeu;
-      ctx.fillStyle   = this.C.rabbet;
-      ctx.globalAlpha = 0.35;
-      if (rs === 0) {
-        // Cas 0 : rainure intérieure — de (wt-r-jeu) à wt depuis bord ext, profondeur rD
-        ctx.fillRect(iX - rJ * sc, sy - H * sc, rJ * sc, rD * sc);
-        ctx.fillRect(rX,            sy - H * sc, rJ * sc, rD * sc);
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = this.C.rabbet; ctx.lineWidth = 1;
-        ctx.strokeRect(iX - rJ * sc, sy - H * sc, rJ * sc, rD * sc);
-        ctx.strokeRect(rX,            sy - H * sc, rJ * sc, rD * sc);
-      } else {
-        // Cas 1 : rainure extérieure — de 0 à r+jeu depuis bord ext, profondeur rD
-        ctx.fillRect(sx,                 sy - H * sc, rJ * sc, rD * sc);
-        ctx.fillRect(sx + (W - rJ) * sc, sy - H * sc, rJ * sc, rD * sc);
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = this.C.rabbet; ctx.lineWidth = 1;
-        ctx.strokeRect(sx,                 sy - H * sc, rJ * sc, rD * sc);
-        ctx.strokeRect(sx + (W - rJ) * sc, sy - H * sc, rJ * sc, rD * sc);
-      }
-    }
-
-    // ── Section couvercle (lid-box) ──
-    if (boxTypeKey === 'lid-box' && lidH > 0) {
-      const gap      = 2;
-      const lidBot   = sy - H * sc - gap;
-      const lidTop   = lidBot - lidH * sc;
-      // Cas 0 : couvercle réduit (inset wt-r) | Cas 1 : couvercle plein (inset 0)
-      const lidInset = rs === 0 ? (wt - r) * sc : 0;
-      const lidSx    = sx + lidInset;
-      const lidW     = W * sc - 2 * lidInset;
-      const lipY     = lidTop + (lidH - rD) * sc;  // début des lèvres (bas du bloc solide)
-
-      // Bloc solide supérieur du couvercle
-      ctx.fillStyle = this.C.woodLt;
-      ctx.fillRect(lidSx, lidTop, lidW, (lidH - rD) * sc);
-      // Cavité intérieure couvercle (plafond = bFll, profondeur = lidH - rD - bFll)
-      const lidCavH = lidH - rD - bFll;
-      if (lidCavH > 0 && W > 2 * wt) {
-        ctx.fillStyle = this.C.inner;
-        ctx.fillRect(sx + wt * sc, lidTop + bFll * sc, (W - 2 * wt) * sc, lidCavH * sc);
-      }
-      ctx.strokeStyle = this.C.text;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(lidSx, lidTop, lidW, (lidH - rD) * sc);
-
-      // Lèvre gauche : de lidSx à lidSx+r — s'emboîte dans rainure corps gauche
-      ctx.fillStyle = this.C.woodLt;
-      ctx.fillRect(lidSx, lipY, r * sc, rD * sc);
-      ctx.strokeStyle = this.C.text;
-      ctx.strokeRect(lidSx, lipY, r * sc, rD * sc);
-
-      // Lèvre droite : de lidSx+lidW-r à lidSx+lidW — s'emboîte dans rainure corps droite
-      ctx.fillStyle = this.C.woodLt;
-      ctx.fillRect(lidSx + lidW - r * sc, lipY, r * sc, rD * sc);
-      ctx.strokeStyle = this.C.text;
-      ctx.strokeRect(lidSx + lidW - r * sc, lipY, r * sc, rD * sc);
-
-      // Poche centrale (zone vide entre les lèvres = au-dessus de l'intérieur du corps)
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(lidSx + r * sc, lipY, lidW - 2 * r * sc, rD * sc);
-      ctx.strokeStyle = this.C.rabbet;
-      ctx.lineWidth = 0.8;
-      ctx.setLineDash([2, 2]);
-      ctx.strokeRect(lidSx + r * sc, lipY, lidW - 2 * r * sc, rD * sc);
-      ctx.setLineDash([]);
-
-      // Ligne de joint
-      ctx.strokeStyle = this.C.rabbet;
-      ctx.lineWidth = 0.5;
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      ctx.moveTo(sx, lidBot); ctx.lineTo(sx + W * sc, lidBot);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    // ── Boîte empilable : languette bas + fantôme (coupe) ─────────────
-    if (boxTypeKey === 'stackable' && rimH > 0) {
-      const tongueInset = wt + jeu;
-      const tongueBot   = csBot + rimH * sc;
-      // Rainures latérales (vides — matière fraisée)
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(sx,                          csBot, tongueInset * sc, rimH * sc);
-      ctx.fillRect(sx + (W - tongueInset) * sc, csBot, tongueInset * sc, rimH * sc);
-      // Plot central solide
-      ctx.fillStyle = this.C.wood;
-      ctx.fillRect(sx + tongueInset * sc, csBot, (W - 2 * tongueInset) * sc, rimH * sc);
-      ctx.strokeStyle = this.C.text; ctx.lineWidth = 1;
-      ctx.strokeRect(sx + tongueInset * sc, csBot, (W - 2 * tongueInset) * sc, rimH * sc);
-      const phantomTop = tongueBot;
+    // 1. Remplissage (+ hachures en coupe)
+    for (const l of prof) {
+      const s = look(l.part);
       ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle   = this.C.wood;
-      ctx.fillRect(sx,                 phantomTop, wt * sc, H * sc);
-      ctx.fillRect(sx + (W - wt) * sc, phantomTop, wt * sc, H * sc);
-      ctx.fillRect(sx, phantomTop + (H - bFl) * sc, W * sc, bFl * sc);
-      ctx.fillStyle = this.C.inner;
-      ctx.fillRect(iX, phantomTop, iW, (H - bFl) * sc);
-      ctx.globalAlpha = 0.45;
-      ctx.strokeStyle = this.C.woodLt; ctx.lineWidth = 1;
-      ctx.setLineDash([5, 3]);
-      ctx.strokeRect(sx, phantomTop, W * sc, H * sc);
-      ctx.setLineDash([]);
+      ctx.globalAlpha = s.alpha;
+      for (const [a, b] of l.iv) {
+        ctx.fillStyle = s.fill;
+        ctx.fillRect(...rect(a, b, l.z0, l.z1));
+        if (hatch && l.part !== 'ghost') { ctx.fillStyle = this._hatch(); ctx.fillRect(...rect(a, b, l.z0, l.z1)); }
+      }
       ctx.restore();
     }
 
-    // ── Cotes section (affichage seul) ──
-    // Épaisseur paroi — ligne d'attache depuis le bas du corps
-    this._dimH(sx, iX, sy + 38,
-      t('view.wall_thick', { val: wt.toFixed(1) }), null, false, wt, 1, 9999, csBot);
-
-    // Feuillure (lid-box) — label centré dans la rainure, fond transparent
-    if (boxTypeKey === 'lid-box' && r > 0) {
-      const rDimX1 = rs === 0 ? iX - r * sc : sx;
-      const rDimX2 = rs === 0 ? iX           : sx + r * sc;
-      const rDimY  = sy - H * sc + rD * sc / 2; // centré dans la profondeur feuillure
+    // 2. Arêtes visibles, pièce par pièce
+    const eq = (p, q) => Math.abs(p - q) < 1e-6;
+    for (const part of [...new Set(prof.map(l => l.part))]) {
+      const ls = prof.filter(l => l.part === part);
+      const s = look(part);
       ctx.save();
-      ctx.strokeStyle = this.C.dimLine;
-      ctx.fillStyle   = this.C.dimLine;
-      ctx.lineWidth   = 0.8;
+      ctx.globalAlpha = part === 'ghost' ? 0.6 : 1;
+      ctx.strokeStyle = s.stroke;
+      ctx.lineWidth = 1.1;
+      ctx.setLineDash(s.dash);
       ctx.beginPath();
-      ctx.moveTo(rDimX1, rDimY - 6); ctx.lineTo(rDimX1, rDimY + 6);
-      ctx.moveTo(rDimX2, rDimY - 6); ctx.lineTo(rDimX2, rDimY + 6);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(rDimX1, rDimY); ctx.lineTo(rDimX2, rDimY);
-      ctx.stroke();
-      this._arrH(rDimX1, rDimY,  1);
-      this._arrH(rDimX2, rDimY, -1);
-      ctx.font         = '10px monospace';
-      ctx.fillStyle    = this.C.text;
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(t('view.rabbet', { val: r.toFixed(1) }), (rDimX1 + rDimX2) / 2, rDimY);
-      ctx.restore();
-    }
-
-    // Jeu assemblage (lid-box) — label à côté de la cote feuillure
-    if (boxTypeKey === 'lid-box' && r > 0 && jeu > 0) {
-      ctx.save();
-      ctx.fillStyle   = this.C.dim;
-      ctx.font        = '9px monospace';
-      ctx.textAlign   = 'center';
-      ctx.globalAlpha = 0.9;
-      const jeuX = rs === 0
-        ? iX - r * sc - jeu * sc / 2
-        : sx + r * sc + jeu * sc / 2;
-      ctx.fillText(t('view.clearance', { val: jeu.toFixed(2) }), jeuX, sy - H * sc + rD * sc + 22);
-      ctx.restore();
-    }
-
-    // Languette (stackable) — cotes rimH et jeu
-    if (boxTypeKey === 'stackable' && rimH > 0) {
-      this._dimV(sx - 22, csBot, csBot + rimH * sc, `H ${rimH.toFixed(1)}`, null, false, rimH);
-      if (jeu > 0) {
-        ctx.save();
-        ctx.fillStyle = this.C.dim; ctx.font = '9px monospace'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.9;
-        ctx.fillText(t('view.clearance', { val: jeu.toFixed(2) }), sx + (wt + jeu / 2) * sc, csBot + rimH * sc / 2);
-        ctx.restore();
+      for (const l of ls) for (const [a, b] of l.iv) {
+        ctx.moveTo(map.u(a), map.z(l.z0)); ctx.lineTo(map.u(a), map.z(l.z1));
+        ctx.moveTo(map.u(b), map.z(l.z0)); ctx.lineTo(map.u(b), map.z(l.z1));
       }
+      const zs = [...new Set(ls.flatMap(l => [l.z0, l.z1]))];
+      for (const z of zs) {
+        const above = TechnicalView._union(ls.filter(l => eq(l.z0, z)).flatMap(l => l.iv));
+        const below = TechnicalView._union(ls.filter(l => eq(l.z1, z)).flatMap(l => l.iv));
+        const edges = [...TechnicalView._sub(above, below), ...TechnicalView._sub(below, above)];
+        for (const [a, b] of edges) { ctx.moveTo(map.u(a), map.z(z)); ctx.lineTo(map.u(b), map.z(z)); }
+      }
+      ctx.stroke();
+      ctx.restore();
     }
 
-    // Épaisseur matière (affichage seul — paramètre machine)
+    // 3. Arêtes cachées (vues extérieures) : vides de la pièce, en pointillés fins
     ctx.save();
-    ctx.font      = '9px monospace';
+    ctx.strokeStyle = this.C.text;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 0.7;
+    ctx.setLineDash([4, 3]);
+    for (const l of prof) {
+      if (!l.hidden || l.part === 'ghost') continue;
+      for (const [a, b] of l.hidden) ctx.strokeRect(...rect(a, b, l.z0, l.z1));
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Vue en élévation : 'face' (vue extérieure, vides en pointillés) ou 'section' (coupe
+   * par la ligne A-A, matière hachurée). axis 'x' : vue de face (horizontale = X) ;
+   * 'y' : vue de côté (horizontale = Y). Renvoie la projection pour placer les cotes.
+   */
+  _elev(ox, oy, qW, qH, nfo, title, axis, mode) {
+    const { bb, sc, layers, zMin, zMax } = nfo;
+    this._panelBg(ox, oy, qW, qH, title);
+    const uMin = axis === 'x' ? bb.minX : bb.minY, uMax = axis === 'x' ? bb.maxX : bb.maxY;
+    const x0 = ox + qW / 2 - (uMax - uMin) * sc / 2;
+    const yBase = oy + qH / 2 + 10 + (zMax - zMin) * sc / 2;
+    const map = { u: v => x0 + (v - uMin) * sc, z: v => yBase - (v - zMin) * sc };
+    const c = axis === 'x' ? (bb.minY + bb.maxY) / 2 : (bb.minX + bb.maxX) / 2;
+    const V = TechnicalView;
+    const prof = layers.map(l => {
+      if (mode === 'section') {
+        const o = V._union(l.outer.flatMap(p => V._cut(p, axis, c)));
+        const h = V._union(l.holes.flatMap(p => V._cut(p, axis, c)));
+        return { ...l, iv: V._sub(o, h) };
+      }
+      return { ...l, iv: V._union(l.outer.map(p => V._proj(p, axis))), hidden: l.holes.map(p => V._proj(p, axis)) };
+    });
+    this._drawProfile(prof, map, { hatch: mode === 'section' });
+    return { map, uMin, uMax, prof };
+  }
+
+  // ── VUE 2 : Face (extérieur, vides en pointillés) ────────────────────────
+  _viewFace(ox, oy, qW, qH, nfo, title) {
+    const { map, uMin, uMax } = this._elev(ox, oy, qW, qH, nfo, title, 'x', 'face');
+    this._elevDims(nfo, map, uMin, uMax, 'x');
+  }
+
+  // ── VUE 3 : Côté (extérieur, vides en pointillés) ────────────────────────
+  _viewCote(ox, oy, qW, qH, nfo, title) {
+    const { map, uMin, uMax } = this._elev(ox, oy, qW, qH, nfo, title, 'y', 'face');
+    this._elevDims(nfo, map, uMin, uMax, 'y');
+  }
+
+  /** Cotes communes aux vues extérieures : largeur, hauteurs (corps, couvercle, plot). */
+  _elevDims(nfo, map, uMin, uMax, axis) {
+    const { H, lidH, rD, rimH, wt, r, rs, boxTypeKey, zMin } = nfo;
+    const L = map.u(uMin), R = map.u(uMax);
+    const bottom = map.z(zMin);   // sous tout le dessin (boîte du dessous de l'empilable comprise)
+    this._dimH(L, R, bottom + 18, `${(uMax - uMin).toFixed(1)} mm`, null, false, uMax - uMin, 1, 9999, bottom);
+    this._dimV(L - 26, map.z(H), map.z(0), `${H.toFixed(1)} mm`, null, false, H, 1, 9999, L);
+    if (boxTypeKey === 'lid-box' && lidH > 0) {
+      const zb = H - rD;
+      this._dimV(R + 26, map.z(zb + lidH), map.z(zb), `${lidH.toFixed(1)} mm`, null, false, lidH, 1, 9999, R);
+      if (rs === 0) {   // couvercle réduit : sa largeur
+        const w = uMax - uMin - 2 * (wt - r);
+        this._dimH(map.u(uMin + wt - r), map.u(uMax - wt + r), map.z(zb + lidH) - 14, `${w.toFixed(1)} mm`, null, false, w);
+      }
+    }
+    if (boxTypeKey === 'stackable' && rimH > 0) {
+      this._dimV(L - 26, map.z(0), map.z(-rimH), `H ${rimH.toFixed(1)}`, null, false, rimH);
+    }
+  }
+
+  // ── VUE 4 : Coupe A-A (matière hachurée) ─────────────────────────────────
+  _viewCoupe(ox, oy, qW, qH, nfo, title) {
+    const { H, bFl, bFll, lidH, r, rD, rimH, jeu, boxTypeKey } = nfo;
+    const { map, prof } = this._elev(ox, oy, qW, qH, nfo, title, 'x', 'section');
+    const ctx = this.ctx;
+
+    // Paroi gauche réellement coupée (sur une forme inclinée, elle diffère de l'épaisseur nominale)
+    const wall = prof.find(l => l.part === 'body' && l.z0 >= bFl - 1e-6 && l.iv.length > 1);
+    if (wall) {
+      const [a, b] = wall.iv[0];
+      this._dimH(map.u(a), map.u(b), map.z(0) + 38,
+        t('view.wall_thick', { val: (b - a).toFixed(1) }), null, false, b - a, 1, 9999, map.z(0));
+      // Profondeur de la cavité, contre la paroi intérieure
+      this._dimV(map.u(b) + 14, map.z(H), map.z(bFl), `${(H - bFl).toFixed(1)}`, null, false, H - bFl);
+    }
+
+    // Épaisseur du fond (texte à gauche)
+    const left = Math.min(...prof.filter(l => l.part === 'body').flatMap(l => l.iv.map(i => i[0])));
+    ctx.save();
+    ctx.font = '9px monospace';
     ctx.fillStyle = this.C.dimLine;
     ctx.textAlign = 'right';
-    ctx.fillText(t('view.bottom_thick', { val: bFl.toFixed(1) }), sx - 5, csBot - bFl * sc / 2);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(t('view.bottom_thick', { val: bFl.toFixed(1) }), map.u(left) - 5, map.z(bFl / 2));
+    // Couvercle : hauteur et épaisseur du dessus
+    if (boxTypeKey === 'lid-box' && lidH > 0) {
+      const zb = H - rD;
+      ctx.fillText(t('view.lid_top_thick', { val: bFll.toFixed(1) }), map.u(left) - 5, map.z(zb + lidH - bFll / 2));
+    }
     ctx.restore();
+
+    // Feuillure et jeu (boîte à couvercle), plot et jeu (boîte empilable) : légende
+    const notes = [];
+    if (boxTypeKey === 'lid-box' && r > 0) notes.push(t('view.rabbet_note', { r: r.toFixed(1), d: rD.toFixed(1), j: jeu.toFixed(2) }));
+    if (boxTypeKey === 'stackable' && rimH > 0) notes.push(t('view.plot_note', { h: rimH.toFixed(1), j: jeu.toFixed(2) }));
+    if (notes.length) {
+      ctx.save();
+      ctx.font = '9px monospace';
+      ctx.fillStyle = this.C.text;
+      ctx.textAlign = 'left';
+      notes.forEach((n, i) => ctx.fillText(n, ox + 10, oy + 32 + i * 12));
+      ctx.restore();
+    }
   }
 
   // ── Cotes horizontales ────────────────────────────────────────────────────
@@ -1091,14 +877,15 @@ export class TechnicalView {
     const pad = 48;
     const sc  = Math.min((CW - pad * 2) / ((gMaxX - gMinX) || 1),
                          (CH - pad * 2 - 20) / ((gMaxY - gMinY) || 1));
-    // Origine canvas telle que la bb globale soit centrée
+    // Origine canvas telle que la bb globale soit centrée ; axe Y vers le HAUT comme sur la
+    // machine (le fond, à Y = 0, est en bas — devant — et non en haut du dessin)
     const ox  = (CW - (gMaxX - gMinX) * sc) / 2 - gMinX * sc;
-    const oy  = (CH - (gMaxY - gMinY) * sc) / 2 - gMinY * sc + 10;
+    const oy  = CH / 2 + 10 + (gMinY + gMaxY) / 2 * sc;
 
     // Un seul save/translate/scale pour tous les panneaux
     ctx.save();
     ctx.translate(ox, oy);
-    ctx.scale(sc, sc);
+    ctx.scale(sc, -sc);
 
     for (const p of panels) {
       const path2d = new Path2D(p.path);
@@ -1109,11 +896,11 @@ export class TechnicalView {
       ctx.stroke(path2d);
     }
 
-    // Labels en espace pixel (on annule le scale)
-    ctx.scale(1 / sc, 1 / sc);
+    // Labels en espace pixel (on annule le scale, Y retourné)
+    ctx.scale(1 / sc, -1 / sc);
     for (const p of panels) {
       const cx = ((p.bMinX + p.bMaxX) / 2) * sc;
-      const cy = ((p.bMinY + p.bMaxY) / 2) * sc;
+      const cy = -((p.bMinY + p.bMaxY) / 2) * sc;
       ctx.font         = '12px monospace';
       ctx.fillStyle    = p.color;
       ctx.textAlign    = 'center';
@@ -1125,32 +912,5 @@ export class TechnicalView {
     }
 
     ctx.restore();
-  }
-
-  /** Offset de contour par bisectrice (même algo que ThreePreview) */
-  _offsetPts(pts, offset) {
-    const n = pts.length;
-    if (n < 3) return [];
-    const res = [];
-    for (let i = 0; i < n; i++) {
-      const prev = pts[(i - 1 + n) % n];
-      const curr = pts[i];
-      const next = pts[(i + 1)     % n];
-      const dx1 = curr.x - prev.x, dy1 = curr.y - prev.y;
-      const dx2 = next.x - curr.x, dy2 = next.y - curr.y;
-      const l1  = Math.hypot(dx1, dy1) || 1;
-      const l2  = Math.hypot(dx2, dy2) || 1;
-      const nx1 = -dy1 / l1, ny1 = dx1 / l1;
-      const nx2 = -dy2 / l2, ny2 = dx2 / l2;
-      const nx  = nx1 + nx2, ny = ny1 + ny2;
-      const den = Math.max(1 + nx1 * nx2 + ny1 * ny2, 0.1);
-      const sc  = offset / den;
-      const cl  = Math.abs(offset) * 3;
-      res.push({
-        x: curr.x + Math.max(-cl, Math.min(cl, nx * sc)),
-        y: curr.y + Math.max(-cl, Math.min(cl, ny * sc)),
-      });
-    }
-    return res;
   }
 }

@@ -236,6 +236,10 @@ export const en = {
     rabbet:      'rabbet {{val}}',
     wall_thick:  'Wall {{val}}',
     bottom_thick:'Bot. {{val}}',
+    lid_top_thick:'Top th. {{val}}',
+    rabbet_note: 'Rabbet {{r}} × {{d}} mm · clearance {{j}} mm',
+    plot_note:   'Plug H {{h}} mm · clearance {{j}} mm',
+    corner_r:    'R {{val}}',
   },
 
   // ── Panel labels (finger-joint flat view) ───────────────────────────────

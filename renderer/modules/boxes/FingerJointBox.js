@@ -177,7 +177,7 @@ export class FingerJointBox {
     const t = thickness, fw = fingerWidth, bl = clearance;
     const bb = shape.getBoundingBox();
     const W = bb.width, D = bb.height, H = height;
-    const gap = 15;
+    const gap = 20;   // même écart que la disposition du G-code (_buildGCodeLayout)
 
     const frontRel = withLid ? this._frontWithTop(W, H, fw, t, bl)  : this._frontWithoutTop(W, H, fw, t, bl);
     const sideRel  = withLid ? this._sideWithTop(D, H, fw, t, bl)   : this._sideWithoutTop(D, H, fw, t, bl);

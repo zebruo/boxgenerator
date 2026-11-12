@@ -236,6 +236,10 @@ export const fr = {
     rabbet:      'feuillure {{val}}',
     wall_thick:  'Ép. paroi {{val}}',
     bottom_thick:'Ép. fond {{val}}',
+    lid_top_thick:'Ép. dessus {{val}}',
+    rabbet_note: 'Feuillure {{r}} × {{d}} mm · jeu {{j}} mm',
+    plot_note:   'Plot H {{h}} mm · jeu {{j}} mm',
+    corner_r:    'R {{val}}',
   },
 
   // ── Labels panneaux (vue à plat finger-joint) ────────────────────────────
