@@ -93,6 +93,7 @@ export class ThreePreview {
     this.controls.dampingFactor  = 0.07;
     this.controls.zoomSpeed      = 1.2;
     this.controls.rotateSpeed    = 0.7;
+    this.canvas.addEventListener('dblclick', () => this.resetView());   // recadrage par défaut
 
     this._animate();
   }
@@ -176,11 +177,22 @@ export class ThreePreview {
       visH = H;
       visZCenter = H / 2;
     }
-    const maxDim = Math.max(layW, layD, visH);
-    const dist   = maxDim * 1.9;
-    this.camera.position.set(layW / 2 + dist * 0.7, layD / 2 - dist * 0.7, visZCenter + dist * 0.55);
-    this.controls.target.set(layW / 2, layD / 2, visZCenter);
-    this.controls.update();
+    // Cadrage par défaut au premier affichage, au changement de type de boîte ou de disposition
+    // (ou double-clic) ; sinon on garde l'angle et le zoom de l'utilisateur et on suit
+    // seulement le centre de la pièce quand ses dimensions changent.
+    const center  = new THREE.Vector3(layW / 2, layD / 2, visZCenter);
+    const viewKey = `${boxTypeKey}|${lidLay ? this.lidLayout : ''}`;
+    this._frame = { center, size: Math.max(layW, layD, visH) };
+    if (viewKey !== this._viewKey || !this._lastCenter) {
+      this._viewKey = viewKey;
+      this.resetView();
+    } else {
+      const d = center.clone().sub(this._lastCenter);
+      this.camera.position.add(d);
+      this.controls.target.add(d);
+      this.controls.update();
+    }
+    this._lastCenter = center;
 
     // Grille sous la boîte (Z=0 = sol, grille à Z=-1)
     // Boîte empilable : sol entre la boîte usinée et la boîte du dessous (milieu de l'intervalle)
@@ -197,6 +209,16 @@ export class ThreePreview {
     const zOff  = boxTypeKey === 'stackable' ? -_rimH : 0;
     this._buildZ0Gizmo(layW, layD, machH, this.z0Pos, this.z0Level, zOff);
     this._buildStock(layW, layD, machH, this.stockOffset, this.stockSide, zOff);
+  }
+
+  /** Cadrage par défaut (vue 3/4 avant-droite) sur la dernière géométrie construite. */
+  resetView() {
+    if (!this._frame) return;
+    const { center: c, size } = this._frame;
+    const dist = size * 1.45;
+    this.camera.position.set(c.x + dist * 0.7, c.y - dist * 0.7, c.z + dist * 0.55);
+    this.controls.target.copy(c);
+    this.controls.update();
   }
 
   dispose() {
