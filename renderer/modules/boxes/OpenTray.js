@@ -42,7 +42,8 @@ export class OpenTray {
       const savedThickness = gen.machine.materialThickness;
       gen.machine.materialThickness = height - bFl;
       if (partitions > 0) {
-        const cells = buildPartitionContours(bb.width, bb.height, wallThickness, partitions, partitionDir, machineParams.toolDiameter);
+        const cells = buildPartitionContours(bb.width, bb.height, wallThickness, partitions, partitionDir, machineParams.toolDiameter,
+          { minX: bb.minX, minY: bb.minY, cavity: gen.insetContour(pts, wallThickness) });
         if (cells) {
           cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`));
         } else {
@@ -73,13 +74,18 @@ export class OpenTray {
    * seule » : coordonnées de la forme (origine programme non appliquée).
    * outer = contour qui détache la pièce du brut.
    */
-  getDrawing(shape, params) {
+  getDrawing(shape, params, machineParams = {}) {
     const pts = shape.getContourPoints();
-    const cavity = insetPolygon(pts, params.wallThickness ?? 6);
-    return [
-      { pts, face: 1, outer: true },
-      ...(cavity.length > 2 ? [{ pts: cavity, face: 1 }] : []),
-    ];
+    const wt = params.wallThickness ?? 6;
+    const cavity = insetPolygon(pts, wt);
+    const bb = shape.getBoundingBox();
+    const cells = (params.partitions ?? 0) > 0
+      ? buildPartitionContours(bb.width, bb.height, wt, params.partitions,
+          params.partitionDir === 'horizontal' ? 'horizontal' : 'vertical', machineParams.toolDiameter ?? 3.175,
+          { minX: bb.minX, minY: bb.minY, cavity })
+      : null;
+    const inner = cells ?? (cavity.length > 2 ? [cavity] : []);
+    return [{ pts, face: 1, outer: true }, ...inner.map(c => ({ pts: c, face: 1 }))];
   }
 
   /**

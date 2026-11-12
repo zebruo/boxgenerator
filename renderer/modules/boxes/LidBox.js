@@ -112,7 +112,8 @@ export class LidBox {
     if (cavW > 0 && cavH > 0) {
       gen.machine.materialThickness = height - bFl;
       if (partitions > 0) {
-        const cells = buildPartitionContours(W, D, wallThickness, partitions, partitionDir, machineParams.toolDiameter);
+        const cells = buildPartitionContours(W, D, wallThickness, partitions, partitionDir, machineParams.toolDiameter,
+          { minX: bb.minX, minY: bb.minY, cavity: gen.insetContour(bodyPts, wallThickness) });
         if (cells) {
           cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`, cavDepthStart));
         } else {
@@ -227,7 +228,14 @@ export class LidBox {
     const lidOuter = rabbetSide === 0 ? mirrorPts(insetPolygon(bodyPts, wallThickness - rabbet)) : mirrorPts(bodyPts);
     const cavity = insetPolygon(bodyPts, wallThickness);
     const items = [{ pts: bodyPts, face: 1, outer: true }];
-    if (cavity.length > 2) items.push({ pts: cavity, face: 1 }, { pts: shift(mirrorPts(cavity)), face: 1 });
+    // Corps : compartiments s'il y a des cloisons, sinon la cavité
+    const cells = (params.partitions ?? 0) > 0
+      ? buildPartitionContours(W, D, wallThickness, params.partitions,
+          params.partitionDir === 'horizontal' ? 'horizontal' : 'vertical', machineParams.toolDiameter ?? 3.175,
+          { minX: bb.minX, minY: bb.minY, cavity })
+      : null;
+    for (const c of cells ?? (cavity.length > 2 ? [cavity] : [])) items.push({ pts: c, face: 1 });
+    if (cavity.length > 2) items.push({ pts: shift(mirrorPts(cavity)), face: 1 });
     if (lidOuter.length > 2) items.push({ pts: shift(lidOuter), face: 1, outer: true });
     return items;
   }

@@ -79,6 +79,28 @@ export function differencePolygons(subject, clip) {
   return solution.filter(p => p.length >= 3).map(fromPath);
 }
 
+/**
+ * Partie de `poly` située dans `region` (intersection). Renvoie les contours extérieurs
+ * obtenus (plusieurs si `region` est concave), dans le sens de parcours de `region`.
+ */
+export function clipToRegion(poly, region) {
+  if (poly.length < 3 || region.length < 3) return [];
+  const C = clipper();
+  const c = new C.Clipper();
+  c.AddPath(toPath(poly), C.PolyType.ptSubject, true);
+  c.AddPath(toPath(region), C.PolyType.ptClip, true);
+  const solution = new C.Paths();
+  c.Execute(C.ClipType.ctIntersection, solution, C.PolyFillType.pftNonZero, C.PolyFillType.pftNonZero);
+  const sign = Math.sign(signedArea(region));
+  return solution
+    .filter(p => p.length >= 3 && C.Clipper.Orientation(p))
+    .map(p => {
+      const q = fromPath(p);
+      if (Math.sign(signedArea(q)) !== sign) q.reverse();
+      return q;
+    });
+}
+
 /** Rétrécit un contour de d mm ; renvoie le plus grand contour obtenu, ou [] s'il disparaît. */
 export function insetPolygon(points, d, opts) {
   return offsetPolygons(points, -d, opts)[0] ?? [];
