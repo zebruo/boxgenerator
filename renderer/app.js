@@ -244,7 +244,7 @@ function bindEvents() {
   });
 
   // Machine params — live update
-  ['param-thickness','param-tool-diameter','param-passes','param-feedrate','param-plunge','param-spindle','param-safe-z'].forEach(id => {
+  ['param-thickness','param-tool-diameter','param-passes','param-feedrate','param-plunge','param-spindle','param-safe-z','param-arcs'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => { updateRabbetToolWarning(); updatePartitionWarning(); updatePreview(); });
   });
 
@@ -544,7 +544,8 @@ function getMachineParams() {
     feedrate:          parseFloat(document.getElementById('param-feedrate').value),
     plungeRate:        parseFloat(document.getElementById('param-plunge').value),
     spindleSpeed:      parseFloat(document.getElementById('param-spindle').value),
-    safeZ:             parseFloat(document.getElementById('param-safe-z').value)
+    safeZ:             parseFloat(document.getElementById('param-safe-z').value),
+    arcs:              document.getElementById('param-arcs').checked
   };
 }
 
@@ -744,7 +745,7 @@ function renderGCode(code) {
     const l = line.trim();
     if (l.startsWith(';'))                          return `<span class="gc-comment">${escHtml(line)}</span>`;
     if (l.startsWith('G0'))                         return `<span class="gc-rapid">${escHtml(line)}</span>`;
-    if (l.startsWith('G1'))                         return `<span class="gc-move">${escHtml(line)}</span>`;
+    if (/^G[123](?![0-9.])/.test(l))                return `<span class="gc-move">${escHtml(line)}</span>`;
     if (l.startsWith('M') || l.startsWith('S'))     return `<span class="gc-cmd">${escHtml(line)}</span>`;
     if (l.startsWith('F'))                          return `<span class="gc-feed">${escHtml(line)}</span>`;
     return escHtml(line);
@@ -1253,6 +1254,7 @@ async function loadSession() {
     set('param-plunge',       mp.plungeRate);
     set('param-spindle',      mp.spindleSpeed);
     set('param-safe-z',       mp.safeZ);
+    if (typeof mp.arcs === 'boolean') document.getElementById('param-arcs').checked = mp.arcs;
   }
 
   // Restaure Z0

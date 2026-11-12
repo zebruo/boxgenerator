@@ -1,3 +1,5 @@
+import { compactGCode } from './GCodeCompactor.js';
+
 /**
  * Générateur G-code CNC générique.
  * Produit du G-code standard (Grbl / Mach3 / LinuxCNC compatible).
@@ -17,6 +19,7 @@ export class GCodeGenerator {
       originX: machine.originX ?? 0,  // décalage X (mm)
       originY: machine.originY ?? 0,  // décalage Y (mm)
       zOffset: machine.zOffset ?? 0,  // 0 = Z0 en surface, matThickness = Z0 en bas du brut
+      arcs:    machine.arcs    ?? true, // regroupe les segments G1 en arcs G2/G3 à la sortie
       unit: 'mm'
     };
     this.lines = [];
@@ -1241,8 +1244,9 @@ export class GCodeGenerator {
     return xs;
   }
 
+  /** G-code final : arcs G2/G3 regroupés (si machine.arcs) et mots modaux compactés. */
   getCode() {
-    return this.lines.join('\n');
+    return compactGCode(this.lines, { arcs: this.machine.arcs, tol: 0.015 }).join('\n');
   }
 
   getStats() {
