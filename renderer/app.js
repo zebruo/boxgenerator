@@ -561,7 +561,7 @@ function getMachineParams() {
 const EXPORT_OPTS_DEFAULT = {
   entry: 'plunge', rampLen: null, helixR: null, helixTurns: 1,
   leadInOn: false, leadInR: null, finishOn: false, finishAllowance: 0.2,
-  tabsOn: true, tabCount: 4, tabWidth: 8, tabHeight: 2, pocketConc: true,
+  tabsOn: true, tabCount: 4, tabWidth: 8, tabHeight: 2, pocketConc: true, rasterFinish: true,
 };
 
 function loadExportOpts() {
@@ -597,6 +597,7 @@ function exportGenOptions(machine) {
       leadIn: o.leadInOn ? (o.leadInR ?? d.leadR) : false, finishAllowance,
     },
     pocketConc: o.pocketConc,
+    rasterFinish: o.rasterFinish,
     finishAllowance,
   };
 }
@@ -730,6 +731,8 @@ function updatePreview() {
     if (!threePreview) {
       threePreview = new ThreePreview(canvas2d);
       threePreview.setTheme(document.documentElement.dataset.theme === 'light');
+      const z0 = getZ0Settings();   // repère Z0 = boutons Z0 (session chargée en vue 2D…)
+      threePreview.z0Pos = z0.pos; threePreview.z0Level = z0.level;
       const area = document.querySelector('.preview-area');
       threePreview.resize(area.clientWidth, area.clientHeight);
     }
@@ -1024,6 +1027,10 @@ function showExportModal(sections, machine = {}) {
         </label>
         <span class="entry-lbl pocket-raster-lbl" data-tip="${t('modal.tip_raster')}">${t('modal.raster')}</span>
       </div>
+      <label class="tabs-toggle-row raster-finish-row" data-tip="${t('modal.tip_raster_finish')}">
+        <input type="checkbox" id="modal-raster-finish">
+        <span>${t('modal.raster_finish')}</span>
+      </label>
     </div>
     <p class="modal-sub">${t(opsKey, { count: optional.length })}</p>
     <div class="modal-toolbar">
@@ -1100,7 +1107,7 @@ function showExportModal(sections, machine = {}) {
     const origin  = computeOrigin(z0, machine);
     const fc = state.boxType.generateGCode(
       state.shape, state.boxParams,
-      { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcStats.checked, finishAllowance: entryOpts.finishAllowance }
+      { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcStats.checked, rasterFinish: modal.querySelector('#modal-raster-finish').checked, finishAllowance: entryOpts.finishAllowance }
     );
     const fSections = parseGCodeSections(fc);
     const sel = new Set();
@@ -1185,6 +1192,14 @@ function showExportModal(sections, machine = {}) {
   });
 
   const pocketConcCb = modal.querySelector('#modal-pocket-conc');
+  // Passe de finition : n'a d'effet qu'en balayage (case visible seulement si « concentrique » est décoché)
+  const rasterFinishCb  = modal.querySelector('#modal-raster-finish');
+  const rasterFinishRow = modal.querySelector('.raster-finish-row');
+  rasterFinishCb.checked = o.rasterFinish !== false;
+  const syncRasterFinish = () => { rasterFinishRow.hidden = pocketConcCb.checked; };
+  syncRasterFinish();
+  pocketConcCb.addEventListener('change', syncRasterFinish);
+  rasterFinishCb.addEventListener('change', updateModalStats);
   // Met à jour les labels de poche dans la liste quand la stratégie change
   pocketConcCb.addEventListener('change', () => {
     list.querySelectorAll('.sec-label').forEach(lbl => {
@@ -1215,6 +1230,7 @@ function showExportModal(sections, machine = {}) {
       tabWidth:        fin(num('#modal-tab-width'), 8),
       tabHeight:       fin(num('#modal-tab-height'), 2),
       pocketConc:      pocketConcCb.checked,
+      rasterFinish:    rasterFinishCb.checked,
     };
   };
   const rememberOpts = () => saveExportOpts(readExportOpts());
@@ -1258,7 +1274,7 @@ function showExportModal(sections, machine = {}) {
     const z0      = getZ0Settings();
     const origin  = computeOrigin(z0, machine);
     const finalCode = state.boxType.generateGCode(
-      state.shape, state.boxParams, { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
+      state.shape, state.boxParams, { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, rasterFinish: rasterFinishCb.checked, finishAllowance: entryOpts.finishAllowance }
     );
     const finalSections = parseGCodeSections(finalCode);
 
@@ -1326,7 +1342,7 @@ function showExportModal(sections, machine = {}) {
         const lidOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
         const lidCode = state.boxType.generateGCode(
           state.shape, state.boxParams,
-          { ...machine, ...lidOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance, lidAtOrigin: true }
+          { ...machine, ...lidOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, rasterFinish: rasterFinishCb.checked, finishAllowance: entryOpts.finishAllowance, lidAtOrigin: true }
         );
         sectionsForExport = parseGCodeSections(lidCode);
         // Corrige le préambule : ═══ CORPS ═══ → ═══ COUVERCLE ═══
@@ -1338,7 +1354,7 @@ function showExportModal(sections, machine = {}) {
         const bodyOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
         const bodyCode = state.boxType.generateGCode(
           state.shape, state.boxParams,
-          { ...machine, ...bodyOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
+          { ...machine, ...bodyOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, rasterFinish: rasterFinishCb.checked, finishAllowance: entryOpts.finishAllowance }
         );
         sectionsForExport = parseGCodeSections(bodyCode);
       }
@@ -1363,7 +1379,7 @@ async function saveSession() {
   if (!state.shape || !state.boxType) return;
 
   const session = {
-    version:       1,
+    version:       2,   // 2 : haricot avec longueur sur X
     shapeKey:      state.shapeKey,
     boxTypeKey:    state.boxTypeKey,
     shapeParams:   { ...state.shape.params },
@@ -1383,13 +1399,29 @@ async function loadSession() {
   let session;
   try { session = JSON.parse(result.content); } catch { return; }
 
+  // Compatibilité des anciennes sessions
+  let shapeKey = session.shapeKey ?? 'rectangle';
+  let shapeParams = session.shapeParams ? { ...session.shapeParams } : null;
+  if (shapeKey === 'hexagon') {
+    // Hexagone supprimé : polygone à 6 côtés, mêmes cotes, rayon et rotation
+    shapeKey = 'polygon';
+    if (shapeParams) shapeParams = {
+      length: shapeParams.longueur, width: shapeParams.largeur, sides: 6,
+      cornerRadius: shapeParams.cornerRadius ?? 0, orientation: shapeParams.orientation ?? 0,
+    };
+  } else if (shapeKey === 'bean' && (session.version ?? 1) < 2 && shapeParams) {
+    // Avant la version 2, la longueur du haricot était sur Y : on garde la même pièce
+    [shapeParams.length, shapeParams.width] = [shapeParams.width, shapeParams.length];
+  }
+  if (!SHAPES[shapeKey]) shapeKey = 'rectangle';
+
   // Restaure type de boîte et forme
   selectBoxType(session.boxTypeKey ?? 'open-tray');
-  selectShape(session.shapeKey ?? 'rectangle');
+  selectShape(shapeKey);
 
   // Restaure params forme directement dans state.shape.params
-  if (session.shapeParams) {
-    Object.entries(session.shapeParams).forEach(([k, v]) => {
+  if (shapeParams) {
+    Object.entries(shapeParams).forEach(([k, v]) => {
       if (state.shape.params.hasOwnProperty(k)) state.shape.updateParam(k, v);
     });
     renderShapeParams();
@@ -1420,6 +1452,11 @@ async function loadSession() {
   if (session.z0) {
     document.querySelectorAll('.z0-btn').forEach(b => b.classList.toggle('active', b.dataset.pos === session.z0.pos));
     document.querySelectorAll('.z0-lvl-btn').forEach(b => b.classList.toggle('active', b.dataset.level === session.z0.level));
+    // Le repère Z0 de la vue 3D suit les boutons (l'export les lit déjà)
+    if (threePreview) {
+      const z0 = getZ0Settings();
+      threePreview.z0Pos = z0.pos; threePreview.z0Level = z0.level;
+    }
   }
 
   updatePreview();

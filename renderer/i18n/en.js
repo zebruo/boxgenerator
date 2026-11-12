@@ -164,6 +164,7 @@ export const en = {
     pocket_strategy:  'Pocket strategy',
     concentric:       'Concentric (default)',
     raster:           'Raster (zig-zag) if unchecked',
+    raster_finish:    'Finishing outline after the zig-zag',
     ops_one:          '{{count}} operation — check what you want to export:',
     ops_other:        '{{count}} operations — check what you want to export:',
     select_all:       'Select all',
@@ -188,6 +189,7 @@ export const en = {
     tip_leadin_r:    'Lead-in/out arc radius = 0.4 × tool Ø = {{val}}mm by default.\nThe arc must fit in the clearance space around the contour.',
     tip_concentric:  'Concentric path (ring by ring).\n✔ Recommended for convex shapes (rectangle, circle, oval, polygon).\n✔ Better pocket wall finish.\n✗ Avoid for deeply concave shapes.',
     tip_raster:      'Horizontal zig-zag raster, line by line.\n✔ Universal: works for all shapes.\n✔ Ideal for concave shapes (C, U, L).\n✗ May leave slight marks on pocket walls.',
+    tip_raster_finish: 'After the zig-zag of each pass, the cutter follows the pocket outline.\n✔ Clean walls, no ridges or leftover material.\nUnchecked: zig-zag only, faster, stepped walls.',
   },
 
   // ── Confirm dialogs ─────────────────────────────────────────────────────

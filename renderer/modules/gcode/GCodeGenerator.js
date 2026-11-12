@@ -1,5 +1,5 @@
 import { compactGCode } from './GCodeCompactor.js';
-import { insetPolygon } from './Offset.js';
+import { insetPolygon, offsetPolygons } from './Offset.js';
 
 /**
  * Générateur G-code CNC générique.
@@ -21,6 +21,7 @@ export class GCodeGenerator {
       originY: machine.originY ?? 0,  // décalage Y (mm)
       zOffset: machine.zOffset ?? 0,  // 0 = Z0 en surface, matThickness = Z0 en bas du brut
       arcs:    machine.arcs    ?? true, // regroupe les segments G1 en arcs G2/G3 à la sortie
+      rasterFinish: machine.rasterFinish ?? true, // poche raster : passe de finition sur le contour
       unit: 'mm'
     };
     this.lines = [];
@@ -974,16 +975,20 @@ export class GCodeGenerator {
   }
 
   /**
-   * Pocket d'une forme quelconque par balayage raster (zig-zag).
-   * Compense le rayon d'outil par insetting du contour.
+   * Poche d'une forme quelconque par balayage raster (zig-zag), puis passe de finition.
    *
-   * Entre deux lignes raster consécutives, l'outil se dégage à `clearance` mm
-   * au-dessus du fond de passe (et non au safeZ) pour éviter les ~N retracts
-   * inutiles. Un retrait complet au safeZ n'est fait que pour les tronçons
-   * non-contigus sur la même ligne Y (formes concaves).
+   * Le balayage reste dans le contour décalé de r (+ une petite surépaisseur si la finition
+   * est active), calculé par Clipper : l'outil reste partout à r de la paroi, y compris sur
+   * les parois obliques ou courbes (un décalage purement horizontal la mordait).
+   * Finition (machine.rasterFinish, active par défaut) : à chaque passe, l'outil suit le
+   * contour décalé de r exactement, ce qui efface les stries du balayage sur les parois.
+   *
+   * Entre deux lignes, l'outil se dégage à `clearance` mm au-dessus du fond de passe (et non
+   * au safeZ) ; retrait complet seulement pour les tronçons disjoints d'une même ligne.
    *
    * @param {Array<{x,y}>} points  - contour fermé de la poche
    * @param {string}       label
+   * @param {number}       depthStart - profondeur déjà usinée (mm)
    */
   pocketShape(points, label = 'Pocket', depthStart = 0) {
     if (points.length < 3) return;
@@ -995,75 +1000,73 @@ export class GCodeGenerator {
     const remainDepth = this.machine.materialThickness - depthStart;
     const passes      = Math.max(1, Math.ceil(remainDepth / this.machine.depthPerPass));
     const stepZ       = remainDepth / passes;
-    const clearance = 1.0;  // dégagement inter-lignes au-dessus du fond de passe (mm)
+    const clearance   = 1.0;  // dégagement inter-lignes au-dessus du fond de passe (mm)
+    const zo          = this.machine.zOffset;
 
-    // Bounding box de la zone fraisable (inset d'un rayon d'outil)
-    const allX = points.map(p => p.x);
-    const allY = points.map(p => p.y);
-    const minX = Math.min(...allX) + r;
-    const maxX = Math.max(...allX) - r;
-    const minY = Math.min(...allY) + r;
-    const maxY = Math.max(...allY) - r;
+    const finish = this.machine.rasterFinish !== false;
+    const leave  = finish ? Math.min(0.2, r * 0.25) : 0;   // surépaisseur enlevée par la finition
+    const walls  = offsetPolygons(points, -r);                       // trajet de finition
+    const zone   = leave > 0 ? offsetPolygons(points, -(r + leave)) : walls;   // zone balayée
 
-    if (minX >= maxX || minY >= maxY) {
+    if (!walls.length) {
       this.comment(`ATTENTION: forme trop petite pour l'outil (${td}mm)`);
       return;
     }
+    const ys   = zone.flatMap(poly => poly.map(p => p.y));
+    const minY = ys.length ? Math.min(...ys) : 0, maxY = ys.length ? Math.max(...ys) : 0;
+    // Lignes régulièrement espacées (≤ stepOver), légèrement en retrait des tangentes haute et basse
+    const EDGE = 0.01, span = maxY - minY - 2 * EDGE;
+    const rows = ys.length && span > 0 ? Math.max(1, Math.ceil(span / stepOver)) : 0;
+    const rowYs = rows ? Array.from({ length: rows + 1 }, (_, i) => minY + EDGE + span * i / rows) : [];
 
-    this.comment(`─── ${label} — Pocket raster ───`);
+    this.comment(`─── ${label} — Pocket raster${finish ? ' + finition' : ''} ───`);
 
     for (let pass = 1; pass <= passes; pass++) {
       const z      = -(depthStart + stepZ * pass);
-      const clearZ = z + clearance;  // niveau de dégagement inter-lignes
+      const clearZ = z + clearance;
+      const reenter = () => { if (depthStart > 0) this.emit(`G0 Z${(-depthStart + zo).toFixed(3)}`); this.plungeTo(z); };
       this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}`);
       this.rapidZ(this.machine.safeZ);
 
-      let curY      = minY;
-      let dir       = 1;
-      let firstMove = true;
-
-      while (curY <= maxY + 1e-6) {
-        // Intersections de la ligne horizontale avec le contour
-        const xCuts = this._rasterIntersections(points, curY);
-        if (xCuts.length >= 2) {
-          xCuts.sort((a, b) => a - b);
-          let firstSegInRow = true;
-          // Traite chaque paire d'intersections (gestion des formes concaves)
-          for (let k = 0; k + 1 < xCuts.length; k += 2) {
-            const xFrom_raw = xCuts[k]     + r;
-            const xTo_raw   = xCuts[k + 1] - r;
-            if (xTo_raw <= xFrom_raw) continue;
-
-            const xFrom = dir > 0 ? xFrom_raw : xTo_raw;
-            const xTo   = dir > 0 ? xTo_raw   : xFrom_raw;
-
-            if (firstMove) {
-              // Première plongée de la passe
-              this.rapidTo(xFrom, curY);
-              if (depthStart > 0) this.emit(`G0 Z${(-depthStart + this.machine.zOffset).toFixed(3)}`);
-              this.plungeTo(z);
-              firstMove = false;
-            } else if (!firstSegInRow) {
-              // Même ligne Y, tronçon non-contigu (forme concave) → retrait complet
-              this.rapidZ(this.machine.safeZ);
-              this.rapidTo(xFrom, curY);
-              if (depthStart > 0) this.emit(`G0 Z${(-depthStart + this.machine.zOffset).toFixed(3)}`);
-              this.plungeTo(z);
-            } else {
-              // Nouvelle ligne raster → dégagement minimal (sans retour au safeZ)
-              this.emit(`G0 Z${(clearZ + this.machine.zOffset).toFixed(3)}`);
-              this.rapidTo(xFrom, curY);
-              this.plungeTo(z);
-            }
-            this.lineTo(xTo, curY);
-            firstSegInRow = false;
+      let dir = 1, firstMove = true;
+      for (const y of rowYs) {
+        const xCuts = zone.flatMap(poly => this._rasterIntersections(poly, y)).sort((a, b) => a - b);
+        let firstSegInRow = true;
+        for (let k = 0; k + 1 < xCuts.length; k += 2) {
+          if (xCuts[k + 1] - xCuts[k] < 1e-6) continue;
+          const xFrom = dir > 0 ? xCuts[k] : xCuts[k + 1];
+          const xTo   = dir > 0 ? xCuts[k + 1] : xCuts[k];
+          if (firstMove) {
+            this.rapidTo(xFrom, y);
+            reenter();
+            firstMove = false;
+          } else if (!firstSegInRow) {
+            // Même ligne, tronçon disjoint (forme concave) → retrait complet
+            this.rapidZ(this.machine.safeZ);
+            this.rapidTo(xFrom, y);
+            reenter();
+          } else {
+            // Nouvelle ligne → dégagement minimal (sans retour au safeZ)
+            this.emit(`G0 Z${(clearZ + zo).toFixed(3)}`);
+            this.rapidTo(xFrom, y);
+            this.plungeTo(z);
           }
+          this.lineTo(xTo, y);
+          firstSegInRow = false;
         }
-
-        curY += stepOver;
-        dir  *= -1;
+        dir *= -1;
       }
 
+      // Finition : contour exact (centre outil à r de la paroi) à cette profondeur
+      if (finish) {
+        for (const loop of walls) {
+          this.rapidZ(this.machine.safeZ);
+          this.rapidTo(loop[0].x, loop[0].y);
+          reenter();
+          for (let i = 1; i < loop.length; i++) this.lineTo(loop[i].x, loop[i].y);
+          this.lineTo(loop[0].x, loop[0].y);
+        }
+      }
       this.rapidZ(this.machine.safeZ);
     }
     this.comment('');
