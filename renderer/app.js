@@ -358,7 +358,6 @@ function renderShapeParams() {
             if (inp && inp !== e.target) inp.value = typeof pval === 'number' ? +pval.toFixed(2) : pval;
           }
           updateShapeInputWarnings();
-          updateFingerJointWarnings();
         } else {
           state.boxParams[d.id] = val;
         }
@@ -397,7 +396,7 @@ function updatePinDepthWarning() {
   const warn      = pinDepth > 0 && pinDepth > brut;
   el.classList.toggle('input-warn', warn);
   el.title = warn
-    ? `⚠ Prof. > brut (${brut}mm) : le trou pénètre dans le martyre pour loger les goupilles de repositionnement`
+    ? t('warn.pin_depth', { brut })
     : '';
 }
 
@@ -436,7 +435,7 @@ function updatePartitionWarning() {
   const warn = cellW < minCell || cellH < minCell;
   el.classList.toggle('input-warn', warn);
   el.title = warn
-    ? `⚠ Compartiment trop petit (${Math.min(cellW, cellH).toFixed(0)}mm) — min. ${minCell.toFixed(0)}mm (3×Ø ${td}mm)`
+    ? t('warn.partition_small', { cell: Math.min(cellW, cellH).toFixed(0), min: minCell.toFixed(0), td })
     : '';
 }
 

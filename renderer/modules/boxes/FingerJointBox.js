@@ -157,53 +157,9 @@ export class FingerJointBox {
 
   // ─── Conversion relatif → absolu ──────────────────────────────────────────
 
-  _toSVGPath(rel, ox = 0, oy = 0) {
-    let x = ox, y = oy;
-    return rel.map(([dx, dy], i) => {
-      x += dx; y += dy;
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(3)},${y.toFixed(3)}`;
-    }).join(' ') + ' Z';
-  }
-
   _toPoints(rel, ox = 0, oy = 0) {
     let x = ox, y = oy;
     return rel.map(([dx, dy]) => { x += dx; y += dy; return { x, y }; });
-  }
-
-  // ─── Vue 2D aplatie ───────────────────────────────────────────────────────
-
-  getFlatPanels(shape, params) {
-    const { height = 40, thickness = 6, fingerWidth = 10, clearance = 0.1, withLid = true } = params;
-    const t = thickness, fw = fingerWidth, bl = clearance;
-    const bb = shape.getBoundingBox();
-    const W = bb.width, D = bb.height, H = height;
-    const gap = 20;   // même écart que la disposition du G-code (_buildGCodeLayout)
-
-    const frontRel = withLid ? this._frontWithTop(W, H, fw, t, bl)  : this._frontWithoutTop(W, H, fw, t, bl);
-    const sideRel  = withLid ? this._sideWithTop(D, H, fw, t, bl)   : this._sideWithoutTop(D, H, fw, t, bl);
-
-    const panels = [
-      { id: 'bottom', label: 'panel.bottom', rel: this._bottom(W, D, fw, t, bl), x: 0,         y: 0,               color: '#4a9eff' },
-      ...(withLid ? [{ id: 'top', label: 'panel.top', rel: this._bottom(W, D, fw, t, bl), x: W + gap, y: 0, color: '#4affcc' }] : []),
-      { id: 'front',  label: 'panel.front',  rel: frontRel,                       x: 0,         y: D + gap,         color: '#ff9f4a' },
-      { id: 'back',   label: 'panel.back',   rel: frontRel,                       x: W + gap,   y: D + gap,         color: '#ff9f4a' },
-      { id: 'left',   label: 'panel.left',   rel: sideRel,                        x: 0,         y: D + H + 2 * gap, color: '#c04aff' },
-      { id: 'right',  label: 'panel.right',  rel: sideRel,                        x: D + gap,   y: D + H + 2 * gap, color: '#c04aff' },
-    ];
-
-    return panels.map(p => {
-      const path = this._toSVGPath(p.rel, p.x, p.y);
-      const pts  = this._toPoints(p.rel, p.x, p.y);
-      const xs = pts.map(q => q.x), ys = pts.map(q => q.y);
-      const bMinX = Math.min(...xs), bMaxX = Math.max(...xs);
-      const bMinY = Math.min(...ys), bMaxY = Math.max(...ys);
-      return {
-        ...p, path,
-        width:  bMaxX - bMinX,
-        height: bMaxY - bMinY,
-        bMinX, bMinY, bMaxX, bMaxY,
-      };
-    });
   }
 
   // ─── Layout partagé G-code ────────────────────────────────────────────────
@@ -226,23 +182,6 @@ export class FingerJointBox {
       { key: 'left',   label: 'Côté gauche',   rel: sideRel,                        ox: 0,       oy: D + H + 2 * gap },
       { key: 'right',  label: 'Côté droit',    rel: sideRel,                        ox: D + gap, oy: D + H + 2 * gap },
     ];
-  }
-
-  // Bounding box complète incluant les protrusions de tabs (valeurs négatives)
-  // Utilisée pour calculer la taille de plaque conseillée.
-  getSheetBoundingBox(shape, params) {
-    const layout = this._buildGCodeLayout(shape, params);
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const p of layout) {
-      const pts = this._toPoints(p.rel, p.ox, p.oy);
-      for (const q of pts) {
-        if (q.x < minX) minX = q.x;
-        if (q.y < minY) minY = q.y;
-        if (q.x > maxX) maxX = q.x;
-        if (q.y > maxY) maxY = q.y;
-      }
-    }
-    return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
   }
 
   /** Contours théoriques des panneaux pour la simulation (même disposition que le G-code). */

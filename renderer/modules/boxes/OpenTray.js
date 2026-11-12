@@ -88,57 +88,6 @@ export class OpenTray {
     return [{ pts, face: 1, outer: true }, ...inner.map(c => ({ pts: c, face: 1 }))];
   }
 
-  /**
-   * Retourne les panneaux SVG pour la vue développée.
-   */
-  getFlatPanels(shape, params) {
-    const { height = 30 } = params;
-    const bb = shape.getBoundingBox();
-    const panels = [];
-
-    // Fond — polyline pour compatibilité CAO (évite les arcs SVG mal interprétés)
-    const fondPts = shape.getContourPoints();
-    panels.push({
-      id: 'bottom',
-      label: 'Fond',
-      x: 0, y: 0,
-      path: fondPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ') + ' Z',
-      width: bb.width, height: bb.height,
-      color: '#4a9eff'
-    });
-
-    // Parois : uniquement pour Rectangle (les autres formes ont des parois courbes,
-    // et de toute façon l'OpenTray est usiné dans un seul bloc)
-    const isRectangle = 'cornerRadius' in (shape.params ?? {}) && (shape.params.cornerRadius ?? 0) === 0;
-    if (isRectangle) {
-      const gap = 10;
-      for (let i = 0; i < 2; i++) {
-        const px = 0, py = bb.height + gap + i * (height + gap);
-        panels.push({
-          id: `wall-front-${i}`,
-          label: i === 0 ? 'Paroi avant' : 'Paroi arrière',
-          x: px, y: py,
-          width: bb.width, height: height,
-          path: `M${px},${py} L${px+bb.width},${py} L${px+bb.width},${py+height} L${px},${py+height} Z`,
-          color: '#ff9f4a'
-        });
-      }
-      for (let i = 0; i < 2; i++) {
-        const px = bb.width + gap, py = bb.height + gap + i * (height + gap);
-        panels.push({
-          id: `wall-side-${i}`,
-          label: i === 0 ? 'Paroi gauche' : 'Paroi droite',
-          x: px, y: py,
-          width: bb.height, height: height,
-          path: `M${px},${py} L${px+bb.height},${py} L${px+bb.height},${py+height} L${px},${py+height} Z`,
-          color: '#ff9f4a'
-        });
-      }
-    }
-
-    return panels;
-  }
-
   getBoxParams() {
     return [
       { id: 'height',          label: 'param.height',           min: 5,  max: 500, step: 1,   unit: 'mm', value: 40 },

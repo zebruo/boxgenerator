@@ -45,12 +45,4 @@ export class Rectangle extends ShapeBase {
     ], rc);
   }
 
-  getSVGPath() {
-    const { length: L, width: W, cornerRadius: r } = this.params;
-    const rc = Math.min(r, L / 2, W / 2);
-    if (rc <= 0) {
-      return `M0,0 L${L},0 L${L},${W} L0,${W} Z`;
-    }
-    return `M${rc},0 L${L - rc},0 A${rc},${rc} 0 0 1 ${L},${rc} L${L},${W - rc} A${rc},${rc} 0 0 1 ${L - rc},${W} L${rc},${W} A${rc},${rc} 0 0 1 0,${W - rc} L0,${rc} A${rc},${rc} 0 0 1 ${rc},0 Z`;
-  }
 }

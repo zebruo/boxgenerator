@@ -1,6 +1,6 @@
 /**
  * Classe de base pour toutes les formes.
- * Chaque forme doit implémenter getParams(), getContourPoints(), et getSVGPath().
+ * Chaque forme implémente defaultParams(), getParamDescriptors() et getContourPoints().
  */
 export class ShapeBase {
   constructor(params = {}) {
@@ -19,15 +19,6 @@ export class ShapeBase {
    */
   getContourPoints() { return []; }
 
-  /**
-   * Retourne le chemin SVG (attribut d)
-   */
-  getSVGPath() {
-    const pts = this.getContourPoints();
-    if (!pts.length) return '';
-    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(3)},${p.y.toFixed(3)}`).join(' ') + ' Z';
-  }
-
   /** Bounding box {minX, minY, maxX, maxY, width, height} */
   getBoundingBox() {
     const pts = this.getContourPoints();
@@ -37,17 +28,6 @@ export class ShapeBase {
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
     return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
-  }
-
-  /** Périmètre approximatif en mm */
-  getPerimeter() {
-    const pts = this.getContourPoints();
-    let perim = 0;
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length];
-      perim += Math.hypot(b.x - a.x, b.y - a.y);
-    }
-    return perim;
   }
 
   updateParam(id, value) {

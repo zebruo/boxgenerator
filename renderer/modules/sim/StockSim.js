@@ -122,19 +122,6 @@ export class StockSim {
     return pointOnMove(moves[this.idx], this.u);
   }
 
-  /** Hauteur du dessus de la matière au point (x, y), ou null hors du brut. */
-  heightAt(x, y) {
-    const i = Math.round((x - this.x0) / this.cell), j = Math.round((y - this.y0) / this.cell);
-    if (i < 0 || j < 0 || i >= this.nx || j >= this.ny) return null;
-    return this.heights[j * this.nx + i];
-  }
-
-  /** Hauteur du dessous de la matière au point (x, y) (relevé par la face 2), ou null. */
-  floorAt(x, y) {
-    const i = Math.round((x - this.x0) / this.cell), j = Math.round((y - this.y0) / this.cell);
-    if (i < 0 || j < 0 || i >= this.nx || j >= this.ny) return null;
-    return this.floors[j * this.nx + i];
-  }
 }
 
 /** Pas de grille pour une emprise donnée et une résolution ('fast' | 'standard' | 'fine'). */

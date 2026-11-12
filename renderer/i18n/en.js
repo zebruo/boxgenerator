@@ -12,16 +12,6 @@ export const en = {
     stackable_short: 'Stack',
   },
 
-  // ── SVG panels ──────────────────────────────────────────────────────────
-  panel: {
-    bottom: 'Bottom',
-    top:    'Lid',
-    front:  'Front',
-    back:   'Back',
-    left:   'Left',
-    right:  'Right',
-  },
-
   // ── Contour shapes ──────────────────────────────────────────────────────
   shape: {
     rectangle: 'Rectangle',
@@ -115,11 +105,12 @@ export const en = {
   stats: {
     lines:      'Total lines',
     lines_exec: 'Executable',
-    lines_count: '{{n}} lines',
   },
 
   // ── Inline warnings ─────────────────────────────────────────────────────
   warn: {
+    pin_depth:          '⚠ Depth > stock ({{brut}} mm): the hole goes into the spoilboard to hold the locating pins',
+    partition_small:    '⚠ Compartment too small ({{cell}} mm) — min. {{min}} mm (3 × Ø {{td}} mm)',
     tool_too_large:    '⚠ Tool Ø{{td}}mm ≥ rabbet+clearance ({{ringW}}mm) — use Ø < {{ringW}}mm',
     bean_ratio:        '⚠ Ratio outside recommended CNC range (0.5 – 1.5)',
     radius_clamped: 'Radius too large for these dimensions — limited to {{value}} mm (half the smallest dimension).',
@@ -230,7 +221,6 @@ export const en = {
     side:        'SIDE',
     section:     'SECTION A-A',
     flat_panels: 'FLAT PANELS',
-    clearance:   'gap {{val}}mm',
     rabbet:      'rabbet {{val}}',
     wall_thick:  'Wall {{val}}',
     bottom_thick:'Bot. {{val}}',

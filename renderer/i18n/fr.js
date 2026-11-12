@@ -12,16 +12,6 @@ export const fr = {
     stackable_short: 'Empilable',
   },
 
-  // ── Panneaux SVG ────────────────────────────────────────────────────────
-  panel: {
-    bottom: 'Fond',
-    top:    'Couvercle',
-    front:  'Façade',
-    back:   'Arrière',
-    left:   'Gauche',
-    right:  'Droite',
-  },
-
   // ── Formes du contour ───────────────────────────────────────────────────
   shape: {
     rectangle: 'Rectangle',
@@ -115,11 +105,12 @@ export const fr = {
   stats: {
     lines:      'Total lignes',
     lines_exec: 'Exécutables',
-    lines_count: '{{n}} lignes',
   },
 
   // ── Warnings inline ────────────────────────────────────────────────────
   warn: {
+    pin_depth:          '⚠ Prof. > brut ({{brut}} mm) : le trou pénètre dans le martyr pour loger les goupilles de repositionnement',
+    partition_small:    '⚠ Compartiment trop petit ({{cell}} mm) — min. {{min}} mm (3 × Ø {{td}} mm)',
     tool_too_large:    '⚠ Fraise Ø{{td}}mm ≥ feuillure+jeu ({{ringW}}mm) — utiliser Ø < {{ringW}}mm',
     bean_ratio:        '⚠ Ratio hors plage CNC recommandée (0.5 – 1.5)',
     radius_clamped: 'Rayon trop grand pour ces dimensions — limité à {{value}} mm (moitié de la plus petite cote).',
@@ -230,7 +221,6 @@ export const fr = {
     side:        'CÔTÉ',
     section:     'COUPE A-A',
     flat_panels: 'PANNEAUX À PLAT',
-    clearance:   'jeu {{val}}mm',
     rabbet:      'feuillure {{val}}',
     wall_thick:  'Ép. paroi {{val}}',
     bottom_thick:'Ép. fond {{val}}',

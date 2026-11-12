@@ -24,7 +24,6 @@ export class GCodeGenerator {
       unit: 'mm'
     };
     this.lines = [];
-    this.stats = { totalLines: 0, estimatedTime: 0, totalDistance: 0 };
   }
 
   // ─── Primitives G-code ───────────────────────────────────────────────────
@@ -352,7 +351,6 @@ export class GCodeGenerator {
     this.comment(`─── ${label} (${side}${entryLabel}${leadLabel}${faLabel}) ───`);
 
     let leadIn  = leadInR  ? this._leadArc(ptsRough, leadInR, 'in') : null;
-    let leadOut = leadOutR ? this._leadOutArc(ptsRough, leadOutR)   : null;
 
     for (let pass = 1; pass <= passes; pass++) {
       const z = -(stepZ * pass);
@@ -832,7 +830,6 @@ export class GCodeGenerator {
     const helixR     = entryOpts.helixR     ?? this.machine.toolDiameter * 0.5;
     const helixTurns = entryOpts.helixTurns ?? 1;
     const leadInR    = entryOpts.leadIn     ?? false;
-    const leadOutR   = entryOpts.leadOut    ?? false;  // lead-out désactivé : overcut suffit
 
     const leadIn  = leadInR  ? this._leadArc(pts, leadInR, 'in') : null;
 
@@ -1084,41 +1081,6 @@ export class GCodeGenerator {
     this.comment('');
   }
 
-  /**
-   * Pocket rectangulaire (raster zig-zag).
-   */
-  pocketRectangle(x, y, w, h, label = 'Pocket') {
-    const td       = this.machine.toolDiameter;
-    const overlap  = 0.4;
-    const stepOver = td * (1 - overlap);
-    const depth    = this.machine.materialThickness;
-    const passes   = Math.max(1, Math.ceil(depth / this.machine.depthPerPass));
-    const stepZ    = depth / passes;
-
-    this.comment(`─── ${label} — Pocket ${w.toFixed(1)}×${h.toFixed(1)}mm ───`);
-
-    for (let pass = 1; pass <= passes; pass++) {
-      const z = -(stepZ * pass);
-      this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}`);
-      this.rapidZ(this.machine.safeZ);
-
-      let curY = y + td / 2;
-      let dir  = 1;
-      this.rapidTo(x + td / 2, curY);
-      this.plungeTo(z);
-
-      while (curY <= y + h - td / 2) {
-        const x1 = dir > 0 ? x + w - td / 2 : x + td / 2;
-        this.lineTo(x1, curY);
-        curY += stepOver;
-        if (curY <= y + h - td / 2) this.lineTo(x1, curY);
-        dir *= -1;
-      }
-      this.rapidZ(this.machine.safeZ);
-    }
-    this.comment('');
-  }
-
   // ─── Utilitaires ─────────────────────────────────────────────────────────
 
   _maxSegIdx(pts) {
@@ -1274,29 +1236,5 @@ export class GCodeGenerator {
   /** G-code final : arcs G2/G3 regroupés (si machine.arcs) et mots modaux compactés. */
   getCode() {
     return compactGCode(this.lines, { arcs: this.machine.arcs, tol: 0.015 }).join('\n');
-  }
-
-  getStats() {
-    const lineCount = this.lines.length;
-    let dist = 0;
-    let lastX = 0, lastY = 0, lastZ = 0;
-    for (const line of this.lines) {
-      const xm = line.match(/X([-\d.]+)/);
-      const ym = line.match(/Y([-\d.]+)/);
-      const zm = line.match(/Z([-\d.]+)/);
-      const x  = xm ? parseFloat(xm[1]) : lastX;
-      const y  = ym ? parseFloat(ym[1]) : lastY;
-      const z  = zm ? parseFloat(zm[1]) : lastZ;
-      if (line.startsWith('G1')) {
-        dist += Math.hypot(x - lastX, y - lastY, z - lastZ);
-      }
-      lastX = x; lastY = y; lastZ = z;
-    }
-    const timeMin = dist / this.machine.feedrate;
-    return {
-      lines:    lineCount,
-      distance: dist.toFixed(0),
-      timeMin:  timeMin.toFixed(1)
-    };
   }
 }

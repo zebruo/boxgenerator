@@ -44,9 +44,4 @@ export class Oval extends ShapeBase {
     return angles.map(at);
   }
 
-  getSVGPath() {
-    const rx = this.params.length / 2;
-    const ry = this.params.width / 2;
-    return `M${2 * rx},${ry} A${rx},${ry} 0 1 1 ${2 * rx - 0.001},${ry} Z`;
-  }
 }

@@ -835,29 +835,16 @@ export class TechnicalView {
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  /** Retourne les descripteurs de param correspondant à W et D */
-  _getWDParams(shape) {
-    const descs = shape.getParamDescriptors ? shape.getParamDescriptors() : [];
-    const byId  = Object.fromEntries(descs.map(d => [d.id, d]));
-    const mk    = id => byId[id]
-      ? { id, value: shape.params[id] ?? byId[id].min, min: byId[id].min, max: byId[id].max }
-      : null;
-    const lP  = mk('length') ?? mk('diameter');
-    const wdP = mk('width')  ?? (lP?.id === 'diameter' ? null : mk('diameter'));
-    // Si wP et dP pointent vers le même paramètre (ex: cercle → diameter),
-    // dP = null pour éviter une cote verticale cliquable redondante.
-    return {
-      wP: lP,
-      dP: (wdP?.id && wdP.id !== lP?.id) ? wdP : null,
-    };
-  }
-
   // ── Vue panneau plat — Boîte encoches ─────────────────────────────────────
   _viewFingerJoint(CW, CH, boxType, shape, boxParams) {
-    const ctx    = this.ctx;
-    const panels = boxType.getFlatPanels(shape, boxParams);
-    if (!panels || panels.length === 0) return;
+    const ctx = this.ctx;
+    // Mêmes contours que le G-code, la simulation et l'export SVG
+    const panels = boxType.getDrawing(shape, boxParams).map(d => {
+      const xs = d.pts.map(p => p.x), ys = d.pts.map(p => p.y);
+      const bMinX = Math.min(...xs), bMaxX = Math.max(...xs), bMinY = Math.min(...ys), bMaxY = Math.max(...ys);
+      return { pts: d.pts, label: d.label, bMinX, bMaxX, bMinY, bMaxY, width: bMaxX - bMinX, height: bMaxY - bMinY };
+    });
+    if (panels.length === 0) return;
 
     // Titre
     ctx.fillStyle = this.C.title;
@@ -888,12 +875,14 @@ export class TechnicalView {
     ctx.scale(sc, -sc);
 
     for (const p of panels) {
-      const path2d = new Path2D(p.path);
-      ctx.fillStyle   = p.color + '26';
-      ctx.fill(path2d);
-      ctx.strokeStyle = p.color;
+      ctx.beginPath();
+      p.pts.forEach((q, i) => i === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y));
+      ctx.closePath();
+      ctx.fillStyle   = this.C.wood;
+      ctx.fill();
+      ctx.strokeStyle = this.C.woodLt;
       ctx.lineWidth   = 1.5 / sc;
-      ctx.stroke(path2d);
+      ctx.stroke();
     }
 
     // Labels en espace pixel (on annule le scale, Y retourné)
@@ -902,7 +891,7 @@ export class TechnicalView {
       const cx = ((p.bMinX + p.bMaxX) / 2) * sc;
       const cy = -((p.bMinY + p.bMaxY) / 2) * sc;
       ctx.font         = '12px monospace';
-      ctx.fillStyle    = p.color;
+      ctx.fillStyle    = this.C.text;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(t(p.label), cx, cy);

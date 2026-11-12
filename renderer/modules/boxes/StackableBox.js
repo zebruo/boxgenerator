@@ -161,19 +161,4 @@ export class StackableBox {
   _mirrorOp2(pts, bb) {
     return pts.map(p => ({ x: bb.width - p.x, y: p.y })).reverse();
   }
-
-  getFlatPanels(shape, params) {
-    const { height = 40 } = params;
-    const bb = shape.getBoundingBox();
-    return [
-      {
-        id: 'body', label: `Corps (H=${height}mm)`,
-        x: 0, y: 0, width: bb.width, height: bb.height,
-        path: shape.getContourPoints().map((p, i) =>
-          `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`
-        ).join(' ') + ' Z',
-        color: '#4a9eff'
-      }
-    ];
-  }
 }
