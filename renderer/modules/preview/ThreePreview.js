@@ -536,7 +536,7 @@ export class ThreePreview {
     const oz = (level === 'top' ? H : 0) + zOffset;
 
     const origin = new THREE.Vector3(ox, oy, oz);
-    const axLen  = Math.max(W, D) * 0.35;
+    const axLen  = Math.max(W, D) * 0.25;   // flèches, pointes et sphère suivent cette longueur
     const hLen   = axLen * 0.22;
     const hRad   = axLen * 0.08;
 
