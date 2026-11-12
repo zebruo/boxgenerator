@@ -320,11 +320,6 @@ function renderShapeParams() {
         updateRabbetToolWarning();
         updatePreview();
       });
-      if (d.id === 'partitionDir' && state.shapeKey !== 'rectangle') {
-        row.querySelector('select').disabled = true;
-        row.style.opacity = '0.4';
-        row.style.pointerEvents = 'none';
-      }
     } else {
       // ── Param numérique ────────────────────────────────────────────────────
       const currentVal = state.shape.params[d.id] ?? state.boxParams[d.id] ?? d.value ?? d.min;
@@ -344,12 +339,7 @@ function renderShapeParams() {
         row.style.opacity = '0.4';
         row.style.pointerEvents = 'none';
       }
-      if (d.id === 'partitions' && state.shapeKey !== 'rectangle') {
-        const inp = row.querySelector('input');
-        inp.disabled = true;
-        row.style.opacity = '0.4';
-        row.style.pointerEvents = 'none';
-      }
+      // Cloisons : disponibles pour toutes les formes (compartiments découpés par la cavité)
       row.querySelector('input').addEventListener('input', e => {
         if (d.readonly) return;
         const val = parseFloat(e.target.value);
