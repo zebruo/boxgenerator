@@ -881,10 +881,10 @@ function showExportModal(sections, machine = {}) {
         <span class="tab-f-lbl">${t('modal.tab_count')}</span>
         <input type="number" id="modal-tab-count"  class="tab-input" value="4"   min="1"   max="12"  step="1">
         <span class="tab-f-lbl">${t('modal.tab_width')}</span>
-        <input type="number" id="modal-tab-width"  class="tab-input" value="4"   min="1"   max="20"  step="0.5">
+        <input type="number" id="modal-tab-width"  class="tab-input" value="8"   min="1"   max="20"  step="0.5">
         <span class="tab-f-unit">mm</span>
         <span class="tab-f-lbl">${t('modal.tab_height')}</span>
-        <input type="number" id="modal-tab-height" class="tab-input" value="1.5" min="0.5" max="10"  step="0.5">
+        <input type="number" id="modal-tab-height" class="tab-input" value="2"   min="0.5" max="10"  step="0.5">
         <span class="tab-f-unit">mm</span>
       </div>
     </div>

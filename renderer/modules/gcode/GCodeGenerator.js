@@ -527,8 +527,8 @@ export class GCodeGenerator {
 
     const hasTabs   = !!tabOpts;
     const tabCount  = hasTabs ? (tabOpts.count  ?? 4)   : 0;
-    const tabWidth  = hasTabs ? (tabOpts.width  ?? 4)   : 0;
-    const tabHeight = hasTabs ? (tabOpts.height ?? 1.5) : 0;
+    const tabWidth  = hasTabs ? (tabOpts.width  ?? 8) : 0;
+    const tabHeight = hasTabs ? (tabOpts.height ?? 2) : 0;
     const tabZ      = -(depth - tabHeight);
 
     const leadInR  = entryOpts.leadIn  ?? false;
@@ -679,7 +679,9 @@ export class GCodeGenerator {
   /**
    * Fraise un contour fermé avec tabs (ponts de maintien).
    *
-   * Les tabs sont répartis uniformément sur le périmètre.
+   * Les tabs sont placés au milieu des portions droites du contour (les plus longues,
+   * réparties au mieux), jamais dans un angle ou un arrondi ; à défaut de portion droite
+   * (cercle, ovale), ils sont répartis uniformément sur le périmètre.
    * Sur les passes intermédiaires, le contour est fraisé normalement.
    * Sur la dernière passe, l'outil remonte à tabZ au passage de chaque tab.
    *
@@ -687,8 +689,8 @@ export class GCodeGenerator {
    * @param {string}       side     - 'outside' | 'inside' | 'center'
    * @param {Object}       tabOpts  - options des tabs
    *   count  {number} : nombre de tabs (défaut 4)
-   *   width  {number} : largeur d'un tab en mm (défaut 4)
-   *   height {number} : hauteur résiduelle du tab en mm (défaut 1.5)
+   *   width  {number} : largeur d'un tab en mm (défaut 8)
+   *   height {number} : hauteur résiduelle du tab en mm (défaut 2)
    * @param {string}       label
    */
   /**
@@ -699,8 +701,8 @@ export class GCodeGenerator {
     if (points.length < 2) return;
 
     const tabCount  = tabOpts.count  ?? 4;
-    const tabWidth  = tabOpts.width  ?? 4;
-    const tabHeight = tabOpts.height ?? 1.5;
+    const tabWidth  = tabOpts.width  ?? 8;
+    const tabHeight = tabOpts.height ?? 2;
 
     const fa       = entryOpts.finishAllowance ?? 0;
     const toolR    = this.machine.toolDiameter / 2;
@@ -745,7 +747,9 @@ export class GCodeGenerator {
     // les segments droits (entre coins consécutifs) et on place chaque tab au
     // milieu du segment le plus long disponible. Fonctionne pour les contours
     // simples (rectangle) comme pour les finger-joints (nombreux coins 90°).
-    const CORNER_THR  = 20;              // degrés — au-delà : coin réel
+    // Seuil bas : un arrondi discrétisé (ex. 11,25° par segment) est une suite de
+    // « coins » ; il n'offre aucun segment assez long, donc aucun tab ne s'y pose.
+    const CORNER_THR  = 1;               // degrés — au-delà : changement de direction
     const cornerMargin = tabWidth / 2 + 2; // marge bord-de-tab → coin (mm)
 
     // Recenser tous les coins (toutes directions confondues)
@@ -765,21 +769,24 @@ export class GCodeGenerator {
 
     // Construire la liste des segments droits entre coins consécutifs
     // et placer un tab au milieu de chacun des N plus longs
-    let safeTabCenters;
-    const nc = allCornerDists.length;
-    if (nc === 0) {
-      // Forme sans coins (cercle, ovale) : répartition uniforme classique
-      safeTabCenters = tabCenters;
-    } else {
+    const straightSegs = () => {
       const sorted = [...allCornerDists].sort((a, b) => a - b);
       const segs = [];
-      for (let i = 0; i < nc; i++) {
+      for (let i = 0; i < sorted.length; i++) {
         const s   = sorted[i];
-        const e   = i + 1 < nc ? sorted[i + 1] : sorted[0] + perimeter;
+        const e   = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + perimeter;
         const len = e - s;
         if (len > tabWidth + cornerMargin)
           segs.push({ center: ((s + e) / 2) % perimeter, len });
       }
+      return segs;
+    };
+    let safeTabCenters;
+    const segs = allCornerDists.length ? straightSegs() : [];
+    if (segs.length === 0) {
+      // Forme sans portion droite assez longue (cercle, ovale, haricot) : répartition uniforme
+      safeTabCenters = tabCenters;
+    } else {
       // Algorithme farthest-first : commence sur le segment le plus long,
       // puis choisit à chaque étape le segment dont le centre est le plus
       // éloigné de tous les tabs déjà placés → répartition maximale
