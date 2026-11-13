@@ -41,17 +41,14 @@ export class OpenTray {
     if (innerW > 0 && innerH > 0) {
       const savedThickness = gen.machine.materialThickness;
       gen.machine.materialThickness = height - bFl;
-      if (partitions > 0) {
-        const cells = buildPartitionContours(bb.width, bb.height, wallThickness, partitions, partitionDir, machineParams.toolDiameter,
-          { minX: bb.minX, minY: bb.minY, cavity: gen.insetContour(pts, wallThickness) });
-        if (cells) {
-          cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`));
-        } else {
-          doPocket(gen.insetContour(pts, wallThickness), t('gcode.op_cavity'));
-        }
-      } else {
-        doPocket(gen.insetContour(pts, wallThickness), t('gcode.op_cavity'));
-      }
+      // Compartiments s'il y a des cloisons, sinon (ou si elles ne tiennent pas) la cavité entière
+      const cavity = gen.insetContour(pts, wallThickness);
+      const cells = partitions > 0
+        ? buildPartitionContours(bb.width, bb.height, wallThickness, partitions, partitionDir, machineParams.toolDiameter,
+            { minX: bb.minX, minY: bb.minY, cavity })
+        : null;
+      if (cells) cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`));
+      else       doPocket(cavity, t('gcode.op_cavity'));
       gen.machine.materialThickness = savedThickness;
     }
 
@@ -72,9 +69,10 @@ export class OpenTray {
     const wt = params.wallThickness ?? 6;
     const cavity = insetPolygon(pts, wt);
     const bb = shape.getBoundingBox();
+    const partitionDir = params.partitionDir === 'horizontal' ? 'horizontal' : 'vertical';
     const cells = (params.partitions ?? 0) > 0
       ? buildPartitionContours(bb.width, bb.height, wt, params.partitions,
-          params.partitionDir === 'horizontal' ? 'horizontal' : 'vertical', machineParams.toolDiameter ?? 3.175,
+          partitionDir, machineParams.toolDiameter ?? 3.175,
           { minX: bb.minX, minY: bb.minY, cavity })
       : null;
     const inner = cells ?? (cavity.length > 2 ? [cavity] : []);
