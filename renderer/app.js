@@ -793,6 +793,17 @@ function updateInfoBar() {
         : h;
   const stockOffset = parseFloat(document.getElementById('stock-offset').value) || 0;
   document.getElementById('param-thickness').value = (totalH + stockOffset).toFixed(1);
+  // Boîte à couvercle de hauteurs différentes : on montre le brut de chaque pièce (la valeur max
+  // ci-dessus reste celle du G-code, qui garde le brut à la hauteur max pour les deux)
+  const lidH = state.boxParams.lidHeight ?? 15;
+  const twoStocks = state.boxTypeKey === 'lid-box' && Math.abs(h - lidH) > 1e-6;
+  document.getElementById('row-stock').hidden = twoStocks;
+  document.getElementById('row-stock-body').hidden = !twoStocks;
+  document.getElementById('row-stock-lid').hidden  = !twoStocks;
+  if (twoStocks) {
+    document.getElementById('stock-body').value = (h + stockOffset).toFixed(1);
+    document.getElementById('stock-lid').value  = (lidH + stockOffset).toFixed(1);
+  }
   infoDims.textContent = `${bb.width.toFixed(1)} × ${bb.height.toFixed(1)} × ${h.toFixed(1)} mm`;
   const area = (bb.width * bb.height / 100).toFixed(1);
   infoArea.textContent = `${t('info.surface')}: ${area} cm²`;

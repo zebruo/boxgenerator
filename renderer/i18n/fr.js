@@ -68,6 +68,8 @@ export const fr = {
     dimensions:    'Dimensions',
     material_tool: 'Matière & Outil',
     stock:         'Brut',
+    stock_body:    'Brut corps',
+    stock_lid:     'Brut couvercle',
     tool_diameter: 'Diam. fraise',
     depth_per_pass:'Prof. /passe',
     feed_xy:       'Vitesse XY',
@@ -252,6 +254,8 @@ export const fr = {
   // ── Tooltips (data-tip) ─────────────────────────────────────────────────
   tip: {
     stock:            'Épaisseur totale du brut',
+    stock_body:       'Épaisseur du brut du corps. Le G-code garde le brut à la hauteur max pour les deux pièces',
+    stock_lid:        'Épaisseur du brut du couvercle. Le G-code garde le brut à la hauteur max pour les deux pièces',
     tool_diameter:    'Diamètre de la fraise',
     depth_per_pass:   'Profondeur de coupe par passe',
     feed_xy:          "Vitesse d'avance XY",

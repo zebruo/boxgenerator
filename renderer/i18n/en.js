@@ -68,6 +68,8 @@ export const en = {
     dimensions:    'Dimensions',
     material_tool: 'Material & Tool',
     stock:         'Stock',
+    stock_body:    'Body stock',
+    stock_lid:     'Lid stock',
     tool_diameter: 'Tool diam.',
     depth_per_pass:'Depth/pass',
     feed_xy:       'Feed XY',
@@ -252,6 +254,8 @@ export const en = {
   // ── Tooltips (data-tip) ─────────────────────────────────────────────────
   tip: {
     stock:            'Total stock thickness',
+    stock_body:       'Body stock thickness. The G-code keeps the stock at the max height for both parts',
+    stock_lid:        'Lid stock thickness. The G-code keeps the stock at the max height for both parts',
     tool_diameter:    'Tool diameter',
     depth_per_pass:   'Depth of cut per pass',
     feed_xy:          'XY feed rate',

@@ -141,10 +141,22 @@
         <section class="panel-section">
           <h3 class="section-title" data-i18n="ui.material_tool">Matière & Outil</h3>
           <div class="params-list">
-            <div class="param-row" data-tip="tip.stock">
+            <div class="param-row" id="row-stock" data-tip="tip.stock">
               <label data-i18n="ui.stock">Brut</label>
               <input type="number" id="param-thickness" value="6" min="0.5" max="500" step="0.5" readonly
                 tabindex="-1">
+              <span class="param-unit">mm</span>
+            </div>
+            <!-- Boîte à couvercle de hauteurs différentes : un brut par pièce (affichage seulement ;
+                 le G-code garde le brut à la hauteur max, valeur de « param-thickness ») -->
+            <div class="param-row" id="row-stock-body" data-tip="tip.stock_body" hidden>
+              <label data-i18n="ui.stock_body">Brut corps</label>
+              <input type="number" id="stock-body" value="0" readonly tabindex="-1">
+              <span class="param-unit">mm</span>
+            </div>
+            <div class="param-row" id="row-stock-lid" data-tip="tip.stock_lid" hidden>
+              <label data-i18n="ui.stock_lid">Brut couvercle</label>
+              <input type="number" id="stock-lid" value="0" readonly tabindex="-1">
               <span class="param-unit">mm</span>
             </div>
             <div class="param-row" data-tip="tip.tool_diameter">
