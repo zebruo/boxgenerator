@@ -273,7 +273,7 @@ export class TechnicalView {
         ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText('A', x, yA - 14);
+        ctx.fillText('A', x, yA - 21);   // au-dessus de la flèche (qui monte à yA − 17)
       }
       ctx.restore();
     }
