@@ -291,7 +291,7 @@ export function showHelpModal(machine = {}) {
 
         <section class="help-section">
           <h4>Boîte empilable</h4>
-          <p>Corps creux avec un plot qui s'emboîte dans la cavité de la boîte du dessous. Nécessite <strong>deux opérations</strong> avec retournement de la pièce.</p>
+          <p>Corps creux avec un plot (piétement) qui s'emboîte dans la cavité de la boîte du dessous. Nécessite <strong>deux opérations</strong> avec retournement de la pièce.</p>
           <dl class="help-dl">
             <dt>OP 1 — Dessus</dt><dd>Trous de centrage (goupilles) + cavité intérieure depuis le dessus.</dd>
             <dt>Retournement</dt><dd>La pièce est retournée sur ses goupilles et refixée.</dd>
