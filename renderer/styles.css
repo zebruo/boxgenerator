@@ -146,7 +146,8 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .param-row input[type=number]::-webkit-inner-spin-button,
 .export-modal .tab-input::-webkit-inner-spin-button,
 .sim-lbl input[type=number]::-webkit-inner-spin-button,
-#stock-offset::-webkit-inner-spin-button { opacity: 0; margin-left: 2px; cursor: pointer; }
+#stock-offset::-webkit-inner-spin-button,
+#stock-offset-lid::-webkit-inner-spin-button { opacity: 0; margin-left: 2px; cursor: pointer; }
 .param-row input[type=number]:hover::-webkit-inner-spin-button,
 .param-row input[type=number]:focus::-webkit-inner-spin-button,
 .export-modal .tab-input:hover::-webkit-inner-spin-button,
@@ -154,7 +155,9 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .sim-lbl input[type=number]:hover::-webkit-inner-spin-button,
 .sim-lbl input[type=number]:focus::-webkit-inner-spin-button,
 #stock-offset:hover::-webkit-inner-spin-button,
-#stock-offset:focus::-webkit-inner-spin-button { opacity: .8; }
+#stock-offset:focus::-webkit-inner-spin-button,
+#stock-offset-lid:hover::-webkit-inner-spin-button,
+#stock-offset-lid:focus::-webkit-inner-spin-button { opacity: .8; }
 .param-row input[type=number][readonly] {
   color: var(--text-muted); cursor: default; border-style: dashed;
 }
@@ -241,7 +244,9 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   align-items: center; justify-content: center; padding: 0; line-height: 1;
 }
 
-#stock-offset {
+.stock-lid-group { display: contents; }
+.stock-lid-group[hidden] { display: none; }
+#stock-offset, #stock-offset-lid {
   width: 58px; padding: 2px 3px 2px 5px; font-size: 11px; line-height: 18px;
   background: var(--bg-card); border: 1px solid var(--border);
   color: var(--text); border-radius: var(--radius-sm);

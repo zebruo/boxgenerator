@@ -14,7 +14,7 @@ export function stockHeaderLines(thickness, depthPerPass) {
   const stepZ  = thickness / passes;
   const zList  = Array.from({ length: passes }, (_, i) => `Z${-(stepZ * (i + 1)).toFixed(3)}`).join(', ');
   return [
-    `; Brut: ${thickness}mm | ${passes} passe${passes > 1 ? 's' : ''} × ${stepZ.toFixed(3)}mm`,
+    `; Brut: ${+thickness.toFixed(3)}mm | ${passes} passe${passes > 1 ? 's' : ''} × ${stepZ.toFixed(3)}mm`,
     `; Passes: ${zList}`,
   ];
 }

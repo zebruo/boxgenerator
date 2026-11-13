@@ -182,8 +182,8 @@ function bindEvents() {
   });
 
   // Offset brut
-  document.getElementById('stock-offset').addEventListener('input', e => {
-    if (threePreview) { threePreview.stockOffset = Number.parseFloat(e.target.value) || 0; updatePreview(); }
+  for (const id of ['stock-offset', 'stock-offset-lid']) document.getElementById(id).addEventListener('input', () => {
+    updatePreview();
   });
 
   // Côté offset brut (haut / bas)
@@ -556,8 +556,25 @@ function getMachineParams() {
     spindleSpeed:      Number.parseFloat(document.getElementById('param-spindle').value),
     safeZ:             Number.parseFloat(document.getElementById('param-safe-z').value),
     arcs:              document.getElementById('param-arcs').checked,
-    rapidRate:         Number.parseFloat(document.getElementById('param-rapid').value) || 3000  // G0 (temps estimé)
+    rapidRate:         Number.parseFloat(document.getElementById('param-rapid').value) || 3000,  // G0 (temps estimé)
+    // Boîte à couvercle de hauteurs différentes : surplus de brut de chaque pièce (sinon indéfinis)
+    ...stockExtras(),
   };
+}
+
+// Surplus de brut (« Brut + ») : un seul pour tout, sauf boîte à couvercle de hauteurs différentes
+// où chaque pièce a le sien (deux champs dans la barre 3D)
+function stockOffsets() {
+  const num = id => Math.max(0, Number.parseFloat(document.getElementById(id).value) || 0);
+  const h = state.boxParams.height ?? 40, lidH = state.boxParams.lidHeight ?? 15;
+  const two = state.boxTypeKey === 'lid-box' && Math.abs(h - lidH) > 1e-6;
+  const body = num('stock-offset');
+  return { body, lid: two ? num('stock-offset-lid') : body, two, h, lidH };
+}
+
+function stockExtras() {
+  const so = stockOffsets();
+  return so.two ? { stockExtraBody: so.body, stockExtraLid: so.lid } : {};
 }
 
 // ─── Options d'export mémorisées ─────────────────────────────────────────────
@@ -620,7 +637,8 @@ async function openSimulation() {
   const bb = state.boxType.getGCodeBoundingBox
     ? state.boxType.getGCodeBoundingBox(state.shape, state.boxParams, machine)
     : state.shape.getBoundingBox();
-  const margin = Math.max(Number.parseFloat(document.getElementById('stock-offset').value) || 0, machine.toolDiameter * 2 + 4);
+  const so = stockOffsets();
+  const margin = Math.max(so.body, so.lid, machine.toolDiameter * 2 + 4);
   const stock = {
     x0: bb.minX + origin.originX - margin, x1: bb.minX + bb.width  + origin.originX + margin,
     y0: bb.minY + origin.originY - margin, y1: bb.minY + bb.height + origin.originY + margin,
@@ -658,6 +676,7 @@ function lidBoxParts(code, drawing, stock, machine, margin) {
   const iLid  = lines.findIndex(l => l.trim() === '; ═══ COUVERCLE ═══');
   if (iBody < 0 || iLid < 0) return null;
   const extra = Math.max(0, machine.materialThickness - Math.max(H, lidH));   // surplus de brut
+  const extraOf = key => (key === 'lid' ? machine.stockExtraLid : machine.stockExtraBody) ?? extra;
   const part = (key, label, codeLines, height) => {
     const draw = drawing.filter(d => d.part === key);
     const pts = draw.flatMap(d => d.pts);
@@ -667,7 +686,7 @@ function lidBoxParts(code, drawing, stock, machine, margin) {
       stock: {
         x0: Math.min(...xs) - margin, x1: Math.max(...xs) + margin,
         y0: Math.min(...ys) - margin, y1: Math.max(...ys) + margin,
-        top: stock.top, bottom: stock.top - (height + extra),
+        top: stock.top, bottom: stock.top - (height + extraOf(key)),
       },
     };
   };
@@ -682,7 +701,7 @@ function lidBoxParts(code, drawing, stock, machine, margin) {
 function pieceStock(piece, machine) {
   const hBody = state.boxParams.height ?? 40, hLid = state.boxParams.lidHeight ?? 15;
   const extra = Math.max(0, machine.materialThickness - Math.max(hBody, hLid));
-  return (piece === 'lid' ? hLid : hBody) + extra;
+  return piece === 'lid' ? hLid + (machine.stockExtraLid ?? extra) : hBody + (machine.stockExtraBody ?? extra);
 }
 
 // Réécrit les lignes « Brut » et « Passes » de l'en-tête pour l'épaisseur de la pièce exportée
@@ -747,6 +766,10 @@ function resizeCanvases() {
 }
 
 function updatePreview() {
+  if (threePreview) {
+    const so = stockOffsets();
+    threePreview.stockOffset = so.body; threePreview.stockOffsetLid = so.lid;
+  }
   // Choix « À plat / Assemblé » : boîtes en plusieurs pièces (couvercle, encoches)
   document.querySelectorAll('.lid-layout-ctrl').forEach(el => {
     el.style.display = state.boxTypeKey === 'lid-box' || state.boxTypeKey === 'finger-joint' ? '' : 'none';
@@ -818,9 +841,10 @@ function updateInfoBar() {
   // Brut = hauteur de la pièce la plus haute + offset brut
   // Pour finger-joint : brut = épaisseur des panneaux (pas la hauteur de la boîte)
   // Pour lid-box : corps et couvercle taillés dans la même planche → épaisseur = max(height, lidHeight)
-  const stockOffset = Number.parseFloat(document.getElementById('stock-offset').value) || 0;
-  document.getElementById('param-thickness').value = (stockHeight(h) + stockOffset).toFixed(1);
-  updateStockRows(h, stockOffset);
+  const so = stockOffsets();
+  const total = so.two ? Math.max(so.h + so.body, so.lidH + so.lid) : stockHeight(h) + so.body;
+  document.getElementById('param-thickness').value = total.toFixed(1);
+  updateStockRows(so);
   infoDims.textContent = `${bb.width.toFixed(1)} × ${bb.height.toFixed(1)} × ${h.toFixed(1)} mm`;
   const area = (bb.width * bb.height / 100).toFixed(1);
   infoArea.textContent = `${t('info.surface')}: ${area} cm²`;
@@ -829,15 +853,17 @@ function updateInfoBar() {
 
 // Boîte à couvercle de hauteurs différentes : on montre le brut de chaque pièce (la valeur max
 // du champ « Brut » reste celle du G-code, qui garde le brut à la hauteur max pour les deux)
-function updateStockRows(h, stockOffset) {
-  const lidH = state.boxParams.lidHeight ?? 15;
-  const twoStocks = state.boxTypeKey === 'lid-box' && Math.abs(h - lidH) > 1e-6;
-  document.getElementById('row-stock').hidden = twoStocks;
-  document.getElementById('row-stock-body').hidden = !twoStocks;
-  document.getElementById('row-stock-lid').hidden  = !twoStocks;
-  if (twoStocks) {
-    document.getElementById('stock-body').value = (h + stockOffset).toFixed(1);
-    document.getElementById('stock-lid').value  = (lidH + stockOffset).toFixed(1);
+function updateStockRows({ two, h, lidH, body, lid }) {
+  document.getElementById('row-stock').hidden = two;
+  document.getElementById('row-stock-body').hidden = !two;
+  document.getElementById('row-stock-lid').hidden  = !two;
+  document.getElementById('stock-lid-group').hidden = !two;   // second champ « Brut + » (couvercle)
+  const label = document.getElementById('stock-offset-label');
+  label.dataset.i18n = two ? 'ui.stock_offset_body' : 'ui.stock_offset';
+  label.textContent = t(label.dataset.i18n);
+  if (two) {
+    document.getElementById('stock-body').value = (h + body).toFixed(1);
+    document.getElementById('stock-lid').value  = (lidH + lid).toFixed(1);
   }
 }
 

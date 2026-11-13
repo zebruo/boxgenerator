@@ -56,7 +56,7 @@ export function showHelpModal(machine = {}) {
           <dd>Paramètres propres à la forme sélectionnée (largeur, hauteur, rayon…) et au modèle de boîte (hauteur paroi, épaisseur, jeu d'assemblage…). Ces valeurs alimentent directement la génération G-code et la prévisualisation 3D.</dd>
           <dt>Matière &amp; Outil</dt>
           <dd>
-            <strong>Brut</strong> — épaisseur totale calculée automatiquement depuis la hauteur de boîte + surplus de brut <em>Brut +</em> de la barre 3D (lecture seule). Boîte à couvercle de hauteurs différentes : deux lignes, <strong>Brut corps</strong> et <strong>Brut couvercle</strong> (deux bruts).<br>
+            <strong>Brut</strong> — épaisseur totale calculée automatiquement depuis la hauteur de boîte + surplus de brut <em>Brut +</em> de la barre 3D (lecture seule). Boîte à couvercle de hauteurs différentes : deux lignes, <strong>Brut corps</strong> et <strong>Brut couvercle</strong> (deux bruts), chacun avec son propre surplus : la barre 3D affiche alors deux champs <em>Brut +</em> (corps, couvercle) ; saisir par exemple 0,3 pour une planche de 8,6 mm sous un couvercle de 8,3 mm.<br>
             <strong>Diam. fraise</strong> — diamètre de l'outil en mm ; utilisé pour l'offset de contour et les valeurs par défaut de la modale d'export.<br>
             <strong>Prof./passe</strong> — profondeur de coupe par passe Z ; le nombre de passes est déduit automatiquement (⌈brut ÷ prof.⌉).<br>
             <strong>Vitesse XY / Z</strong> — avance en mm/min pour les mouvements de coupe (G1) et de plongée.<br>

@@ -33,6 +33,7 @@ export class ThreePreview {
     this.z0Pos       = 'center'; // 'center' | 'front-left' | 'front-right' | 'back-left' | 'back-right'
     this.z0Level     = 'top'; // 'bottom' (Z=0) | 'top' (Z=visH)
     this.stockOffset = 0;        // mm ajouté sur chaque côté XY en Z
+    this.stockOffsetLid = 0;     // idem pour le brut du couvercle (hauteurs différentes)
     this.stockSide   = 'top';   // 'top' | 'bottom'
     this.lidLayout   = 'flat';  // boîte à couvercle : 'flat' (comme usinée) | 'assembled'
     this._gizmos     = [];
@@ -224,7 +225,7 @@ export class ThreePreview {
       for (const m of pc.bodyMeshes) m.position.z += zBody;
       pc.lid.position.z += zLid;
       this._buildStock(pc.W, pc.D, pc.H,    this.stockOffset, this.stockSide, zBody, 0,     0);
-      this._buildStock(pc.W, pc.D, pc.lidH, this.stockOffset, this.stockSide, zLid,  pc.dx, pc.dy);
+      this._buildStock(pc.W, pc.D, pc.lidH, this.stockOffsetLid, this.stockSide, zLid,  pc.dx, pc.dy);
     } else {
       this._buildStock(layW, layD, machH, this.stockOffset, this.stockSide, zOff);
     }

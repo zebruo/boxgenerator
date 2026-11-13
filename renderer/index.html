@@ -228,9 +228,16 @@
             </div>
             <span class="ctrl-sep">|</span>
             <span class="ctrl-label-sm" id="stock-offset-label" data-i18n="ui.stock_offset">Brut +</span>
-            <input type="number" id="stock-offset" value="0" min="0" max="200" step="1" aria-labelledby="stock-offset-label"
+            <input type="number" id="stock-offset" value="0" min="0" max="200" step="0.1" aria-labelledby="stock-offset-label"
               data-i18n-title="tip.stock_offset" title="Offset du brut par rapport à la boîte">
             <span class="ctrl-label-sm">mm</span>
+            <!-- Boîte à couvercle de hauteurs différentes : un surplus de brut par pièce (corps ci-dessus) -->
+            <span class="stock-lid-group" id="stock-lid-group" hidden>
+              <span class="ctrl-label-sm" id="stock-offset-lid-label" data-i18n="ui.stock_offset_lid">couvercle</span>
+              <input type="number" id="stock-offset-lid" value="0" min="0" max="200" step="0.1" aria-labelledby="stock-offset-lid-label"
+                data-i18n-title="tip.stock_offset_lid" title="Offset du brut du couvercle">
+              <span class="ctrl-label-sm">mm</span>
+            </span>
             <div class="z0-level" data-i18n-title="tip.stock_offset_lvl" title="Appliquer l'offset en haut ou en bas de la boîte">
               <button class="stock-side-btn active" data-side="top" data-i18n-title="tip.stock_top" title="Offset au-dessus">▲</button>
               <button class="stock-side-btn" data-side="bottom" data-i18n-title="tip.stock_bottom" title="Offset en dessous">▼</button>

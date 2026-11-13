@@ -77,8 +77,9 @@ export class LidBox {
     // ne doit pas descendre à l'épaisseur du corps (il entrerait dans le martyr), et
     // inversement. Hauteurs égales : inchangé (= savedT).
     const stockExtra = Math.max(0, savedT - Math.max(height, lidHeight));
-    const bodyT = height    + stockExtra;
-    const lidT  = lidHeight + stockExtra;
+    // Hauteurs différentes : un surplus de brut par pièce (champs « Brut + » corps / couvercle)
+    const bodyT = height    + (machineParams.stockExtraBody ?? stockExtra);
+    const lidT  = lidHeight + (machineParams.stockExtraLid  ?? stockExtra);
     const fa = machineParams.finishAllowance ?? 0;
     const doPocket = machineParams.pocketConc
       ? (pts, lbl, ds = 0) => pocketConcentric(gen, pts, lbl, ds, fa)
