@@ -182,17 +182,23 @@ export class ThreePreview {
     // seulement le centre de la pièce quand ses dimensions changent.
     const center  = new THREE.Vector3(layW / 2, layD / 2, visZCenter);
     const viewKey = `${boxTypeKey}|${lidLay ? this.lidLayout : ''}`;
-    this._frame = { center, size: Math.max(layW, layD, visH) };
-    if (viewKey !== this._viewKey || !this._lastCenter) {
-      this._viewKey = viewKey;
-      this.resetView();
-    } else {
-      const d = center.clone().sub(this._lastCenter);
-      this.camera.position.add(d);
-      this.controls.target.add(d);
-      this.controls.update();
+    const size    = Math.max(layW, layD, visH);
+    // Cote non valide (NaN) : on ne touche pas à la caméra, qui resterait cassée ensuite
+    const finite  = [center.x, center.y, center.z, size].every(Number.isFinite);
+    if (finite) {
+      this._frame = { center, size };
+      const camOk = [this.camera.position, this.controls.target].every(v => Number.isFinite(v.x + v.y + v.z));
+      if (viewKey !== this._viewKey || !this._lastCenter || !camOk) {
+        this._viewKey = viewKey;
+        this.resetView();
+      } else {
+        const d = center.clone().sub(this._lastCenter);
+        this.camera.position.add(d);
+        this.controls.target.add(d);
+        this.controls.update();
+      }
+      this._lastCenter = center;
     }
-    this._lastCenter = center;
 
     // Grille sous la boîte (Z=0 = sol, grille à Z=-1)
     // Boîte empilable : sol entre la boîte usinée et la boîte du dessous (milieu de l'intervalle)

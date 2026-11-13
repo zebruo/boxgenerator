@@ -350,6 +350,9 @@ function renderShapeParams() {
       row.querySelector('input').addEventListener('input', e => {
         if (d.readonly) return;
         const val = parseFloat(e.target.value);
+        // Champ vidé ou saisie en cours (« 8. », « - ») : on attend une valeur valide au lieu
+        // d'envoyer NaN aux formes, au G-code et à l'aperçu
+        if (!Number.isFinite(val)) return;
         if (state.shape.params.hasOwnProperty(d.id)) {
           state.shape.updateParam(d.id, val);
           // Synchronise les inputs liés (ex: longueur/largeur du rectangle)
