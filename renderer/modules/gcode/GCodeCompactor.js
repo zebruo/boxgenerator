@@ -53,32 +53,48 @@ function circle3(a, b, c) {
  */
 const SAG_MAX = 0.1;
 
+/** Écart angulaire a − prev, ramené dans ]−π, π]. */
+function angleStep(a, prev) {
+  let d = a - prev;
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d <= -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+/**
+ * Parcourt les sommets autour du cercle c : renvoie { sweep, sign } (balayage total et sens),
+ * ou null si un sommet s'écarte du cercle, si le sens change, ou si un segment est trop long
+ * (plus d'un quart de tour, ou flèche segment / arc au-delà de SAG_MAX).
+ */
+function arcSweep(pts, c, tol) {
+  let sweep = 0, sign = 0;
+  let prevA = Math.atan2(pts[0].y - c.cy, pts[0].x - c.cx);
+  for (let k = 1; k < pts.length; k++) {
+    const p = pts[k];
+    if (Math.abs(Math.hypot(p.x - c.cx, p.y - c.cy) - c.r) > tol) return null;
+    const a = Math.atan2(p.y - c.cy, p.x - c.cx);
+    const d = angleStep(a, prevA);
+    prevA = a;
+    if (Math.abs(d) < 1e-12) continue;
+    const s = Math.sign(d);
+    const reversed = sign && s !== sign;                                   // changement de sens
+    const tooLong  = Math.abs(d) > Math.PI / 2 ||                          // segment trop long
+                     c.r * (1 - Math.cos(Math.abs(d) / 2)) > SAG_MAX;      // flèche segment / arc
+    if (reversed || tooLong) return null;
+    sign = s;
+    sweep += d;
+  }
+  return { sweep, sign };
+}
+
 /** Teste si la polyligne pts[0..n] est un arc : sommets à tol près du cercle. Renvoie {cx, cy, dir} ou null. */
 function fitArc(pts, tol) {
   const n = pts.length - 1;
   const c = circle3(pts[0], pts[n >> 1], pts[n]);
   if (!c || c.r < 0.05 || c.r > 5000) return null;
-
-  let sweep = 0, sign = 0;
-  let prevA = Math.atan2(pts[0].y - c.cy, pts[0].x - c.cx);
-  for (let k = 1; k <= n; k++) {
-    const p = pts[k];
-    if (Math.abs(Math.hypot(p.x - c.cx, p.y - c.cy) - c.r) > tol) return null;
-    const a = Math.atan2(p.y - c.cy, p.x - c.cx);
-    let d = a - prevA;
-    if (d > Math.PI) d -= 2 * Math.PI;
-    if (d <= -Math.PI) d += 2 * Math.PI;
-    prevA = a;
-    if (Math.abs(d) < 1e-12) continue;
-    const s = Math.sign(d);
-    if (sign && s !== sign) return null;                          // changement de sens
-    sign = s;
-    if (Math.abs(d) > Math.PI / 2) return null;                   // segment trop long
-    if (c.r * (1 - Math.cos(Math.abs(d) / 2)) > SAG_MAX) return null; // flèche segment / arc
-    sweep += d;
-  }
-  if (!sign || Math.abs(sweep) > 1.9 * Math.PI) return null;
-  return { cx: c.cx, cy: c.cy, dir: sign > 0 ? 3 : 2 };
+  const arc = arcSweep(pts, c, tol);
+  if (!arc?.sign || Math.abs(arc.sweep) > 1.9 * Math.PI) return null;
+  return { cx: c.cx, cy: c.cy, dir: arc.sign > 0 ? 3 : 2 };
 }
 
 const MIN_SEGS = 4;   // un arc remplace au moins 4 segments G1
@@ -153,27 +169,26 @@ function fitArcs(recs, tol) {
 // ── Passe 3 : émission, X/Y/Z/F seulement quand ils changent ───────────────
 const differs = (a, b) => a === null || Math.abs(a - b) > EPS;
 
-function formatMove(r, st) {
-  const w = r.words, isArc = r.g === 2 || r.g === 3;
-  const parts = [`G${r.g}`];
-  let hasAxis = false;
+/** Mots X/Y/Z à écrire : sur un arc X et Y toujours (le point final définit l'arc), sinon seulement s'ils changent. */
+function axisWords(w, isArc, st) {
+  const parts = [];
   for (const k of ['X', 'Y', 'Z']) {
     if (!w[k]) continue;
     const key = k.toLowerCase();
-    // Sur un arc, X et Y sont toujours écrits (le point final définit l'arc)
-    if ((isArc && k !== 'Z') || differs(st[key], w[k].v)) { parts.push(k + w[k].tok); hasAxis = true; }
+    if ((isArc && k !== 'Z') || differs(st[key], w[k].v)) parts.push(k + w[k].tok);
     st[key] = w[k].v;
   }
-  if (isArc) {
-    if (w.I) parts.push('I' + w.I.tok);
-    if (w.J) parts.push('J' + w.J.tok);
-  }
-  for (const k of Object.keys(w)) {
-    if ('XYZIJF'.includes(k)) continue;
-    parts.push(k + w[k].tok);   // mots inattendus : conservés tels quels
-    hasAxis = true;
-  }
-  if (!hasAxis && !isArc) return r.comment || null;   // mouvement nul
+  return parts;
+}
+
+function formatMove(r, st) {
+  const w = r.words, isArc = r.g === 2 || r.g === 3;
+  const axes   = axisWords(w, isArc, st);
+  const centre = isArc ? ['I', 'J'].filter(k => w[k]).map(k => k + w[k].tok) : [];
+  // mots inattendus : conservés tels quels
+  const extras = Object.keys(w).filter(k => !'XYZIJF'.includes(k)).map(k => k + w[k].tok);
+  if (axes.length === 0 && extras.length === 0 && !isArc) return r.comment || null;   // mouvement nul
+  const parts = [`G${r.g}`, ...axes, ...centre, ...extras];
   if (w.F && differs(st.f, w.F.v)) { parts.push('F' + w.F.tok); st.f = w.F.v; }
   return r.comment ? `${parts.join(' ')}   ${r.comment}` : parts.join(' ');
 }

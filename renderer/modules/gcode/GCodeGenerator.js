@@ -19,6 +19,74 @@ export function stockHeaderLines(thickness, depthPerPass) {
   ];
 }
 
+/**
+ * Placement des tabs aux milieux des segments droits : au lieu d'une distribution uniforme
+ * + filtrage (qui place des tabs sur des angles quand les positions tombent sur des
+ * transitions), on repère les coins, on en déduit les segments droits entre coins consécutifs
+ * et on place chaque tab au milieu du segment le plus long disponible. Fonctionne pour les
+ * contours simples (rectangle) comme pour les finger-joints (nombreux coins à 90°).
+ * Seuil bas : un arrondi discrétisé (ex. 11,25° par segment) est une suite de « coins » ;
+ * il n'offre aucun segment assez long, donc aucun tab ne s'y pose.
+ */
+const CORNER_THR   = 1;   // degrés — au-delà : changement de direction
+const CORNER_CLEAR = 1;   // dégagement mini (mm) entre le trajet relevé et chaque coin
+
+/** Abscisses curvilignes de tous les coins du contour fermé (toutes directions confondues). */
+function cornerDistances(pts, segLengths) {
+  const n = pts.length, dists = [];
+  let cd = 0;
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n], curr = pts[i], next = pts[(i + 1) % n];
+    const d1x = curr.x - prev.x, d1y = curr.y - prev.y;
+    const d2x = next.x - curr.x, d2y = next.y - curr.y;
+    const l1  = Math.hypot(d1x, d1y) || 1, l2 = Math.hypot(d2x, d2y) || 1;
+    const cosA = Math.max(-1, Math.min(1, (d1x/l1)*(d2x/l2) + (d1y/l1)*(d2y/l2)));
+    if (Math.acos(cosA) * 180 / Math.PI > CORNER_THR) dists.push(cd);
+    cd += segLengths[i];
+  }
+  return dists;
+}
+
+/** Segments droits assez longs pour un tab (longueur relevée `width` + dégagement aux coins). */
+function straightSegments(cornerDists, perimeter, width) {
+  const sorted = [...cornerDists].sort((a, b) => a - b);
+  const segs = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const s   = sorted[i];
+    const e   = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + perimeter;
+    const len = e - s;
+    if (len > width + 2 * CORNER_CLEAR) segs.push({ center: ((s + e) / 2) % perimeter, len });
+  }
+  return segs;
+}
+
+/**
+ * Algorithme farthest-first : commence sur le segment le plus long, puis choisit à chaque
+ * étape le segment dont le centre est le plus éloigné de tous les tabs déjà placés →
+ * répartition maximale indépendamment du point de départ du contour.
+ */
+function spreadTabs(segs, count, perimeter) {
+  segs = [...segs].sort((a, b) => b.len - a.len);   // par longueur décroissante
+  const centers = [segs[0].center];
+  const used = new Array(segs.length).fill(false);
+  used[0] = true;
+  while (centers.length < count) {
+    let best = -1, bestMinDist = -1;
+    for (let i = 0; i < segs.length; i++) {
+      if (used[i]) continue;
+      const minDist = Math.min(...centers.map(placed => {
+        const d = Math.abs(segs[i].center - placed);
+        return Math.min(d, perimeter - d);
+      }));
+      if (minDist > bestMinDist) { bestMinDist = minDist; best = i; }
+    }
+    if (best < 0) break;
+    centers.push(segs[best].center);
+    used[best] = true;
+  }
+  return centers;
+}
+
 /** Signe du décalage d'outil selon le côté : dehors −1, dedans +1, sur le trait 0. */
 const SIDE_SIGN = { outside: -1, inside: 1 };
 const sideSign = side => SIDE_SIGN[side] ?? 0;
@@ -803,88 +871,12 @@ export class GCodeGenerator {
    * @param {number} width - longueur relevée d'un tab sur le trajet (pont + Ø)
    */
   _placeTabs(pts, segLengths, perimeter, count, width) {
-    const n = pts.length;
-    // ── Positions curvilignes des centres de tabs ────────────────────────────
-    // Répartition uniforme, premier tab à la moitié de l'intervalle
-    const tabCenters = [];
-    for (let t = 0; t < count; t++) {
-      tabCenters.push((perimeter / count) * (t + 0.5));
-    }
-
-    // ── Placement des tabs aux milieux des segments droits ───────────────────
-    // Au lieu d'une distribution uniforme + filtrage (qui place des tabs sur des
-    // angles quand les positions tombent sur des transitions), on identifie tous
-    // les segments droits (entre coins consécutifs) et on place chaque tab au
-    // milieu du segment le plus long disponible. Fonctionne pour les contours
-    // simples (rectangle) comme pour les finger-joints (nombreux coins 90°).
-    // Seuil bas : un arrondi discrétisé (ex. 11,25° par segment) est une suite de
-    // « coins » ; il n'offre aucun segment assez long, donc aucun tab ne s'y pose.
-    const CORNER_THR  = 1;               // degrés — au-delà : changement de direction
-    const CORNER_CLEAR = 1;                // dégagement mini (mm) entre le trajet relevé et chaque coin
-
-    // Recenser tous les coins (toutes directions confondues)
-    const allCornerDists = [];
-    {
-      let cd = 0;
-      for (let i = 0; i < n; i++) {
-        const prev = pts[(i - 1 + n) % n], curr = pts[i], next = pts[(i + 1) % n];
-        const d1x = curr.x - prev.x, d1y = curr.y - prev.y;
-        const d2x = next.x - curr.x, d2y = next.y - curr.y;
-        const l1  = Math.hypot(d1x, d1y) || 1, l2 = Math.hypot(d2x, d2y) || 1;
-        const cosA = Math.max(-1, Math.min(1, (d1x/l1)*(d2x/l2) + (d1y/l1)*(d2y/l2)));
-        if (Math.acos(cosA) * 180 / Math.PI > CORNER_THR) allCornerDists.push(cd);
-        cd += segLengths[i];
-      }
-    }
-
-    // Construire la liste des segments droits entre coins consécutifs
-    // et placer un tab au milieu de chacun des N plus longs
-    const straightSegs = () => {
-      const sorted = [...allCornerDists].sort((a, b) => a - b);
-      const segs = [];
-      for (let i = 0; i < sorted.length; i++) {
-        const s   = sorted[i];
-        const e   = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + perimeter;
-        const len = e - s;
-        if (len > width + 2 * CORNER_CLEAR)
-          segs.push({ center: ((s + e) / 2) % perimeter, len });
-      }
-      return segs;
-    };
-    let safeTabCenters;
-    const segs = allCornerDists.length ? straightSegs() : [];
-    if (segs.length === 0) {
-      // Forme sans portion droite assez longue (cercle, ovale, haricot) : répartition uniforme
-      safeTabCenters = tabCenters;
-    } else {
-      // Algorithme farthest-first : commence sur le segment le plus long,
-      // puis choisit à chaque étape le segment dont le centre est le plus
-      // éloigné de tous les tabs déjà placés → répartition maximale
-      // indépendamment du point de départ du contour.
-      segs.sort((a, b) => b.len - a.len); // tri par longueur décroissante
-      safeTabCenters = [];
-      const used = new Array(segs.length).fill(false);
-      if (segs.length > 0) {
-        safeTabCenters.push(segs[0].center);
-        used[0] = true;
-      }
-      while (safeTabCenters.length < count) {
-        let best = -1, bestMinDist = -1;
-        for (let i = 0; i < segs.length; i++) {
-          if (used[i]) continue;
-          const c = segs[i].center;
-          const minDist = Math.min(...safeTabCenters.map(placed => {
-            const d = Math.abs(c - placed);
-            return Math.min(d, perimeter - d);
-          }));
-          if (minDist > bestMinDist) { bestMinDist = minDist; best = i; }
-        }
-        if (best < 0) break;
-        safeTabCenters.push(segs[best].center);
-        used[best] = true;
-      }
-    }
-    return safeTabCenters;
+    const corners = cornerDistances(pts, segLengths);
+    const segs = corners.length ? straightSegments(corners, perimeter, width) : [];
+    if (segs.length > 0) return spreadTabs(segs, count, perimeter);
+    // Forme sans portion droite assez longue (cercle, ovale, haricot) : répartition uniforme,
+    // premier tab à la moitié de l'intervalle
+    return Array.from({ length: count }, (_, t) => (perimeter / count) * (t + 0.5));
   }
 
   /**
