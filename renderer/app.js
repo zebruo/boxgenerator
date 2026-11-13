@@ -815,11 +815,18 @@ function updateInfoBar() {
   // Brut = hauteur de la pièce la plus haute + offset brut
   // Pour finger-joint : brut = épaisseur des panneaux (pas la hauteur de la boîte)
   // Pour lid-box : corps et couvercle taillés dans la même planche → épaisseur = max(height, lidHeight)
-  const totalH = stockHeight(h);
   const stockOffset = Number.parseFloat(document.getElementById('stock-offset').value) || 0;
-  document.getElementById('param-thickness').value = (totalH + stockOffset).toFixed(1);
-  // Boîte à couvercle de hauteurs différentes : on montre le brut de chaque pièce (la valeur max
-  // ci-dessus reste celle du G-code, qui garde le brut à la hauteur max pour les deux)
+  document.getElementById('param-thickness').value = (stockHeight(h) + stockOffset).toFixed(1);
+  updateStockRows(h, stockOffset);
+  infoDims.textContent = `${bb.width.toFixed(1)} × ${bb.height.toFixed(1)} × ${h.toFixed(1)} mm`;
+  const area = (bb.width * bb.height / 100).toFixed(1);
+  infoArea.textContent = `${t('info.surface')}: ${area} cm²`;
+  updateSheetSize();
+}
+
+// Boîte à couvercle de hauteurs différentes : on montre le brut de chaque pièce (la valeur max
+// du champ « Brut » reste celle du G-code, qui garde le brut à la hauteur max pour les deux)
+function updateStockRows(h, stockOffset) {
   const lidH = state.boxParams.lidHeight ?? 15;
   const twoStocks = state.boxTypeKey === 'lid-box' && Math.abs(h - lidH) > 1e-6;
   document.getElementById('row-stock').hidden = twoStocks;
@@ -829,12 +836,11 @@ function updateInfoBar() {
     document.getElementById('stock-body').value = (h + stockOffset).toFixed(1);
     document.getElementById('stock-lid').value  = (lidH + stockOffset).toFixed(1);
   }
-  infoDims.textContent = `${bb.width.toFixed(1)} × ${bb.height.toFixed(1)} × ${h.toFixed(1)} mm`;
-  const area = (bb.width * bb.height / 100).toFixed(1);
-  infoArea.textContent = `${t('info.surface')}: ${area} cm²`;
+}
 
-  // Taille plaque conseillée : emprise réelle des pièces (mêmes contours que le G-code,
-  // la simulation et l'export SVG) + trous hors pièce, plus une marge de chaque côté
+// Taille de plaque conseillée : emprise réelle des pièces (mêmes contours que le G-code,
+// la simulation et l'export SVG) + trous hors pièce, plus une marge de chaque côté
+function updateSheetSize() {
   const margin = 20;
   const ext = items => {
     const xs = items.flatMap(d => d.pts.map(p => p.x)), ys = items.flatMap(d => d.pts.map(p => p.y));
@@ -939,25 +945,21 @@ function parseGCodeSections(code) {
     }
   }
   if (currentSec) sections.push(currentSec);
-
-  // Extrait le pied de programme (M5 / M30) de la dernière section optionnelle
-  const lastOp = sections.at(-1);
-  if (lastOp && !lastOp.required) {
-    let footerStart = -1;
-    for (let i = lastOp.lines.length - 1; i >= 0; i--) {
-      if (lastOp.lines[i].trim().startsWith('M5')) {
-        footerStart = i;
-        while (footerStart > 0 && lastOp.lines[footerStart - 1].trim() === '') footerStart--;
-        break;
-      }
-    }
-    if (footerStart >= 0) {
-      const footerLines = lastOp.lines.splice(footerStart);
-      sections.push({ label: t('modal.footer_section'), lines: footerLines, required: true });
-    }
-  }
-
+  splitFooter(sections);
   return sections;
+}
+
+// Extrait le pied de programme (M5 / M30) de la dernière section optionnelle : il devient une
+// section obligatoire à part (les lignes vides qui le précèdent le suivent)
+function splitFooter(sections) {
+  const lastOp = sections.at(-1);
+  if (!lastOp || lastOp.required) return;
+  const m5 = lastOp.lines.findLastIndex(l => l.trim().startsWith('M5'));
+  if (m5 < 0) return;
+  let footerStart = m5;
+  while (footerStart > 0 && lastOp.lines[footerStart - 1].trim() === '') footerStart--;
+  const footerLines = lastOp.lines.splice(footerStart);
+  sections.push({ label: t('modal.footer_section'), lines: footerLines, required: true });
 }
 
 function showExportModal(sections, machine = {}) {
@@ -1409,21 +1411,7 @@ async function loadSession() {
   let session;
   try { session = JSON.parse(result.content); } catch { return; }
 
-  // Compatibilité des anciennes sessions
-  let shapeKey = session.shapeKey ?? 'rectangle';
-  let shapeParams = session.shapeParams ? { ...session.shapeParams } : null;
-  if (shapeKey === 'hexagon') {
-    // Hexagone supprimé : polygone à 6 côtés, mêmes cotes, rayon et rotation
-    shapeKey = 'polygon';
-    if (shapeParams) shapeParams = {
-      length: shapeParams.longueur, width: shapeParams.largeur, sides: 6,
-      cornerRadius: shapeParams.cornerRadius ?? 0, orientation: shapeParams.orientation ?? 0,
-    };
-  } else if (shapeKey === 'bean' && (session.version ?? 1) < 2 && shapeParams) {
-    // Avant la version 2, la longueur du haricot était sur Y : on garde la même pièce
-    [shapeParams.length, shapeParams.width] = [shapeParams.width, shapeParams.length];
-  }
-  if (!SHAPES[shapeKey]) shapeKey = 'rectangle';
+  const { shapeKey, shapeParams } = migrateSessionShape(session);
 
   // Restaure type de boîte et forme
   selectBoxType(session.boxTypeKey ?? 'open-tray');
@@ -1443,34 +1431,55 @@ async function loadSession() {
     renderShapeParams();
   }
 
-  // Restaure params machine
-  if (session.machineParams) {
-    const mp = session.machineParams;
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-    set('param-thickness',    mp.materialThickness);
-    set('param-tool-diameter',mp.toolDiameter);
-    set('param-passes',       session.depthPerPass ?? mp.depthPerPass);
-    set('param-feedrate',     mp.feedrate);
-    set('param-plunge',       mp.plungeRate);
-    set('param-spindle',      mp.spindleSpeed);
-    set('param-safe-z',       mp.safeZ);
-    if (typeof mp.arcs === 'boolean') document.getElementById('param-arcs').checked = mp.arcs;
-    if (mp.rapidRate > 0) set('param-rapid', mp.rapidRate);
-  }
-
-  // Restaure Z0
-  if (session.z0) {
-    document.querySelectorAll('.z0-btn').forEach(b => b.classList.toggle('active', b.dataset.pos === session.z0.pos));
-    document.querySelectorAll('.z0-lvl-btn').forEach(b => b.classList.toggle('active', b.dataset.level === session.z0.level));
-    // Le repère Z0 de la vue 3D suit les boutons (l'export les lit déjà)
-    if (threePreview) {
-      const z0 = getZ0Settings();
-      threePreview.z0Pos = z0.pos; threePreview.z0Level = z0.level;
-    }
-  }
+  if (session.machineParams) restoreMachineParams(session.machineParams, session.depthPerPass);
+  if (session.z0) restoreZ0(session.z0);
 
   updatePreview();
   updateInfoBar();
+}
+
+// Forme et paramètres d'une session, avec compatibilité des anciennes versions
+function migrateSessionShape(session) {
+  let shapeKey = session.shapeKey ?? 'rectangle';
+  let shapeParams = session.shapeParams ? { ...session.shapeParams } : null;
+  if (shapeKey === 'hexagon') {
+    // Hexagone supprimé : polygone à 6 côtés, mêmes cotes, rayon et rotation
+    shapeKey = 'polygon';
+    if (shapeParams) shapeParams = {
+      length: shapeParams.longueur, width: shapeParams.largeur, sides: 6,
+      cornerRadius: shapeParams.cornerRadius ?? 0, orientation: shapeParams.orientation ?? 0,
+    };
+  } else if (shapeKey === 'bean' && (session.version ?? 1) < 2 && shapeParams) {
+    // Avant la version 2, la longueur du haricot était sur Y : on garde la même pièce
+    [shapeParams.length, shapeParams.width] = [shapeParams.width, shapeParams.length];
+  }
+  if (!SHAPES[shapeKey]) shapeKey = 'rectangle';
+  return { shapeKey, shapeParams };
+}
+
+// Restaure les paramètres machine du panneau gauche
+function restoreMachineParams(mp, depthPerPass) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  set('param-thickness',    mp.materialThickness);
+  set('param-tool-diameter',mp.toolDiameter);
+  set('param-passes',       depthPerPass ?? mp.depthPerPass);
+  set('param-feedrate',     mp.feedrate);
+  set('param-plunge',       mp.plungeRate);
+  set('param-spindle',      mp.spindleSpeed);
+  set('param-safe-z',       mp.safeZ);
+  if (typeof mp.arcs === 'boolean') document.getElementById('param-arcs').checked = mp.arcs;
+  if (mp.rapidRate > 0) set('param-rapid', mp.rapidRate);
+}
+
+// Restaure la position et le niveau du repère Z0
+function restoreZ0(z0) {
+  document.querySelectorAll('.z0-btn').forEach(b => b.classList.toggle('active', b.dataset.pos === z0.pos));
+  document.querySelectorAll('.z0-lvl-btn').forEach(b => b.classList.toggle('active', b.dataset.level === z0.level));
+  // Le repère Z0 de la vue 3D suit les boutons (l'export les lit déjà)
+  if (threePreview) {
+    const cur = getZ0Settings();
+    threePreview.z0Pos = cur.pos; threePreview.z0Level = cur.level;
+  }
 }
 
 async function exportSVG() {
