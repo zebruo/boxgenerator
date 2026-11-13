@@ -104,6 +104,9 @@ function updateI18n() {
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
     el.title = t(el.dataset.i18nTitle);
   });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+    el.setAttribute('aria-label', t(el.dataset.i18nAria));
+  });
   // Sync le sélecteur de langue avec la langue courante
   const switcher = document.getElementById('lang-switcher');
   if (switcher) switcher.value = currentLang();

@@ -70,6 +70,8 @@ export const fr = {
     stock:         'Brut',
     stock_body:    'Brut corps',
     stock_lid:     'Brut couvercle',
+    panel_params:  'Paramètres',
+    panel_gcode:   'G-code',
     tool_diameter: 'Diam. fraise',
     depth_per_pass:'Prof. /passe',
     feed_xy:       'Vitesse XY',

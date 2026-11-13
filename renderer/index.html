@@ -38,8 +38,8 @@
             </div>
             <div class="settings-sep"></div>
             <div class="settings-row">
-              <span data-i18n="settings.language">Langue</span>
-              <select id="lang-switcher" class="settings-lang-select">
+              <span id="lang-label" data-i18n="settings.language">Langue</span>
+              <select id="lang-switcher" class="settings-lang-select" aria-labelledby="lang-label">
                 <option value="fr">FR</option>
                 <option value="en">EN</option>
               </select>
@@ -52,7 +52,7 @@
 
     <div class="workspace">
       <!-- Panel gauche: Paramètres -->
-      <aside class="panel-left">
+      <aside class="panel-left" data-i18n-aria="ui.panel_params" aria-label="Paramètres">
 
         <!-- Section: Type de modèle -->
         <section class="panel-section">
@@ -142,7 +142,7 @@
           <h3 class="section-title" data-i18n="ui.material_tool">Matière & Outil</h3>
           <div class="params-list">
             <div class="param-row" id="row-stock" data-tip="tip.stock">
-              <label data-i18n="ui.stock">Brut</label>
+              <label for="param-thickness" data-i18n="ui.stock">Brut</label>
               <input type="number" id="param-thickness" value="6" min="0.5" max="500" step="0.5" readonly
                 tabindex="-1">
               <span class="param-unit">mm</span>
@@ -150,32 +150,32 @@
             <!-- Boîte à couvercle de hauteurs différentes : un brut par pièce (affichage seulement ;
                  le G-code garde le brut à la hauteur max, valeur de « param-thickness ») -->
             <div class="param-row" id="row-stock-body" data-tip="tip.stock_body" hidden>
-              <label data-i18n="ui.stock_body">Brut corps</label>
+              <label for="stock-body" data-i18n="ui.stock_body">Brut corps</label>
               <input type="number" id="stock-body" value="0" readonly tabindex="-1">
               <span class="param-unit">mm</span>
             </div>
             <div class="param-row" id="row-stock-lid" data-tip="tip.stock_lid" hidden>
-              <label data-i18n="ui.stock_lid">Brut couvercle</label>
+              <label for="stock-lid" data-i18n="ui.stock_lid">Brut couvercle</label>
               <input type="number" id="stock-lid" value="0" readonly tabindex="-1">
               <span class="param-unit">mm</span>
             </div>
             <div class="param-row" data-tip="tip.tool_diameter">
-              <label data-i18n="ui.tool_diameter">Diam. fraise</label>
+              <label for="param-tool-diameter" data-i18n="ui.tool_diameter">Diam. fraise</label>
               <input type="number" id="param-tool-diameter" value="3.175" min="0.5" max="25" step="any">
               <span class="param-unit">mm</span>
             </div>
             <div class="param-row" data-tip="tip.depth_per_pass">
-              <label data-i18n="ui.depth_per_pass">Prof. /passe</label>
+              <label for="param-passes" data-i18n="ui.depth_per_pass">Prof. /passe</label>
               <input type="number" id="param-passes" value="1.5" min="0.1" max="50" step="any">
               <span class="param-unit">mm</span>
             </div>
             <div class="param-row" data-tip="tip.feed_xy">
-              <label data-i18n="ui.feed_xy">Vitesse XY</label>
+              <label for="param-feedrate" data-i18n="ui.feed_xy">Vitesse XY</label>
               <input type="number" id="param-feedrate" value="800" min="100" max="10000" step="100">
               <span class="param-unit">mm/min</span>
             </div>
             <div class="param-row" data-tip="tip.feed_z">
-              <label data-i18n="ui.feed_z">Vitesse Z</label>
+              <label for="param-plunge" data-i18n="ui.feed_z">Vitesse Z</label>
               <input type="number" id="param-plunge" value="300" min="50" max="2000" step="50">
               <span class="param-unit">mm/min</span>
             </div>
@@ -185,12 +185,12 @@
               <span class="param-unit">mm/min</span>
             </div>
             <div class="param-row" data-tip="tip.spindle">
-              <label data-i18n="ui.spindle">Broche</label>
+              <label for="param-spindle" data-i18n="ui.spindle">Broche</label>
               <input type="number" id="param-spindle" value="12000" min="1000" max="30000" step="1000">
               <span class="param-unit">tr/min</span>
             </div>
             <div class="param-row" data-tip="tip.safe_z">
-              <label data-i18n="ui.safe_z">Survol Z</label>
+              <label for="param-safe-z" data-i18n="ui.safe_z">Survol Z</label>
               <input type="number" id="param-safe-z" value="5" min="1" max="50" step="1">
               <span class="param-unit">mm</span>
             </div>
@@ -227,8 +227,8 @@
               <button class="z0-btn" data-pos="front-right" data-i18n-title="tip.z0_front_right" title="Avant droit">↘</button>
             </div>
             <span class="ctrl-sep">|</span>
-            <span class="ctrl-label-sm" data-i18n="ui.stock_offset">Brut +</span>
-            <input type="number" id="stock-offset" value="0" min="0" max="200" step="1"
+            <span class="ctrl-label-sm" id="stock-offset-label" data-i18n="ui.stock_offset">Brut +</span>
+            <input type="number" id="stock-offset" value="0" min="0" max="200" step="1" aria-labelledby="stock-offset-label"
               data-i18n-title="tip.stock_offset" title="Offset du brut par rapport à la boîte">
             <span class="ctrl-label-sm">mm</span>
             <div class="z0-level" data-i18n-title="tip.stock_offset_lvl" title="Appliquer l'offset en haut ou en bas de la boîte">
@@ -260,7 +260,7 @@
       </main>
 
       <!-- Panel droit: G-code -->
-      <aside class="panel-right">
+      <aside class="panel-right" data-i18n-aria="ui.panel_gcode" aria-label="G-code">
         <div class="gcode-header">
           <span class="section-title" data-i18n="ui.gcode_panel">G-code</span>
           <div class="gcode-header-actions">

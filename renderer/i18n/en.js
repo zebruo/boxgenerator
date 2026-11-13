@@ -70,6 +70,8 @@ export const en = {
     stock:         'Stock',
     stock_body:    'Body stock',
     stock_lid:     'Lid stock',
+    panel_params:  'Parameters',
+    panel_gcode:   'G-code',
     tool_diameter: 'Tool diam.',
     depth_per_pass:'Depth/pass',
     feed_xy:       'Feed XY',
