@@ -184,7 +184,7 @@ export class TechnicalView {
     const ctx = this.ctx;
     ctx.fillStyle = this.C.panel;
     ctx.fillRect(ox + 1, oy + 1, qW - 2, qH - 2);
-    ctx.font      = 'bold 10px monospace';
+    ctx.font      = 'bold 12px monospace';
     ctx.fillStyle = this.C.title;
     ctx.textAlign = 'left';
     ctx.fillText(title, ox + 10, oy + 17);
@@ -270,7 +270,7 @@ export class TechnicalView {
       for (const x of [xa, xb]) {
         ctx.beginPath(); ctx.moveTo(x, yA); ctx.lineTo(x, yA - 12); ctx.stroke();
         this._arrV(x, yA - 12, -1);   // pointe vers le haut : coupe vue depuis l'avant
-        ctx.font = 'bold 10px monospace';
+        ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
         ctx.fillText('A', x, yA - 14);
@@ -289,7 +289,7 @@ export class TechnicalView {
       ctx.fillStyle = this.C.text;
       ctx.lineWidth = 0.8;
       ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 14, py - 14); ctx.lineTo(px + 22, py - 14); ctx.stroke();
-      ctx.font = '10px monospace';
+      ctx.font = '12px monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillText(t('view.corner_r', { val: cr.toFixed(1) }), px + 24, py - 14);
@@ -338,7 +338,7 @@ export class TechnicalView {
       this._dimH(holeXL + holeR, shapeL, dimOffY,
         `${regHoleOffset.toFixed(0)}`, null, false, regHoleOffset);
       // Diamètre du trou
-      ctx.font = '9px monospace'; ctx.fillStyle = this.C.dim;
+      ctx.font = '11px monospace'; ctx.fillStyle = this.C.dim;
       ctx.textAlign = 'center'; ctx.textBaseline = 'top';
       ctx.fillText(`Ø${regHoleDia.toFixed(0)}`, holeXL, holeYC + holeR + 3);
       ctx.restore();
@@ -597,7 +597,7 @@ export class TechnicalView {
     // Épaisseur du fond (texte à gauche)
     const left = Math.min(...prof.filter(l => l.part === 'body').flatMap(l => l.iv.map(i => i[0])));
     ctx.save();
-    ctx.font = '9px monospace';
+    ctx.font = '11px monospace';
     ctx.fillStyle = this.C.dimLine;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
@@ -615,10 +615,10 @@ export class TechnicalView {
     if (boxTypeKey === 'stackable' && rimH > 0) notes.push(t('view.plot_note', { h: rimH.toFixed(1), j: jeu.toFixed(2) }));
     if (notes.length) {
       ctx.save();
-      ctx.font = '9px monospace';
+      ctx.font = '11px monospace';
       ctx.fillStyle = this.C.text;
       ctx.textAlign = 'left';
-      notes.forEach((n, i) => ctx.fillText(n, ox + 10, oy + 32 + i * 12));
+      notes.forEach((n, i) => ctx.fillText(n, ox + 10, oy + 36 + i * 14));
       ctx.restore();
     }
   }
@@ -660,9 +660,9 @@ export class TechnicalView {
 
     // Label
     const mx = (x1 + x2) / 2;
-    ctx.font = `${clickable ? 'bold ' : ''}10px monospace`;
+    ctx.font = `${clickable ? 'bold ' : ''}12px monospace`;
     const tw = ctx.measureText(label).width;
-    const th = 13;
+    const th = 16;
     ctx.fillStyle = this.C.panel;
     ctx.fillRect(mx - tw / 2 - 3, y - th / 2, tw + 6, th);
     ctx.fillStyle = clickable ? this.C.dim : this.C.text;
@@ -715,9 +715,9 @@ export class TechnicalView {
     ctx.save();
     ctx.translate(x, my);
     ctx.rotate(-Math.PI / 2);
-    ctx.font = `${clickable ? 'bold ' : ''}10px monospace`;
+    ctx.font = `${clickable ? 'bold ' : ''}12px monospace`;
     const tw = ctx.measureText(label).width;
-    const th = 13;
+    const th = 16;
     ctx.fillStyle = this.C.panel;
     ctx.fillRect(-tw / 2 - 3, -th / 2, tw + 6, th);
     ctx.fillStyle    = clickable ? this.C.dim : this.C.text;
@@ -801,7 +801,7 @@ export class TechnicalView {
       color:        '#f0c040',
       border:       '1.5px solid #f0c040',
       borderRadius: '4px',
-      font:         'bold 12px monospace',
+      font:         'bold 13px monospace',
       textAlign:    'center',
       zIndex:       '9999',
       outline:      'none',
@@ -848,7 +848,7 @@ export class TechnicalView {
 
     // Titre
     ctx.fillStyle = this.C.title;
-    ctx.font      = 'bold 10px monospace';
+    ctx.font      = 'bold 12px monospace';
     ctx.textAlign = 'left';
     ctx.fillText(t('view.flat_panels'), 10, 17);
 
@@ -890,14 +890,14 @@ export class TechnicalView {
     for (const p of panels) {
       const cx = ((p.bMinX + p.bMaxX) / 2) * sc;
       const cy = -((p.bMinY + p.bMaxY) / 2) * sc;
-      ctx.font         = '12px monospace';
+      ctx.font         = '13px monospace';
       ctx.fillStyle    = this.C.text;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(t(p.label), cx, cy);
-      ctx.font      = '11px monospace';
+      ctx.font      = '12px monospace';
       ctx.fillStyle = this.C.text;
-      ctx.fillText(`${p.width.toFixed(0)}×${p.height.toFixed(0)}`, cx, cy + 14);
+      ctx.fillText(`${p.width.toFixed(0)}×${p.height.toFixed(0)}`, cx, cy + 16);
     }
 
     ctx.restore();
