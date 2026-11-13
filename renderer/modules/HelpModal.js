@@ -37,7 +37,7 @@ export function showHelpModal(machine = {}) {
         <dl class="help-dl">
           <dt>Modèle de boîte</dt>
           <dd>Choisit le type de construction :
-            <strong>Plateau</strong> (fond + 4 parois inclinées, sans couvercle),
+            <strong>Plateau</strong> (fond + parois, sans couvercle),
             <strong>Encoches</strong> (finger joint — panneaux assemblés par tenons-mortaises),
             <strong>Couvercle</strong> (corps + couvercle emboîtable avec feuillure),
             <strong>Empilable</strong> (bords inversés pour empilage). Le modèle détermine quelles panneaux sont générés et comment le G-code les découpe.
@@ -46,7 +46,7 @@ export function showHelpModal(machine = {}) {
           <dd>Définit le plan de base de la boîte :
             <strong>Rectangle</strong>, <strong>Cercle</strong>, <strong>Ovale</strong>, <strong>Polygone</strong> (N côtés), <strong>Haricot</strong>. Tous les panneaux et contours sont calculés à partir de cette forme.
             <br><br>
-            <strong>Haricot</strong> — contour organique à zone concave, défini par une courbe de Bézier cubique fixe mise à l'échelle selon la <em>Longueur</em> (axe Y) et la <em>Largeur</em> (axe X).
+            <strong>Haricot</strong> — contour organique à zone concave, défini par une courbe de Bézier cubique fixe mise à l'échelle selon la <em>Longueur</em> (axe X) et la <em>Largeur</em> (axe Y), comme les autres formes.
             Le profil ne se paramètre pas : seules les dimensions globales changent.
             Un <strong>ratio Largeur/Longueur entre 0,5 et 1,5</strong> est conseillé (avertissement affiché hors plage).
             La zone concave impose <strong>⌀ fraise ≤ 2 × rayon de courbure minimum</strong> du creux — préférer une fraise fine (Ø 3 – 4 mm) pour les petits formats.
@@ -56,12 +56,14 @@ export function showHelpModal(machine = {}) {
           <dd>Paramètres propres à la forme sélectionnée (largeur, hauteur, rayon…) et au modèle de boîte (hauteur paroi, épaisseur, jeu d'assemblage…). Ces valeurs alimentent directement la génération G-code et la prévisualisation 3D.</dd>
           <dt>Matière &amp; Outil</dt>
           <dd>
-            <strong>Brut</strong> — épaisseur totale calculée automatiquement depuis la hauteur de boîte + offset de brut (lecture seule).<br>
+            <strong>Brut</strong> — épaisseur totale calculée automatiquement depuis la hauteur de boîte + surplus de brut <em>Brut +</em> de la barre 3D (lecture seule). Boîte à couvercle de hauteurs différentes : deux lignes, <strong>Brut corps</strong> et <strong>Brut couvercle</strong> (deux bruts).<br>
             <strong>Diam. fraise</strong> — diamètre de l'outil en mm ; utilisé pour l'offset de contour et les valeurs par défaut de la modale d'export.<br>
             <strong>Prof./passe</strong> — profondeur de coupe par passe Z ; le nombre de passes est déduit automatiquement (⌈brut ÷ prof.⌉).<br>
             <strong>Vitesse XY / Z</strong> — avance en mm/min pour les mouvements de coupe (G1) et de plongée.<br>
+            <strong>Vitesse G0</strong> — vitesse des déplacements rapides de la machine ; sert au temps estimé de la simulation.<br>
             <strong>Broche</strong> — vitesse de rotation en tr/min (commande <span class="help-mono">S…M3</span>).<br>
-            <strong>Survol Z</strong> — hauteur de sécurité entre opérations (commande <span class="help-mono">G0 Z…</span>).
+            <strong>Survol Z</strong> — hauteur de sécurité entre opérations (commande <span class="help-mono">G0 Z…</span>).<br>
+            <strong>Arcs G2/G3</strong> — regroupe les petits segments en vrais arcs et ne répète pas les mots inchangés : le fichier est beaucoup plus court et la machine plus fluide.
           </dd>
         </dl>
       </section>
@@ -72,8 +74,8 @@ export function showHelpModal(machine = {}) {
         <dl class="help-dl">
           <dt>Générer</dt>
           <dd>Calcule et affiche le G-code complet à partir des paramètres courants (forme, modèle de boîte, matière et outil). Le résultat est mis à jour à chaque clic — il n'est pas recalculé automatiquement.</dd>
-          <dt>Statistiques</dt>
-          <dd>Affiche le nombre total de lignes du programme et le nombre de mouvements <span class="help-mono">G1</span> (trajectoires avec avance contrôlée). Utile pour estimer la durée d'usinage.</dd>
+          <dt>Simuler</dt>
+          <dd>Joue le G-code tel qu'il serait exporté (avec les dernières options d'export) sur le brut. Voir <em>Aperçus et simulation</em> ci-dessous.</dd>
           <dt>Visualiseur</dt>
           <dd>Coloration syntaxique par type de commande :
             <span class="help-chip chip-comment">; commentaire</span>
@@ -85,6 +87,19 @@ export function showHelpModal(machine = {}) {
           <dd>Ouvre la fenêtre d'export avec les options d'entrée outil, lead-in/out, tabs de maintien et sélection des sections à exporter. Le G-code est <strong>re-généré</strong> avec ces options au moment de l'export — le visualiseur affiche toujours la version sans options.</dd>
           <dt>SVG</dt>
           <dd>Exporte les pièces en SVG (mm, mêmes contours que le G-code, cloisons comprises). Trois calques : <strong>Découpe</strong> (rouge, contours traversants), <strong>Usinages</strong> (bleu, poches non traversantes) et <strong>Repères</strong> (noms des pièces, à masquer avant découpe). Pour la découpe laser ou la retouche dans Inkscape / Fusion 360.</dd>
+        </dl>
+      </section>
+
+      <!-- ── Aperçus et simulation ─────────────────────────── -->
+      <section class="help-section">
+        <h4>Aperçus et simulation</h4>
+        <dl class="help-dl">
+          <dt>3D</dt>
+          <dd>Boîte et brut (cadre jaune) avec le repère <strong>Z0</strong> : position dans le plan (centre ou un coin) et niveau (▲ dessus, ▼ dessous du brut), tel qu'il sera dans le G-code. <em>Brut +</em> ajoute du brut autour de la boîte, <em>X-Ray</em> rend la matière transparente. Boîtes à couvercle et à encoches : <strong>À plat</strong> (pièces disposées comme dans le G-code) ou <strong>Assemblé</strong>. Double-clic : recadrer la vue.</dd>
+          <dt>Vues 2D</dt>
+          <dd>Dessus (avec le plan de coupe <strong>A-A</strong>), face, côté et coupe A-A hachurée, avec leurs cotes. La boîte à encoches se présente en panneaux à plat.</dd>
+          <dt>Simuler</dt>
+          <dd>Rejoue l'usinage sur le brut : fraise, trajets, matière enlevée, temps estimé. <strong>Dessin</strong> superpose les contours théoriques, <strong>Pièce finie seule</strong> masque la chute. Boîte empilable : choix de la face (dessus, dessous retourné). Boîte à couvercle de hauteurs différentes : choix de la pièce, chacune sur son brut.</dd>
         </dl>
       </section>
 
@@ -169,14 +184,20 @@ export function showHelpModal(machine = {}) {
           <dt>Concentrique (défaut)</dt>
           <dd>L'outil part du centre et trace des anneaux concentriques vers la paroi. La paroi est atteinte lors du dernier anneau, qui constitue la passe de finition. Résultat propre pour les formes convexes (rectangle, cercle, ovale, polygone). Un overcut de ½ ⌀outil sur le dernier anneau élimine la marque de fermeture sur la paroi.</dd>
           <dt>Raster (zig-zag)</dt>
-          <dd>Balayage horizontal ligne par ligne. Universel — fonctionne pour toutes les formes y compris les profils concaves (haricot, C, U). Peut laisser de légères stries sur les parois ; à utiliser quand la forme est trop concave pour la stratégie concentrique.</dd>
+          <dd>Balayage horizontal ligne par ligne. Universel — fonctionne pour toutes les formes y compris les profils concaves (haricot, C, U). À chaque passe, la fraise fait ensuite le tour du contour pour enlever les marches du balayage le long des parois. À utiliser quand la forme est trop concave pour la stratégie concentrique.</dd>
         </dl>
       </section>
 
       <!-- ── Tabs ────────────────────────────────────────── -->
       <section class="help-section">
         <h4>Tabs de maintien</h4>
-        <p>Ponts de matière laissés sur la <strong>dernière passe uniquement</strong> pour maintenir la pièce dans le brut. L'outil remonte automatiquement au-dessus de chaque tab. Ils sont placés au milieu des côtés droits les plus longs, jamais dans un angle ni dans un arrondi ; sur une forme sans côté droit (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre. Par défaut : 4 tabs de 8 mm de long et 2 mm de haut. La largeur saisie est la longueur réelle du pont de matière : l'outil reste au-dessus du tab sur cette largeur plus son diamètre, car il mord de son rayon de chaque côté.</p>
+        <p>Ponts de matière laissés au fond de la coupe pour maintenir la pièce dans le brut : dès qu'une passe descend sous leur sommet, l'outil remonte automatiquement au-dessus de chaque tab. Ils sont placés au milieu des côtés droits les plus longs, jamais dans un angle ni dans un arrondi ; sur une forme sans côté droit (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre. Par défaut : 4 tabs de 8 mm de long et 2 mm de haut. La largeur saisie est la longueur réelle du pont de matière : l'outil reste au-dessus du tab sur cette largeur plus son diamètre, car il mord de son rayon de chaque côté.</p>
+      </section>
+
+      <!-- ── Finition des parois ───────────────────────────── -->
+      <section class="help-section">
+        <h4>Finition des parois</h4>
+        <p>Case <strong>Finition parois</strong> et <strong>surépaisseur</strong> (0,2 mm par défaut) : les passes en profondeur s'arrêtent à cette distance de la cote, puis une passe unique à pleine profondeur suit le contour exact. Un seul passage léger donne une paroi plus nette et soulage la fraise. S'applique aux contours, à la poche concentrique et à la poche en balayage.</p>
       </section>
 
       <!-- ── Valeurs par défaut ──────────────────────────── -->
@@ -263,7 +284,7 @@ export function showHelpModal(machine = {}) {
             <dt>Layout d'export</dt>
             <dd>Corps et couvercle sont placés côte à côte dans le G-code. Le sens est choisi automatiquement pour <strong>minimiser le côté le plus long du brut</strong> : horizontal si W ≤ D, vertical si W &gt; D. Exemple : 140×65 mm → layout vertical, brut 140×150 mm au lieu de 300×65 mm.</dd>
             <dt>Hauteurs différentes</dt>
-            <dd>Si corps et couvercle ont des hauteurs différentes, un <strong>avertissement à l'export</strong> rappelle qu'il faut deux bruts séparés aux épaisseurs correspondantes. Exporter corps et couvercle séparément : le couvercle exporté seul est automatiquement recentré à l'origine (X=0 Y=0).</dd>
+            <dd>Si corps et couvercle ont des hauteurs différentes, un <strong>avertissement à l'export</strong> rappelle qu'il faut deux bruts séparés aux épaisseurs correspondantes. Exporter corps et couvercle séparément : chaque fichier est recentré à l'origine (X=0 Y=0) et son en-tête indique le brut de cette pièce (épaisseur et nombre de passes). Z0 en surface : zéro sur le dessus de chaque brut.</dd>
             <dt>Usage</dt><dd>Coffrets, boîtes à bijoux, étuis de présentation.</dd>
           </dl>
         </section>
