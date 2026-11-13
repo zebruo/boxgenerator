@@ -226,9 +226,10 @@ export class LidBox {
     // part : pièce à laquelle appartient le contour (simulation pièce par pièce)
     const items = [{ pts: bodyPts, face: 1, outer: true, part: 'body' }];
     // Corps : compartiments s'il y a des cloisons, sinon la cavité
+    const partitionDir = params.partitionDir === 'horizontal' ? 'horizontal' : 'vertical';
     const cells = (params.partitions ?? 0) > 0
       ? buildPartitionContours(W, D, wallThickness, params.partitions,
-          params.partitionDir === 'horizontal' ? 'horizontal' : 'vertical', machineParams.toolDiameter ?? 3.175,
+          partitionDir, machineParams.toolDiameter ?? 3.175,
           { minX: bb.minX, minY: bb.minY, cavity })
       : null;
     for (const c of cells ?? (cavity.length > 2 ? [cavity] : [])) items.push({ pts: c, face: 1, part: 'body' });
