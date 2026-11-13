@@ -180,7 +180,7 @@ function bindEvents() {
 
   // Offset brut
   document.getElementById('stock-offset').addEventListener('input', e => {
-    if (threePreview) { threePreview.stockOffset = parseFloat(e.target.value) || 0; updatePreview(); }
+    if (threePreview) { threePreview.stockOffset = Number.parseFloat(e.target.value) || 0; updatePreview(); }
   });
 
   // Côté offset brut (haut / bas)
@@ -215,7 +215,7 @@ function bindEvents() {
 
   // Calcul paramètres de coupe
   document.getElementById('btn-cutting-params').addEventListener('click', () => {
-    const td = parseFloat(document.getElementById('param-tool-diameter').value) || 3.175;
+    const td = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 3.175;
     showCuttingParamsModal(td, ({ n, vf, vfZ, ap, diameter }) => {
       document.getElementById('param-tool-diameter').value = diameter;
       document.getElementById('param-feedrate').value      = vf;
@@ -324,7 +324,7 @@ function renderShapeParams() {
       row.style.gridTemplateColumns = '1fr';
       row.querySelector('select').addEventListener('change', e => {
         const raw = e.target.value;
-        state.boxParams[d.id] = isNaN(raw) || raw === '' ? raw : parseInt(raw);
+        state.boxParams[d.id] = Number.isNaN(Number(raw)) || raw === '' ? raw : Number.parseInt(raw);
         updateRabbetToolWarning();
         updatePreview();
       });
@@ -350,7 +350,7 @@ function renderShapeParams() {
       // Cloisons : disponibles pour toutes les formes (compartiments découpés par la cavité)
       row.querySelector('input').addEventListener('input', e => {
         if (d.readonly) return;
-        const val = parseFloat(e.target.value);
+        const val = Number.parseFloat(e.target.value);
         // Champ vidé ou saisie en cours (« 8. », « - ») : on attend une valeur valide au lieu
         // d'envoyer NaN aux formes, au G-code et à l'aperçu
         if (!Number.isFinite(val)) return;
@@ -393,7 +393,7 @@ function renderShapeParams() {
 function updatePinDepthWarning() {
   const el = document.querySelector('[data-param="pinDepth"]');
   if (!el) return;
-  const pinDepth  = parseFloat(el.value) || 0;
+  const pinDepth  = Number.parseFloat(el.value) || 0;
   const height    = state.boxParams.height    ?? 40;
   const rimHeight = state.boxParams.rimHeight ?? 8;
   const brut      = height + rimHeight;
@@ -424,11 +424,11 @@ function updateShapeInputWarnings() {
 function updatePartitionWarning() {
   const el = document.querySelector('[data-param="partitions"]');
   if (!el) return;
-  const partitions = parseInt(el.value) || 0;
+  const partitions = Number.parseInt(el.value) || 0;
   if (partitions === 0) { el.classList.remove('input-warn'); el.title = ''; return; }
   const partitionDir  = (state.boxParams.partitionDir === 'horizontal') ? 'horizontal' : 'vertical';
   const wallThickness = state.boxParams.wallThickness ?? 6;
-  const td  = parseFloat(document.getElementById('param-tool-diameter').value) || 6;
+  const td  = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 6;
   const bb  = state.shape?.getBoundingBox();
   if (!bb) return;
   const cols  = partitionDir === 'vertical'   ? partitions + 1 : 1;
@@ -448,9 +448,9 @@ function updateRabbetToolWarning() {
   if (!el) return;
   const rabbetSide = state.boxParams.rabbetSide ?? 0;
   if (rabbetSide !== 1) { el.classList.remove('input-warn'); el.title = ''; return; }
-  const rabbet    = parseFloat(el.value) || 0;
+  const rabbet    = Number.parseFloat(el.value) || 0;
   const clearance = state.boxParams.clearance ?? 0.3;
-  const td        = parseFloat(document.getElementById('param-tool-diameter').value) || 0;
+  const td        = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 0;
   const ringW     = rabbet + clearance;
   const warn      = td > ringW;
   el.classList.toggle('input-warn', warn);
@@ -460,7 +460,7 @@ function updateRabbetToolWarning() {
 function updateFingerJointWarnings() {
   const el = document.querySelector('[data-param="fingerWidth"]');
   if (!el) return;
-  const fw = parseFloat(el.value) || 10;
+  const fw = Number.parseFloat(el.value) || 10;
   const thick = state.boxParams.thickness ?? 6;
   const bb = state.shape?.getBoundingBox?.();
   if (!bb) return;
@@ -543,15 +543,15 @@ function updateBoxNameOverlay() {
 // ─── Machine params ─────────────────────────────────────────────────────────
 function getMachineParams() {
   return {
-    materialThickness: parseFloat(document.getElementById('param-thickness').value),
-    toolDiameter:      parseFloat(document.getElementById('param-tool-diameter').value),
-    depthPerPass:      parseFloat(document.getElementById('param-passes').value),
-    passes:            Math.max(1, Math.ceil(parseFloat(document.getElementById('param-thickness').value) /
-                         parseFloat(document.getElementById('param-passes').value))),
-    feedrate:          parseFloat(document.getElementById('param-feedrate').value),
-    plungeRate:        parseFloat(document.getElementById('param-plunge').value),
-    spindleSpeed:      parseFloat(document.getElementById('param-spindle').value),
-    safeZ:             parseFloat(document.getElementById('param-safe-z').value),
+    materialThickness: Number.parseFloat(document.getElementById('param-thickness').value),
+    toolDiameter:      Number.parseFloat(document.getElementById('param-tool-diameter').value),
+    depthPerPass:      Number.parseFloat(document.getElementById('param-passes').value),
+    passes:            Math.max(1, Math.ceil(Number.parseFloat(document.getElementById('param-thickness').value) /
+                         Number.parseFloat(document.getElementById('param-passes').value))),
+    feedrate:          Number.parseFloat(document.getElementById('param-feedrate').value),
+    plungeRate:        Number.parseFloat(document.getElementById('param-plunge').value),
+    spindleSpeed:      Number.parseFloat(document.getElementById('param-spindle').value),
+    safeZ:             Number.parseFloat(document.getElementById('param-safe-z').value),
     arcs:              document.getElementById('param-arcs').checked,
     rapidRate:         Number.parseFloat(document.getElementById('param-rapid').value) || 3000  // G0 (temps estimé)
   };
@@ -686,7 +686,11 @@ function pieceStock(piece, machine) {
 function restateStock(section, thickness, depthPerPass) {
   if (!section?.required) return;
   const [brut, passes] = stockHeaderLines(thickness, depthPerPass);
-  section.lines = section.lines.map(l => l.startsWith('; Brut:') ? brut : l.startsWith('; Passes:') ? passes : l);
+  section.lines = section.lines.map(l => {
+    if (l.startsWith('; Brut:'))   return brut;
+    if (l.startsWith('; Passes:')) return passes;
+    return l;
+  });
 }
 
 // Lit la position et le niveau du gizmo Z0 depuis les boutons actifs
@@ -792,6 +796,17 @@ function onTechParamChange(paramId, value, isShape) {
 }
 
 
+// Hauteur de matière du brut (sans le surplus « Brut + ») selon la boîte
+function stockHeight(h) {
+  const p = state.boxParams;
+  switch (state.boxTypeKey) {
+    case 'finger-joint': return p.thickness ?? 6;
+    case 'lid-box':      return Math.max(h, p.lidHeight ?? 15);
+    case 'stackable':    return h + (p.rimHeight ?? 8);
+    default:             return h;
+  }
+}
+
 function updateInfoBar() {
   if (!state.shape) return;
   const bb = state.shape.getBoundingBox();
@@ -800,14 +815,8 @@ function updateInfoBar() {
   // Brut = hauteur de la pièce la plus haute + offset brut
   // Pour finger-joint : brut = épaisseur des panneaux (pas la hauteur de la boîte)
   // Pour lid-box : corps et couvercle taillés dans la même planche → épaisseur = max(height, lidHeight)
-  const totalH = state.boxTypeKey === 'finger-joint'
-    ? (state.boxParams.thickness ?? 6)
-    : state.boxTypeKey === 'lid-box'
-      ? Math.max(h, state.boxParams.lidHeight ?? 15)
-      : state.boxTypeKey === 'stackable'
-        ? h + (state.boxParams.rimHeight ?? 8)
-        : h;
-  const stockOffset = parseFloat(document.getElementById('stock-offset').value) || 0;
+  const totalH = stockHeight(h);
+  const stockOffset = Number.parseFloat(document.getElementById('stock-offset').value) || 0;
   document.getElementById('param-thickness').value = (totalH + stockOffset).toFixed(1);
   // Boîte à couvercle de hauteurs différentes : on montre le brut de chaque pièce (la valeur max
   // ci-dessus reste celle du G-code, qui garde le brut à la hauteur max pour les deux)
@@ -895,23 +904,34 @@ async function exportGCode() {
 }
 
 // Découpe le G-code en sections identifiées par les marqueurs ; ─── ... ───
+// Titre d'un repère « ; ─── titre ─── », ou null si la ligne n'en est pas un
+function sectionLabel(line) {
+  if (!line.startsWith('; ───')) return null;
+  let i = 2;
+  while (line[i] === '─') i++;                           // tirets d'ouverture
+  if (!/\s/.test(line[i] ?? '')) return null;
+  const rest = line.slice(i);
+  const end = rest.search(/\s─{3}/);                      // premier blanc suivi de tirets de fermeture
+  const label = end < 0 ? '' : rest.slice(0, end).trim();
+  return label || null;
+}
+
 function parseGCodeSections(code) {
   const lines = code.split('\n');
-  const SEP_RE = /^; ─{3,}\s+(.+?)\s+─{3,}/;
   const sections = [];
   let headerLines = [];
   let currentSec = null;
   let pastHeader = false;
 
   for (const line of lines) {
-    const m = line.match(SEP_RE);
-    if (m) {
+    const label = sectionLabel(line);
+    if (label) {
       if (!pastHeader) {
         sections.push({ label: t('modal.header_section'), lines: headerLines, required: true });
         pastHeader = true;
       }
       if (currentSec) sections.push(currentSec);
-      currentSec = { label: m[1].trim(), lines: [line], required: false };
+      currentSec = { label, lines: [line], required: false };
     } else if (!pastHeader) {
       headerLines.push(line);
     } else if (currentSec) {
@@ -921,7 +941,7 @@ function parseGCodeSections(code) {
   if (currentSec) sections.push(currentSec);
 
   // Extrait le pied de programme (M5 / M30) de la dernière section optionnelle
-  const lastOp = sections[sections.length - 1];
+  const lastOp = sections.at(-1);
   if (lastOp && !lastOp.required) {
     let footerStart = -1;
     for (let i = lastOp.lines.length - 1; i >= 0; i--) {
@@ -1084,20 +1104,20 @@ function showExportModal(sections, machine = {}) {
 
   const updateModalStats = () => {
     const tabOpts = tabsOnCbStats.checked ? {
-      count:  parseInt(modal.querySelector('#modal-tab-count').value),
-      width:  parseFloat(modal.querySelector('#modal-tab-width').value),
-      height: parseFloat(modal.querySelector('#modal-tab-height').value)
+      count:  Number.parseInt(modal.querySelector('#modal-tab-count').value),
+      width:  Number.parseFloat(modal.querySelector('#modal-tab-width').value),
+      height: Number.parseFloat(modal.querySelector('#modal-tab-height').value)
     } : null;
     const entryMode = modal.querySelector('.entry-mode-btn.active')?.dataset.mode ?? 'plunge';
     const entryOpts = {
       entry:      entryMode,
-      rampLen:    parseFloat(modal.querySelector('#modal-ramp-len').value),
-      helixR:     parseFloat(modal.querySelector('#modal-helix-r').value),
-      helixTurns: parseInt(modal.querySelector('#modal-helix-turns').value),
+      rampLen:    Number.parseFloat(modal.querySelector('#modal-ramp-len').value),
+      helixR:     Number.parseFloat(modal.querySelector('#modal-helix-r').value),
+      helixTurns: Number.parseInt(modal.querySelector('#modal-helix-turns').value),
       leadIn:     modal.querySelector('#modal-leadin-on').checked
-                    ? parseFloat(modal.querySelector('#modal-leadin-r').value) : false,
+                    ? Number.parseFloat(modal.querySelector('#modal-leadin-r').value) : false,
       finishAllowance: modal.querySelector('#modal-finish-on').checked
-                    ? parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
+                    ? Number.parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
     };
     const machine = getMachineParams();
     const z0      = getZ0Settings();
@@ -1108,7 +1128,7 @@ function showExportModal(sections, machine = {}) {
     );
     const fSections = parseGCodeSections(fc);
     const sel = new Set();
-    list.querySelectorAll('input[type=checkbox]').forEach(cb => { if (cb.checked) sel.add(parseInt(cb.dataset.idx)); });
+    list.querySelectorAll('input[type=checkbox]').forEach(cb => { if (cb.checked) sel.add(Number.parseInt(cb.dataset.idx)); });
     const code = fSections.filter((_, i) => sel.has(i)).map(s => s.lines.join('\n')).join('\n');
     const fl = code.split('\n');
     modalStatsEl.innerHTML = `
@@ -1235,7 +1255,7 @@ function showExportModal(sections, machine = {}) {
   modal.querySelector('#modal-do-export').addEventListener('click', async () => {
     const selected = new Set();
     list.querySelectorAll('input[type=checkbox]').forEach(cb => {
-      if (cb.checked) selected.add(parseInt(cb.dataset.idx));
+      if (cb.checked) selected.add(Number.parseInt(cb.dataset.idx));
     });
     if (selected.size === 0) { showNotif(t('notif.no_ops')); return; }
 
@@ -1243,18 +1263,18 @@ function showExportModal(sections, machine = {}) {
     const finishCb = modal.querySelector('#modal-finish-on');
     const entryOpts = {
       entry:      selectedEntry,
-      rampLen:    parseFloat(modal.querySelector('#modal-ramp-len').value),
-      helixR:     parseFloat(modal.querySelector('#modal-helix-r').value),
-      helixTurns: parseInt(modal.querySelector('#modal-helix-turns').value),
-      leadIn:     leadInCb.checked ? parseFloat(modal.querySelector('#modal-leadin-r').value) : false,
-      finishAllowance: finishCb.checked ? parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
+      rampLen:    Number.parseFloat(modal.querySelector('#modal-ramp-len').value),
+      helixR:     Number.parseFloat(modal.querySelector('#modal-helix-r').value),
+      helixTurns: Number.parseInt(modal.querySelector('#modal-helix-turns').value),
+      leadIn:     leadInCb.checked ? Number.parseFloat(modal.querySelector('#modal-leadin-r').value) : false,
+      finishAllowance: finishCb.checked ? Number.parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
     };
 
     // Paramètres tabs depuis la modale
     const tabOpts = tabsOnCb.checked ? {
-      count:  parseInt(modal.querySelector('#modal-tab-count').value),
-      width:  parseFloat(modal.querySelector('#modal-tab-width').value),
-      height: parseFloat(modal.querySelector('#modal-tab-height').value)
+      count:  Number.parseInt(modal.querySelector('#modal-tab-count').value),
+      width:  Number.parseFloat(modal.querySelector('#modal-tab-width').value),
+      height: Number.parseFloat(modal.querySelector('#modal-tab-height').value)
     } : null;
 
     // Re-génère le G-code avec les options définitives, puis filtre les sections
@@ -1471,7 +1491,7 @@ async function exportSVG() {
 
 // ─── Utilitaires ─────────────────────────────────────────────────────────────
 function escHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return str.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 function showWarnConfirm(title, htmlMsg) {
