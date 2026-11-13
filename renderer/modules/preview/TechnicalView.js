@@ -259,7 +259,9 @@ export class TechnicalView {
     // Plan de coupe A-A (horizontal, au milieu) : trait mixte, flèches vers le sens de vue
     {
       const yA = toY((bb.minY + bb.maxY) / 2);
-      const xa = shapeL - 16, xb = shapeR + 16;
+      // À droite, le repère est au-delà de la cote verticale (à +20, étiquette de ±8 px de large,
+      // centrée à la même hauteur que le plan de coupe) : sinon son fond cache la lettre A
+      const xa = shapeL - 16, xb = shapeR + 36;
       ctx.save();
       ctx.strokeStyle = this.C.dim;
       ctx.fillStyle = this.C.dim;
