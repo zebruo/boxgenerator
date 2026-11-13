@@ -29,7 +29,7 @@ function parseLine(line) {
   const words = {};
   for (const [, letter, num] of code.matchAll(WORD_RE)) {
     if (letter === 'G') continue;
-    words[letter] = { tok: num, v: parseFloat(num) };
+    words[letter] = { tok: num, v: Number.parseFloat(num) };
   }
   return { kind: 'move', g: +m[1], words, comment };
 }

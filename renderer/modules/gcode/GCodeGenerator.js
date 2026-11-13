@@ -19,6 +19,13 @@ export function stockHeaderLines(thickness, depthPerPass) {
   ];
 }
 
+/** Signe du décalage d'outil selon le côté : dehors −1, dedans +1, sur le trait 0. */
+const SIDE_SIGN = { outside: -1, inside: 1 };
+const sideSign = side => SIDE_SIGN[side] ?? 0;
+
+/** Suffixe de commentaire « , finition +0.2mm » (vide sans surépaisseur). */
+const finishLabel = fa => (fa > 0 ? `, finition +${fa}mm` : '');
+
 export class GCodeGenerator {
   constructor(machine = {}) {
     this.machine = {
@@ -53,7 +60,8 @@ export class GCodeGenerator {
     const dpp = this.machine.depthPerPass ?? (materialThickness / passes);
     for (const line of stockHeaderLines(materialThickness, dpp)) this.emit(line);
     this.emit(`; Origine XY: X${originX >= 0 ? '+' : ''}${originX.toFixed(3)} Y${originY >= 0 ? '+' : ''}${originY.toFixed(3)}`);
-    this.emit(`; Origine Z: ${zOffset === 0 ? 'surface (haut)' : `bas du brut (+${zOffset.toFixed(3)}mm)`}`);
+    const origineZ = zOffset === 0 ? 'surface (haut)' : 'bas du brut (+' + zOffset.toFixed(3) + 'mm)';
+    this.emit(`; Origine Z: ${origineZ}`);
     this.emit('');
     this.emit('G21        ; Unités mm');
     this.emit('G90        ; Coordonnées absolues');
@@ -246,8 +254,8 @@ export class GCodeGenerator {
     // Choisir le sens qui correspond à une entrée tangentielle (arc court ≤ 180°)
     if (type === 'in') {
       if (dA > 0) dA -= 2 * Math.PI;  // sens anti-horaire → horaire
-    } else {
-      if (dA < 0) dA += 2 * Math.PI;
+    } else if (dA < 0) {
+      dA += 2 * Math.PI;
     }
 
     const arcPts = [];
@@ -325,9 +333,8 @@ export class GCodeGenerator {
       fa:         entryOpts.finishAllowance ?? 0,
       dogbone:    !!entryOpts.dogbone,
     };
-    e.label = (e.entry === 'ramp'  ? `, ramp ${e.rampLen}mm`
-             : e.entry === 'helix' ? `, helix R${e.helixR}mm×${e.helixTurns}t`
-             : '') + (e.leadInR ? `, lead-in R${e.leadInR}mm` : '');
+    const entryText = { ramp: `, ramp ${e.rampLen}mm`, helix: `, helix R${e.helixR}mm×${e.helixTurns}t` };
+    e.label = (entryText[e.entry] ?? '') + (e.leadInR ? `, lead-in R${e.leadInR}mm` : '');
     return e;
   }
 
@@ -346,7 +353,7 @@ export class GCodeGenerator {
    */
   _contourPaths(points, side, fa, dogbone) {
     const r    = this.machine.toolDiameter / 2;
-    const sign = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
+    const sign = sideSign(side);
     const finish = fa > 0 && sign !== 0;
     const exactRaw = sign !== 0 ? this._offsetContourDist(points, sign * r) : points;
     const roughRaw = finish ? this._offsetContourDist(points, sign * (r + fa)) : exactRaw;
@@ -480,9 +487,10 @@ export class GCodeGenerator {
       centers = this._placeTabs(cut, segLengths, perimeter, tab.count, tab.path);
       tabEv = this._tabEvents(centers, tab.path, perimeter);
       const skipped = tab.count - centers.length;
-      this.comment(`─── ${label} (${side}${e.label}, ${centers.length} tabs ${tab.width}×${tab.height}mm${skipped ? `, ${skipped} évité(s) sur angles` : ''}) ───`);
+      const skippedText = skipped ? `, ${skipped} évité(s) sur angles` : '';
+      this.comment(`─── ${label} (${side}${e.label}, ${centers.length} tabs ${tab.width}×${tab.height}mm${skippedText}) ───`);
     } else {
-      this.comment(`─── ${label} (${side}${e.label}${e.fa > 0 ? `, finition +${e.fa}mm` : ''}) ───`);
+      this.comment(`─── ${label} (${side}${e.label}${finishLabel(e.fa)}) ───`);
     }
 
     for (let pass = 1; pass <= passes; pass++) {
@@ -547,16 +555,15 @@ export class GCodeGenerator {
   cutContoursInterleaved(contoursPoints, side = 'outside', entryOpts = {}, label = 'Contour') {
     const fa    = entryOpts.finishAllowance ?? 0;
     const toolR = this.machine.toolDiameter / 2;
-    const sign  = side === 'outside' ? -1 : side === 'inside' ? 1 : 0;
+    const sign  = sideSign(side);
 
     const paired = contoursPoints.map(pts => {
-      const rough = sign !== 0 ? this._offsetContourDist(pts, sign * (toolR + fa))
-                  : fa > 0    ? this._offsetContourDist(pts, fa)
-                  : pts;
+      let rough = pts;
+      if (sign !== 0)  rough = this._offsetContourDist(pts, sign * (toolR + fa));
+      else if (fa > 0) rough = this._offsetContourDist(pts, fa);
       if (!rough?.length || rough.length < 2) return null;
-      const fin = (fa > 0 && sign !== 0) ? this._offsetContourDist(pts, sign * toolR)
-               : (fa > 0 && sign === 0)  ? pts
-               : null;
+      let fin = null;
+      if (fa > 0) fin = sign !== 0 ? this._offsetContourDist(pts, sign * toolR) : pts;
       if (fin !== null && (!fin?.length || fin.length < 2)) return null;
       const entryIdx = this._maxSegIdx(rough);
       return {
@@ -614,9 +621,7 @@ export class GCodeGenerator {
    */
   cutCircleContour(cx, cy, r, side, entryOpts = {}, label = 'Contour', tabOpts = null) {
     const toolR = this.machine.toolDiameter / 2;
-    const r_off = side === 'outside' ? r + toolR
-                : side === 'inside'  ? r - toolR
-                : r;
+    const r_off = { outside: r + toolR, inside: r - toolR }[side] ?? r;
 
     if (r_off <= toolR * 0.5) {
       this.comment(`ATTENTION: cercle trop petit pour l'outil (Ø${this.machine.toolDiameter}mm)`);
@@ -625,9 +630,10 @@ export class GCodeGenerator {
 
     const fa       = entryOpts.finishAllowance ?? 0;
     const r_off_exact = r_off;
-    const r_off_work  = (fa > 0 && side !== 'center')
-      ? (side === 'outside' ? r_off + fa : Math.max(toolR * 0.5, r_off - fa))
-      : r_off;
+    let r_off_work = r_off;
+    if (fa > 0 && side !== 'center') {
+      r_off_work = side === 'outside' ? r_off + fa : Math.max(toolR * 0.5, r_off - fa);
+    }
 
     const { depth, passes, stepZ } = this._passPlan();
 
@@ -645,8 +651,9 @@ export class GCodeGenerator {
     const startY = cy;
     const oc     = Math.min(this.machine.toolDiameter * 0.5, r_off_work * 0.08);
 
-    const faLabel = fa > 0 ? `, finition +${fa}mm` : '';
-    this.comment(`─── ${label} (${side}, G3 arcs${hasTabs ? `, ${tabCount} tabs ${tabWidth}×${tabHeight}mm` : ''}${leadInR ? `, lead-in R${leadInR}mm` : ''}${faLabel}) ───`);
+    const tabLabel  = hasTabs ? `, ${tabCount} tabs ${tabWidth}×${tabHeight}mm` : '';
+    const leadLabel = leadInR ? `, lead-in R${leadInR}mm` : '';
+    this.comment(`─── ${label} (${side}, G3 arcs${tabLabel}${leadLabel}${finishLabel(fa)}) ───`);
 
     const ox = this.machine.originX, oy = this.machine.originY;
     const f  = this.machine.feedrate;
@@ -972,12 +979,15 @@ export class GCodeGenerator {
     const rows = ys.length && span > 0 ? Math.max(1, Math.ceil(span / stepOver)) : 0;
     const rowYs = rows ? Array.from({ length: rows + 1 }, (_, i) => minY + EDGE + span * i / rows) : [];
 
-    this.comment(`─── ${label} — Pocket raster${fa > 0 ? `, finition +${fa}mm` : ''} ───`);
+    this.comment(`─── ${label} — Pocket raster${finishLabel(fa)} ───`);
 
     for (let pass = 1; pass <= passes; pass++) {
       const z      = -(depthStart + stepZ * pass);
       const clearZ = z + clearance;
-      const reenter = () => { if (depthStart > 0) this.emit(`G0 Z${(-depthStart + zo).toFixed(3)}`); this.plungeTo(z); };
+      const reenter = () => {
+        if (depthStart > 0) this.emit(`G0 Z${(-depthStart + zo).toFixed(3)}`);
+        this.plungeTo(z);
+      };
       this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}`);
       this.rapidZ(this.machine.safeZ);
 
@@ -1114,9 +1124,7 @@ export class GCodeGenerator {
         bx /= bl; by /= bl;
         // Centre du dogbone : décalé de r*(√2−1) dans la direction de la bisectrice
         // → distance exacte r du coin original
-        result.push(curr);
-        result.push({ x: curr.x + scale * bx, y: curr.y + scale * by });
-        result.push(curr);
+        result.push(curr, { x: curr.x + scale * bx, y: curr.y + scale * by }, curr);
       } else {
         result.push(curr);
       }
@@ -1133,11 +1141,11 @@ export class GCodeGenerator {
     // Supprimer les points dupliqués / quasi-identiques (évite bisecteurs dégénérés)
     let pts = [points[0]];
     for (let i = 1; i < points.length; i++) {
-      if (Math.hypot(points[i].x - pts[pts.length - 1].x, points[i].y - pts[pts.length - 1].y) > 1e-6)
+      if (Math.hypot(points[i].x - pts.at(-1).x, points[i].y - pts.at(-1).y) > 1e-6)
         pts.push(points[i]);
     }
     // Supprimer le dernier point s'il est identique au premier (contour fermé avec doublon)
-    while (pts.length > 1 && Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y) < 1e-6)
+    while (pts.length > 1 && Math.hypot(pts.at(-1).x - pts[0].x, pts.at(-1).y - pts[0].y) < 1e-6)
       pts.pop();
 
     const n      = pts.length;
