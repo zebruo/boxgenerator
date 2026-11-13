@@ -3,6 +3,7 @@ import { t, setLang, currentLang } from './modules/i18n.js';
 import { ThreePreview }   from './modules/preview/ThreePreview.js';
 import { TechnicalView }  from './modules/preview/TechnicalView.js';
 import { buildFabricationSVG } from './modules/export/SvgExport.js';
+import { stockHeaderLines } from './modules/gcode/GCodeGenerator.js';
 import { Rectangle }      from './modules/shapes/Rectangle.js';
 import { Circle }         from './modules/shapes/Circle.js';
 import { Oval }           from './modules/shapes/Oval.js';
@@ -673,6 +674,21 @@ function lidBoxParts(code, drawing, stock, machine, margin) {
   ];
 }
 
+// Épaisseur de brut d'une pièce de la boîte à couvercle exportée seule : sa hauteur plus le
+// surplus de brut (même calcul que LidBox). Hauteurs égales : le brut commun.
+function pieceStock(piece, machine) {
+  const hBody = state.boxParams.height ?? 40, hLid = state.boxParams.lidHeight ?? 15;
+  const extra = Math.max(0, machine.materialThickness - Math.max(hBody, hLid));
+  return (piece === 'lid' ? hLid : hBody) + extra;
+}
+
+// Réécrit les lignes « Brut » et « Passes » de l'en-tête pour l'épaisseur de la pièce exportée
+function restateStock(section, thickness, depthPerPass) {
+  if (!section?.required) return;
+  const [brut, passes] = stockHeaderLines(thickness, depthPerPass);
+  section.lines = section.lines.map(l => l.startsWith('; Brut:') ? brut : l.startsWith('; Passes:') ? passes : l);
+}
+
 // Lit la position et le niveau du gizmo Z0 depuis les boutons actifs
 function getZ0Settings() {
   const posBtn = document.querySelector('.z0-btn.active');
@@ -1321,6 +1337,7 @@ function showExportModal(sections, machine = {}) {
         if (sectionsForExport.length > 0 && sectionsForExport[0].required)
           sectionsForExport[0].lines = sectionsForExport[0].lines
             .map(l => l === '; ═══ CORPS ═══' ? '; ═══ COUVERCLE ═══' : l);
+        restateStock(sectionsForExport[0], pieceStock('lid', machine), machine.depthPerPass);
       } else if (!lidSelected) {
         // Corps seul : recentre sur le corps uniquement
         const bodyOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
@@ -1329,6 +1346,7 @@ function showExportModal(sections, machine = {}) {
           { ...machine, ...bodyOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
         );
         sectionsForExport = parseGCodeSections(bodyCode);
+        restateStock(sectionsForExport[0], pieceStock('body', machine), machine.depthPerPass);
       }
     }
 
