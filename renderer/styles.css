@@ -474,8 +474,8 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  width: min(680px, 94vw);
-  max-height: 82vh;
+  width: min(860px, 94vw);
+  max-height: 86vh;
   overflow: hidden;
   box-shadow: 0 8px 40px rgba(0,0,0,.6);
   animation: slideUp .18s ease;
@@ -496,7 +496,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-panel);
 }
 .help-tab {
-  padding: 8px 14px; font-size: 12px; font-weight: 600;
+  padding: 9px 16px; font-size: 13px; font-weight: 600;
   color: var(--text-muted); background: none; border: none;
   border-bottom: 2px solid transparent; cursor: pointer;
   margin-bottom: -1px; transition: color .15s, border-color .15s;
@@ -506,7 +506,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 
 .help-panel { display: none; flex-direction: column; gap: 18px; }
 .help-panel.active { display: flex; }
-.help-header h3 { font-size: 15px; font-weight: 700; color: var(--accent); margin: 0; }
+.help-header h3 { font-size: 17px; font-weight: 700; color: var(--accent); margin: 0; }
 .help-close {
   background: none; border: none; color: var(--text-muted);
   font-size: 16px; cursor: pointer; line-height: 1; padding: 2px 6px;
@@ -520,27 +520,27 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 }
 
 .help-section h4 {
-  font-size: 12px; font-weight: 700;
+  font-size: 13px; font-weight: 700;
   color: var(--accent3); text-transform: uppercase; letter-spacing: .06em;
   margin: 0 0 8px;
 }
 .help-section p {
-  font-size: 12px; color: var(--text-muted); margin: 0 0 8px; line-height: 1.55;
+  font-size: 14px; color: var(--text-muted); margin: 0 0 8px; line-height: 1.55;
 }
 .help-section strong { color: var(--text); }
 
 .help-dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
 .help-dl dt {
-  font-size: 11px; font-weight: 700; color: var(--accent);
+  font-size: 13px; font-weight: 700; color: var(--accent);
   align-self: start; padding-top: 1px;
 }
 .help-dl dd {
-  font-size: 11px; color: var(--text-muted);
+  font-size: 13px; color: var(--text-muted);
   margin: 0; line-height: 1.5;
 }
 
 .help-note {
-  font-size: 11px; color: var(--text-muted);
+  font-size: 13px; color: var(--text-muted);
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 7px 10px;
   margin: 0 0 10px; line-height: 1.55;
@@ -548,10 +548,10 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 
 .help-table {
   width: 100%; border-collapse: collapse;
-  font-size: 11px;
+  font-size: 13px;
 }
 .help-table th {
-  text-align: left; font-size: 10px; font-weight: 700;
+  text-align: left; font-size: 11px; font-weight: 700;
   color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em;
   border-bottom: 1px solid var(--border);
   padding: 5px 8px;
@@ -575,12 +575,12 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   font-weight: 700; color: var(--text); white-space: nowrap;
 }
 .help-mono {
-  font-family: 'Courier New', monospace; font-size: 10px;
+  font-family: 'Courier New', monospace; font-size: 12px;
   background: var(--bg-dark); padding: 1px 4px; border-radius: 3px;
 }
 /* Chips de coloration syntaxique dans l'aide */
 .help-chip {
-  display: inline-block; font-size: 10px; font-family: 'Courier New', monospace;
+  display: inline-block; font-size: 12px; font-family: 'Courier New', monospace;
   padding: 1px 6px; border-radius: 3px; margin: 1px 2px;
 }
 .chip-comment { background: rgba(128,128,128,.25); color: #a0a0a0; }
@@ -597,14 +597,14 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   text-align: center; margin: 10px 0; overflow-x: auto;
   background: var(--bg-card); border-radius: var(--radius-sm); padding: 8px 4px;
 }
-.help-math math { display: block; font-size: 16px; }
+.help-math math { display: block; font-size: 18px; }
 .help-list {
   margin: 6px 0 0; padding-left: 16px;
-  font-size: 11px; color: var(--text-muted); line-height: 1.6;
+  font-size: 13px; color: var(--text-muted); line-height: 1.6;
 }
 .help-list li em { color: var(--accent3); font-style: normal; font-weight: 600; }
 .help-table-wrap { overflow-x: auto; }
-.help-table-wrap .help-table { min-width: 540px; }
+.help-table-wrap .help-table { min-width: 600px; }
 
 /* ── Boîte d'avertissement ───────────────────────────────────────────────── */
 .warn-dialog {
