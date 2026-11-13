@@ -681,12 +681,15 @@ function lidBoxParts(code, drawing, stock, machine, margin) {
     const draw = drawing.filter(d => d.part === key);
     const pts = draw.flatMap(d => d.pts);
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    // Z0 en bas du brut (stock.top > 0) : le dessus de chaque brut est à son épaisseur,
+    // comme dans le G-code (LidBox) ; Z0 en haut : dessus de chaque brut à Z0
+    const top = stock.top > 0 ? stock.top - (machine.materialThickness - (height + extraOf(key))) : stock.top;
     return {
       label, code: codeLines.join('\n'), drawing: draw,
       stock: {
         x0: Math.min(...xs) - margin, x1: Math.max(...xs) + margin,
         y0: Math.min(...ys) - margin, y1: Math.max(...ys) + margin,
-        top: stock.top, bottom: stock.top - (height + extraOf(key)),
+        top, bottom: top - (height + extraOf(key)),
       },
     };
   };

@@ -284,7 +284,7 @@ export function showHelpModal(machine = {}) {
             <dt>Layout d'export</dt>
             <dd>Corps et couvercle sont placés côte à côte dans le G-code. Le sens est choisi automatiquement pour <strong>minimiser le côté le plus long du brut</strong> : horizontal si W ≤ D, vertical si W &gt; D. Exemple : 140×65 mm → layout vertical, brut 140×150 mm au lieu de 300×65 mm.</dd>
             <dt>Hauteurs différentes</dt>
-            <dd>Si corps et couvercle ont des hauteurs différentes, un <strong>avertissement à l'export</strong> rappelle qu'il faut deux bruts séparés aux épaisseurs correspondantes. Exporter corps et couvercle séparément : chaque fichier est recentré à l'origine (X=0 Y=0) et son en-tête indique le brut de cette pièce (épaisseur et nombre de passes). Z0 en surface : zéro sur le dessus de chaque brut.</dd>
+            <dd>Si corps et couvercle ont des hauteurs différentes, un <strong>avertissement à l'export</strong> rappelle qu'il faut deux bruts séparés aux épaisseurs correspondantes. Exporter corps et couvercle séparément : chaque fichier est recentré à l'origine (X=0 Y=0) et son en-tête indique le brut de cette pièce (épaisseur et nombre de passes). Z0 en surface : zéro sur le dessus de chaque brut. Z0 en bas : zéro sur la table, chaque pièce décalée de l'épaisseur de son propre brut (corps et couvercle n'ont donc pas le même décalage).</dd>
             <dt>Usage</dt><dd>Coffrets, boîtes à bijoux, étuis de présentation.</dd>
           </dl>
         </section>

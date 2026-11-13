@@ -215,12 +215,12 @@ export class ThreePreview {
     else if (lidLay) machH = lidLay.height;
     const zOff  = boxTypeKey === 'stackable' ? -_rimH : 0;
     this._buildZ0Gizmo(layW, layD, machH, this.z0Pos, this.z0Level, zOff);
-    // Hauteurs différentes : deux bruts, chacun à l'épaisseur de sa pièce. Le G-code place les
-    // dessus au même niveau (le repère Z0 est ainsi juste pour les deux) : la pièce la moins
-    // haute, avec son brut, est remontée au niveau de la plus haute.
+    // Hauteurs différentes : deux bruts, chacun à l'épaisseur de sa pièce. Z0 en haut : le zéro est
+    // sur le dessus de chaque brut, la pièce la moins haute (avec son brut) est remontée pour que
+    // les dessus soient au même niveau. Z0 en bas : le zéro est sur la table, les deux sont posées.
     const pc = lidLay?.pieces;
     if (pc && Math.abs(pc.H - pc.lidH) > 1e-6) {
-      const gap = Math.abs(pc.H - pc.lidH);
+      const gap = this.z0Level === 'top' ? Math.abs(pc.H - pc.lidH) : 0;
       const zBody = pc.H < pc.lidH ? gap : 0, zLid = pc.lidH < pc.H ? gap : 0;
       for (const m of pc.bodyMeshes) m.position.z += zBody;
       pc.lid.position.z += zLid;
