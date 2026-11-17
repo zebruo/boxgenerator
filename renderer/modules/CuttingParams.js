@@ -48,7 +48,7 @@ const AP_COEFF = {
  */
 function nearestDiamKey(d) {
   const keys = Object.keys(FZ).map(Number);
-  return String(keys.reduce((a, b) => Math.abs(b - d) < Math.abs(a - d) ? b : a));
+  return String(keys.reduce((a, b) => Math.abs(b - d) < Math.abs(a - d) ? b : a, keys[0]));
 }
 
 /**

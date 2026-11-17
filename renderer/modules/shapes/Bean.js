@@ -11,7 +11,7 @@ const _SVG_PATH = 'm 375.96515,180.47179 c 3.48579,-121.716104 -155.37889,-124.9
 
 /** Courbes de Bézier cubiques du premier sous-chemin : [[P0, P1, P2, P3], …] (coordonnées absolues). */
 function _parseCubics(d) {
-  const tokens = d.match(/-?(?:\d+\.?\d*|\d*\.\d+)(?:[eE][+-]?\d+)?|[a-zA-Z]/g) || [];
+  const tokens = d.match(/-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[a-zA-Z]/g) || [];
   const cubics = [];
   let i = 0, cx = 0, cy = 0;
 

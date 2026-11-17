@@ -12,7 +12,7 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply) {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 
   let selMatId   = saved.matId     ?? '200';
-  let selDiam    = DIAMETERS.reduce((a, b) => Math.abs(b - toolDiameter) < Math.abs(a - toolDiameter) ? b : a);
+  let selDiam    = DIAMETERS.reduce((a, b) => Math.abs(b - toolDiameter) < Math.abs(a - toolDiameter) ? b : a, DIAMETERS[0]);
   let selFlutes  = saved.flutes    ?? 2;
   let manualFz   = null;
   let manualAp   = null;
@@ -257,12 +257,12 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply) {
   bindSlider('cp-sl-spindle','cp-sl-spindle-val', v => maxSpindle = v);
 
   // ── Inputs manuels ────────────────────────────────────────────────────────
-  modal.querySelector('#cp-fz-manual').addEventListener('input', e => { manualFz = parseFloat(e.target.value) || null; });
-  modal.querySelector('#cp-ap-manual').addEventListener('input', e => { manualAp = parseFloat(e.target.value) || null; });
+  modal.querySelector('#cp-fz-manual').addEventListener('input', e => { manualFz = Number.parseFloat(e.target.value) || null; });
+  modal.querySelector('#cp-ap-manual').addEventListener('input', e => { manualAp = Number.parseFloat(e.target.value) || null; });
 
   // ── Calculer ──────────────────────────────────────────────────────────────
   modal.querySelector('#cp-btn-calc').addEventListener('click', () => {
-    const vcManual = parseFloat(modal.querySelector('#cp-vc-manual').value);
+    const vcManual = Number.parseFloat(modal.querySelector('#cp-vc-manual').value);
     const mat      = MATERIALS.find(m => m.id === selMatId);
     const vc       = (vcManual > 0) ? vcManual : mat.vc;
 
@@ -332,7 +332,7 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply) {
   // ── Réinitialiser ─────────────────────────────────────────────────────────
   function resetAll() {
     selMatId  = '200';
-    selDiam   = DIAMETERS.reduce((a, b) => Math.abs(b - toolDiameter) < Math.abs(a - toolDiameter) ? b : a);
+    selDiam   = DIAMETERS.reduce((a, b) => Math.abs(b - toolDiameter) < Math.abs(a - toolDiameter) ? b : a, DIAMETERS[0]);
     selFlutes = 2;
     manualFz  = null;
     manualAp  = null;

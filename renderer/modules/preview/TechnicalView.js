@@ -816,8 +816,8 @@ export class TechnicalView {
     input.select();
 
     const commit = () => {
-      const val = parseFloat(input.value);
-      if (!isNaN(val) && val !== ha.value) {
+      const val = Number.parseFloat(input.value);
+      if (!Number.isNaN(val) && val !== ha.value) {
         this.onParamChange(ha.paramId, val, ha.isShape);
       }
       this._removeOverlay();

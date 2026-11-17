@@ -31,7 +31,7 @@ export class ShapeBase {
   }
 
   updateParam(id, value) {
-    this.params[id] = parseFloat(value);
+    this.params[id] = Number.parseFloat(value);
   }
 
   /**

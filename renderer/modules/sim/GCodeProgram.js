@@ -11,7 +11,7 @@
 
 const MOTION_RE = /^G0?([0-3])(?![0-9.])/;
 const WORD_RE   = /([A-Z])([-+]?\d*\.?\d+)/g;
-const SECTION_RE = /^;\s*─{3,}\s*(.+?)\s*─{3,}/;
+const SECTION_RE = /^;\s*─{3,}\s*(\S(?:.*?\S)?)\s*─{3,}/;
 // Repère de retournement écrit par les boîtes usinées sur deux faces (ex. StackableBox)
 const FACE2_RE   = /^;\s*FACE 2\b.*miroir ([XY]) autour de [XY]=([-+]?\d*\.?\d+)/i;
 

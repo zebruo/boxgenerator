@@ -17,7 +17,7 @@ export class Rectangle extends ShapeBase {
   }
 
   updateParam(id, value) {
-    const v = parseFloat(value);
+    const v = Number.parseFloat(value);
     this.params[id] = v;
     // Garantir length ≥ width pour éviter la bascule d'orientation
     if (id === 'length' && v < this.params.width) {
