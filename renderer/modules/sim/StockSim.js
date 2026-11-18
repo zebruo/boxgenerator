@@ -34,8 +34,14 @@ export class StockSim {
     this.heights = new Float32Array(this.nx * this.ny);
     this.floors  = new Float32Array(this.nx * this.ny);
 
-    this.rc = toolRadius / cell;   // rayon de la fraise en cases
     this.step = cell * 0.7;        // pas d'échantillonnage du trajet
+    // Rayon de la fraise en cases, majoré d'une tolérance : (1) le G-code arrondit ses coordonnées
+    // au µm, et deux trajets qui se rejoignent sur un même bord (rainure extérieure + contour de la
+    // pièce) laisseraient un voile de matière d'un µm ; (2) entre deux positions échantillonnées, le
+    // bord d'une paroi droite ondule de (pas/2)² / 2r. Une case dont le centre tombe sur ce bord
+    // clignoterait alors (dents de scie, pointes dans les angles).
+    const ripple = (this.step / 2) ** 2 / (2 * toolRadius);
+    this.rc = (toolRadius + 0.002 + ripple) / cell;
     this.reset();
   }
 
