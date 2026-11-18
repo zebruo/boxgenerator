@@ -2,6 +2,7 @@ import * as THREE from '../../lib/three.module.js';
 import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { FingerJointBox } from '../boxes/FingerJointBox.js';
+import { lipContour, lipSeat } from '../boxes/LidBox.js';
 import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 
 // Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
@@ -155,7 +156,7 @@ export class ThreePreview {
         break;
       case 'lid-box': {
         const _r = boxParams.rabbet ?? 3; const _bFll = boxParams.lidBottomThickness ?? bFl;
-        lidLay = this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells);
+        lidLay = this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells, machineParams.toolDiameter ?? 3.175);
         layW = lidLay.W; layD = lidLay.D;
         break;
       }
@@ -334,7 +335,7 @@ export class ThreePreview {
     return { W, D, assembled: true, height: H };
   }
 
-  _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6, cells = null) {
+  _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6, cells = null, td = 3.175) {
     // Emprise de la forme (même boîte englobante que le G-code pour la disposition du couvercle)
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys);
@@ -382,8 +383,9 @@ export class ThreePreview {
     // Feuillure corps — élargie par le jeu mécanique
     // Cas 0 : rainure intérieure — anneau entre (wt-r-jeu) et wt, largeur r+jeu, profondeur rD
     // Cas 1 : rainure extérieure — anneau entre 0 et r+jeu (bord ext), largeur r+jeu, profondeur rD
-    const grooveOuter = rs === 0 ? this._offsetPts(pts, -(wt - r - jeu)) : pts;
-    const grooveInner = rs === 0 ? innerPts                               : this._offsetPts(pts, -(r + jeu));
+    // Lèvre et logement : mêmes coins arrondis que le G-code (rayon minimum de la lèvre)
+    const grooveOuter = rs === 0 ? lipSeat(pts, wt - r - jeu, td, jeu) : pts;
+    const grooveInner = rs === 0 ? innerPts                            : lipContour(pts, r + jeu, td);
 
     // Partie solide du mur au niveau de la feuillure (pas creusée par la rainure)
     // rs=0 : anneau extérieur (pts → grooveOuter) ; rs=1 : anneau intérieur (grooveInner → innerPts)
@@ -415,7 +417,7 @@ export class ThreePreview {
     // Couvercle tel qu'usiné (miroir x → W − x, posé à plat, ouverture vers le haut, z 0 → lidH),
     // construit dans un groupe qu'on place ensuite à plat ou assemblé.
     const mirror   = p2 => p2.map(p => ({ x: W - p.x, y: p.y }));
-    const lidOuter = mirror(rs === 0 ? this._offsetPts(pts, -(wt - r)) : pts);
+    const lidOuter = mirror(rs === 0 ? lipContour(pts, wt - r, td) : pts);
     const lidCav   = mirror(innerPts);
     const bodyMeshes = this.meshes.slice(firstBodyMesh);
     const lid = new THREE.Group();
@@ -433,7 +435,7 @@ export class ThreePreview {
     if (rs === 0) {
       ring(lidOuter, lidCav, bFll, lidH - bFll);
     } else {
-      const lidRab = mirror(this._offsetPts(pts, -r));
+      const lidRab = mirror(lipSeat(pts, r, td, jeu));
       ring(lidOuter, lidRab, bFll, lidH - bFll);       // bord extérieur, pleine hauteur
       ring(lidRab, lidCav, bFll, lidH - rD - bFll);    // sous la feuillure
     }

@@ -5,6 +5,22 @@ import { insetPolygon, offsetPolygons, unionPolygons, roundCorners } from '../gc
 import { t } from '../i18n.js';
 
 /**
+ * Rayon de coin minimum de la lèvre (partie mâle de la feuillure) : Ø/2 + 0,4 mm. Un coin vif
+ * ne s'emboîte pas dans son logement, dont la fraise arrondit forcément les coins.
+ */
+export const lipRadius = toolDiameter => toolDiameter / 2 + 0.4;
+
+/** Lèvre : contour décalé de d vers l'intérieur, coins arrondis au rayon minimum. */
+export function lipContour(bodyPts, d, toolDiameter) {
+  return roundCorners(insetPolygon(bodyPts, d), lipRadius(toolDiameter));
+}
+
+/** Logement de la lèvre (lèvre + jeu) : même rayon minimum, plus le jeu. */
+export function lipSeat(bodyPts, d, toolDiameter, clearance) {
+  return roundCorners(insetPolygon(bodyPts, d), lipRadius(toolDiameter) + Math.max(clearance, 0));
+}
+
+/**
  * Boîte avec couvercle à double feuillure.
  *
  * Corps  : rainure sur le bord intérieur haut  (largeur=rabbet, profondeur=rabbetDepth)
@@ -100,7 +116,8 @@ export class LidBox {
     // 1. Feuillure corps (peu profond — doit précéder la cavité)
     gen.machine.materialThickness = rabbetDepth;
     if (rabbetSide === 0) {
-      doPocket(gen.insetContour(bodyPts, wallThickness - rabbet - clearance), t('gcode.op_body_rabbet'));
+      // Logement de la lèvre du couvercle : coins au rayon de la lèvre + jeu
+      doPocket(lipSeat(bodyPts, wallThickness - rabbet - clearance, gen.machine.toolDiameter, clearance), t('gcode.op_body_rabbet'));
     } else {
       // Feuillure extérieure : creuse l'anneau périphérique (passes concentriques)
       const td = gen.machine.toolDiameter;
@@ -114,9 +131,8 @@ export class LidBox {
       // Ø/2 + 0,4 mm. Un coin vif ne peut pas s'emboîter dans la poche du couvercle, dont la
       // fraise arrondit forcément les coins. Si le contour a déjà des coins assez ronds,
       // `lip === lipRaw` et rien ne change.
-      const rLip   = td / 2 + 0.4;
       const lipRaw = gen.insetContour(bodyPts, ringW);
-      const lip    = roundCorners(lipRaw, rLip);
+      const lip    = roundCorners(lipRaw, lipRadius(td));
       const rounded = lip !== lipRaw && lip.length > 2;
       // Anneaux jusqu'au bord exact de la feuillure (pas resserré dans les coins)
       const inset = d => gen.insetContour(bodyPts, d);
@@ -194,7 +210,8 @@ export class LidBox {
       // Couvercle réduit : inset nominal (wt-r), lèvre = r s'emboîte dans rainure r+jeu
       const inset0 = wallThickness - rabbet;
       gen.comment(`Couvercle réduit: inset ${inset0.toFixed(1)}mm/côté (lèvre nominale ${rabbet}mm)`);
-      const lidPts = mirrorPts(gen.insetContour(bodyPts, inset0));
+      // Lèvre du couvercle : coins au rayon minimum (s'emboîte dans le logement du corps)
+      const lidPts = mirrorPts(lipContour(bodyPts, inset0, gen.machine.toolDiameter));
       // 1. Cavité intérieure (la lèvre est formée naturellement par contour + cavité)
       const lidCavDepth0 = lidHeight - bFll;
       if (lidCavDepth0 > 0 && W > 2 * wallThickness) {
@@ -213,9 +230,8 @@ export class LidBox {
       // 1. Feuillure (peu profond)
       if (W > 2 * rabbet && D > 2 * rabbet) {
         gen.machine.materialThickness = rabbetDepth;
-        // Poche = lèvre du corps + jeu : même rayon de coin minimum que la lèvre, plus le jeu
-        const rPocket = gen.machine.toolDiameter / 2 + 0.4 + Math.max(clearance, 0);
-        doPocket(mirrorPts(roundCorners(gen.insetContour(bodyPts, rabbet), rPocket)), t('gcode.op_lid_rabbet_pocket'));
+        // Logement de la lèvre du corps : coins au rayon de la lèvre + jeu
+        doPocket(mirrorPts(lipSeat(bodyPts, rabbet, gen.machine.toolDiameter, clearance)), t('gcode.op_lid_rabbet_pocket'));
       }
       // 2. Cavité (depthStart=rabbetDepth, feuillure déjà usinée)
       const lidCavDepth1 = lidHeight - bFll;
@@ -252,7 +268,8 @@ export class LidBox {
       if (useVertical) dy = D + lidGap; else dx = W + lidGap;
     }
     const shift = pts => pts.map(p => ({ x: p.x + dx, y: p.y + dy }));
-    const lidOuter = rabbetSide === 0 ? mirrorPts(insetPolygon(bodyPts, wallThickness - rabbet)) : mirrorPts(bodyPts);
+    const lidOuter = rabbetSide === 0
+      ? mirrorPts(lipContour(bodyPts, wallThickness - rabbet, machineParams.toolDiameter ?? 3.175)) : mirrorPts(bodyPts);
     const cavity = insetPolygon(bodyPts, wallThickness);
     // part : pièce à laquelle appartient le contour (simulation pièce par pièce)
     const items = [{ pts: bodyPts, face: 1, outer: true, part: 'body' }];

@@ -1,6 +1,7 @@
 import { t } from '../i18n.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { insetPolygon } from '../gcode/Offset.js';
+import { lipContour } from '../boxes/LidBox.js';
 
 // Pièce d'illustration (boîte du dessous de l'empilable) : gris, comme dans l'aperçu 3D
 const GHOST = '#8e8e96';
@@ -242,7 +243,7 @@ export class TechnicalView {
 
     // Boîte à couvercle réduit : contour du couvercle (posé dessus), en pointillés
     if (boxTypeKey === 'lid-box' && (boxParams.rabbetSide ?? 0) === 0 && nfo.lidH > 0) {
-      const lid = insetPolygon(pts, wt - (boxParams.rabbet ?? 0));
+      const lid = lipContour(pts, wt - (boxParams.rabbet ?? 0), machineParams.toolDiameter ?? 3.175);
       if (lid.length > 2) {
         ctx.beginPath();
         lid.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
