@@ -88,7 +88,6 @@ function spreadTabs(segs, count, perimeter) {
   return centers;
 }
 
-/** Signe du décalage d'outil selon le côté : dehors −1, dedans +1, sur le trait 0. */
 /** Distance curviligne la plus courte entre deux abscisses d'un contour fermé. */
 const loopDist = (a, b, perimeter) => {
   const d = Math.abs(a - b);
@@ -117,6 +116,7 @@ function completeTabs(centers, count, perimeter, sharpDists, width) {
   return out;
 }
 
+/** Signe du décalage d'outil selon le côté : dehors −1, dedans +1, sur le trait 0. */
 const SIDE_SIGN = { outside: -1, inside: 1 };
 const sideSign = side => SIDE_SIGN[side] ?? 0;
 
@@ -672,7 +672,28 @@ export class GCodeGenerator {
 
     const allPts    = paired.map(p => p.rough);
     const allPtsFin = paired.some(p => p.fin) ? paired.map(p => p.fin).filter(Boolean) : null;
+    this._emitRings(allPts, allPtsFin, side, label);
+  }
 
+  /**
+   * Bande creusée par anneaux concentriques avec passe de finition (feuillure extérieure).
+   * Les anneaux d'ébauche sont déjà positionnés (trajet de l'outil) et doivent laisser la
+   * surépaisseur sur les DEUX parois de la bande ; la finition passe seulement sur les deux
+   * trajets extrêmes (une par paroi). Ce n'est pas le cas de cutContoursInterleaved en
+   * 'center', qui décale tous les anneaux dans le même sens : le dernier dépasserait la paroi.
+   * @param {Array<{x,y}[]>} roughContours - trajets d'ébauche (centre de l'outil)
+   * @param {Array<{x,y}[]>} finContours   - trajets de finition (un par paroi)
+   */
+  cutBandRings(roughContours, finContours, label = 'Contour') {
+    const prep = pts => this._reorderAt(pts, this._maxSegIdx(pts));
+    const rough = roughContours.filter(p => p?.length >= 2).map(prep);
+    const fin   = finContours.filter(p => p?.length >= 2).map(prep);
+    if (rough.length === 0) return;
+    this._emitRings(rough, fin.length ? fin : null, 'center', label);
+  }
+
+  /** Émet les passes d'anneaux : ébauche à chaque profondeur, puis finition à pleine profondeur. */
+  _emitRings(allPts, allPtsFin, side, label) {
     const { depth, passes, stepZ } = this._passPlan();
 
     this.comment(`─── ${label} (${side}, ${allPts.length} anneaux fusionnés) ───`);

@@ -111,9 +111,21 @@ export class LidBox {
         gen.comment(`ATTENTION: fraise Ø${td}mm trop large pour feuillure ${ringW.toFixed(1)}mm — utiliser Ø≤${(ringW).toFixed(1)}mm`);
       }
       // Anneaux jusqu'au bord exact de la feuillure (pas resserré dans les coins)
-      const ringContours = dMin > dMax + 1e-6 ? [] : gen.ringInsets(bodyPts, dMin, dMax)
-        .map(d => gen.insetContour(bodyPts, d)).filter(c => c.length > 2);
-      if (ringContours.length) gen.cutContoursInterleaved(ringContours, 'center', entryOpts, t('gcode.op_body_rabbet_ext'));
+      const inset = d => gen.insetContour(bodyPts, d);
+      const faRing = entryOpts.finishAllowance ?? 0;
+      if (dMin > dMax + 1e-6) {
+        // rien à usiner : la fraise est plus large que la feuillure
+      } else if (faRing > 0) {
+        // Ébauche à faRing des deux parois, puis finition sur chacune (bords exacts)
+        const lo = dMin + faRing, hi = dMax - faRing;
+        const roughD = hi >= lo - 1e-9 ? gen.ringInsets(bodyPts, lo, hi) : [(dMin + dMax) / 2];
+        const finD = dMax - dMin > 1e-6 ? [dMin, dMax] : [dMin];
+        gen.cutBandRings(roughD.map(inset).filter(c => c.length > 2), finD.map(inset).filter(c => c.length > 2),
+          t('gcode.op_body_rabbet_ext'));
+      } else {
+        const ringContours = gen.ringInsets(bodyPts, dMin, dMax).map(inset).filter(c => c.length > 2);
+        if (ringContours.length) gen.cutContoursInterleaved(ringContours, 'center', entryOpts, t('gcode.op_body_rabbet_ext'));
+      }
     }
 
     // 2. Cavité corps
