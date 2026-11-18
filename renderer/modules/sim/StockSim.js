@@ -11,6 +11,9 @@
 
 import { pointOnMove, toStockFrame } from './GCodeProgram.js';
 
+/** Marge sur le rayon de la fraise (mm) : arrondi du G-code au µm (0,002) + tolérance de la compaction en arcs G2/G3 (0,015, voir GCodeCompactor). */
+const SLACK = 0.017;
+
 export class StockSim {
   /**
    * @param {object} o
@@ -41,7 +44,7 @@ export class StockSim {
     // bord d'une paroi droite ondule de (pas/2)² / 2r. Une case dont le centre tombe sur ce bord
     // clignoterait alors (dents de scie, pointes dans les angles).
     const ripple = (this.step / 2) ** 2 / (2 * toolRadius);
-    this.rc = (toolRadius + 0.002 + ripple) / cell;
+    this.rc = (toolRadius + SLACK + ripple) / cell;
     this.reset();
   }
 
