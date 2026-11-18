@@ -321,7 +321,7 @@ function renderShapeParams() {
       if (state.boxParams[d.id] === undefined) state.boxParams[d.id] = currentVal;
       row.innerHTML = `
         <label title="${t(d.label)}">${t(d.label)}</label>
-        <input type="text" data-param="${d.id}" placeholder="${d.placeholder ?? ''}" spellcheck="false" autocomplete="off">
+        <input type="text" data-param="${d.id}" placeholder="${d.placeholder ? t(d.placeholder) : ''}" spellcheck="false" autocomplete="off">
         <span class="param-unit">${d.unit ?? ''}</span>
       `;
       const inp = row.querySelector('input');
@@ -475,7 +475,9 @@ function updatePartitionWarning() {
   setWarn(splitEl, error === 'count' ? t('warn.partition_split_count', { n: partitions + 1 })
     : error === 'invalid' ? t('warn.partition_split_invalid') : tooSmall);
   const fmt = v => (currentLang() === 'fr' ? v.toFixed(1).replace('.', ',') : v.toFixed(1));
-  if (note) note.textContent = sizes.map(fmt).join(' / ') + ' mm';
+  const list = sizes.map(fmt).join(' / ') + ' mm';
+  // Champ vide : on dit que ce sont des parts égales (l'exemple grisé n'est pas une valeur)
+  if (note) note.textContent = (state.boxParams.partitionSplit ?? '').trim() ? list : t('param.partition_split_equal', { sizes: list });
 }
 
 function updateRabbetToolWarning() {

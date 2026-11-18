@@ -45,6 +45,8 @@ export const en = {
     partitions:          'Partitions',
     partition_dir:       'Direction',
     partition_split:     'Split',
+    partition_split_ph:  'e.g. 60/40',
+    partition_split_equal: 'Equal parts: {{sizes}} — type e.g. 60/40',
     finger_width:        'Finger width',
     mat_thickness:       'Material thick.',
     with_lid:            'With lid',

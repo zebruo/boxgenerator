@@ -45,6 +45,8 @@ export const fr = {
     partitions:          'Cloisons',
     partition_dir:       'Direction',
     partition_split:     'Répartition',
+    partition_split_ph:  'ex. 60/40',
+    partition_split_equal: 'Parts égales : {{sizes}} — saisir ex. 60/40',
     finger_width:        'Larg. encoche',
     mat_thickness:       'Épaiss. matière',
     with_lid:            'Avec couvercle',

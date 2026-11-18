@@ -167,7 +167,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .param-note { grid-column: 1 / -1; font-size: 10px; color: var(--text-muted); font-style: italic; margin-top: -2px; }
 .param-row input[type=number].input-warn,
 .param-row input[type=text].input-warn { color: var(--warn) !important; border-color: var(--warn) !important; border-style: dashed; }
-.param-row input[type=text]::placeholder { color: var(--text-muted); opacity: .6; }
+.param-row input[type=text]::placeholder { color: var(--text-muted); opacity: .5; font-style: italic; }
 .param-row input[type=checkbox] { accent-color: var(--accent); cursor: pointer; width: auto; }
 
 
