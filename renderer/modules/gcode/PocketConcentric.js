@@ -76,9 +76,10 @@ function _startNear(ring, p) {
 
 /**
  * Usine tous les anneaux à la profondeur z. Liaison en G1 vers l'anneau suivant si elle
- * est courte (≤ maxLink), sinon remontée, déplacement rapide et nouvelle plongée.
+ * est courte (≤ maxLink), sinon remontée, déplacement rapide et nouvelle entrée depuis
+ * layerTop (dessus de la matière de la couche).
  */
-function _cutRings(gen, rings, z, depthStart, maxLink) {
+function _cutRings(gen, rings, z, layerTop, depthStart, maxLink) {
   const m = gen.machine;
   let pos = null;
   rings.forEach((ring, ri) => {
@@ -87,7 +88,7 @@ function _cutRings(gen, rings, z, depthStart, maxLink) {
       gen.rapidZ(m.safeZ);
       gen.rapidTo(start.x, start.y);
       if (depthStart > 0) gen.emit(`G0 Z${(-depthStart + m.zOffset).toFixed(3)}`);
-      gen.plungeTo(z);
+      gen.pocketEnter(ring, z, layerTop);   // plongée, ou rampe selon l'export
     } else {
       gen.lineTo(start.x, start.y);
     }
@@ -136,7 +137,7 @@ export function pocketConcentric(gen, points, label = 'Pocket concentrique', dep
   for (let pass = 1; pass <= passes; pass++) {
     const z = -(depthStart + stepZ * pass);
     gen.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}`);
-    _cutRings(gen, rings, z, depthStart, maxLink);
+    _cutRings(gen, rings, z, z + stepZ, depthStart, maxLink);
     gen.rapidZ(m.safeZ);
   }
 

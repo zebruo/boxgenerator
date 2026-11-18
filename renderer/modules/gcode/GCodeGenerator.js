@@ -121,6 +121,9 @@ function completeTabs(centers, count, perimeter, sharpDists, width) {
 const SIDE_SIGN = { outside: -1, inside: 1 };
 const sideSign = side => SIDE_SIGN[side] ?? 0;
 
+/** Pente maximale de l'entrée en rampe des poches (10°) : tangente. */
+const POCKET_RAMP_TAN = Math.tan(10 * Math.PI / 180);
+
 /** Suffixe de commentaire « , finition +0.2mm » (vide sans surépaisseur). */
 const finishLabel = fa => (fa > 0 ? `, finition +${fa}mm` : '');
 
@@ -142,6 +145,10 @@ export class GCodeGenerator {
       arcs:    machine.arcs    ?? true, // regroupe les segments G1 en arcs G2/G3 à la sortie
       unit: 'mm'
     };
+    // Entrée des poches : rampe si l'export demande rampe ou hélice (voir pocketEnter)
+    const eo = machine.entryOpts ?? {};
+    this.pocketRamp    = eo.entry === 'ramp' || eo.entry === 'helix';
+    this.pocketRampLen = eo.rampLen > 0 ? eo.rampLen : this.machine.toolDiameter;
     this.lines = [];
   }
 
@@ -243,6 +250,57 @@ export class GCodeGenerator {
 
   comment(text) {
     this.emit(`; ${text}`);
+  }
+
+  /**
+   * Descente dans la matière au début d'un trajet de poche, de fromZ (dessus de la matière à
+   * cet endroit : fond de la couche précédente) jusqu'à z. L'outil est déjà au-dessus de path[0].
+   * Rampe (export en rampe ou hélice) : allers-retours sur le début du trajet, pente ≤ 10°,
+   * jambes de la longueur de rampe choisie ; finit en path[0] à z. Sinon : plongée droite.
+   * @param {{x,y}[]} path    trajet qui va être usiné à partir de path[0]
+   * @param {boolean} closed  trajet fermé (anneau) : la rampe peut continuer après le dernier point
+   */
+  pocketEnter(path, z, fromZ, closed = true) {
+    const sub = this.pocketRamp && fromZ > z + 1e-6 ? this._pathStart(path, closed, this.pocketRampLen) : null;
+    const len = sub ? this._polyLen(sub) : 0;
+    if (len < 0.5) { this.plungeTo(z); return; }
+    const dz    = fromZ - z;
+    const legs  = 2 * Math.max(1, Math.ceil(dz / (2 * len * POCKET_RAMP_TAN)));
+    const total = legs * len;
+    const f = Math.round(this.machine.plungeRate
+      + (2 * Math.atan2(total, dz) / Math.PI) * (this.machine.feedrate - this.machine.plungeRate));
+    const { originX: ox, originY: oy, zOffset: zo } = this.machine;
+    this.emit(`G0 Z${(fromZ + zo).toFixed(3)}`);
+    let done = 0;
+    for (let k = 0; k < legs; k++) {
+      const leg = k % 2 === 0 ? sub : [...sub].reverse();
+      for (let i = 1; i < leg.length; i++) {
+        done += Math.hypot(leg[i].x - leg[i - 1].x, leg[i].y - leg[i - 1].y);
+        const zz = fromZ - dz * Math.min(1, done / total);
+        this.emit(`G1 X${(leg[i].x + ox).toFixed(3)} Y${(leg[i].y + oy).toFixed(3)} Z${(zz + zo).toFixed(3)} F${f}`);
+      }
+    }
+  }
+
+  /** Début du trajet `path` sur une longueur L (dernier point interpolé). Fermé : au plus 90 % du tour. */
+  _pathStart(path, closed, L) {
+    const pts = closed ? [...path, path[0]] : path;
+    const maxL = closed ? 0.9 * this._polyLen(pts) : this._polyLen(pts);
+    let rest = Math.min(L, maxL);
+    const out = [pts[0]];
+    for (let i = 1; i < pts.length && rest > 1e-9; i++) {
+      const a = pts[i - 1], b = pts[i], d = Math.hypot(b.x - a.x, b.y - a.y);
+      if (d <= rest) { out.push(b); rest -= d; continue; }
+      out.push({ x: a.x + (b.x - a.x) * rest / d, y: a.y + (b.y - a.y) * rest / d });
+      rest = 0;
+    }
+    return out;
+  }
+
+  _polyLen(pts) {
+    let l = 0;
+    for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    return l;
   }
 
   // ─── Entrées outil ────────────────────────────────────────────────────────
@@ -1048,7 +1106,6 @@ export class GCodeGenerator {
     const remainDepth = this.machine.materialThickness - depthStart;
     const passes      = Math.max(1, Math.ceil(remainDepth / this.machine.depthPerPass));
     const stepZ       = remainDepth / passes;
-    const clearance   = 1.0;  // dégagement inter-lignes au-dessus du fond de passe (mm)
     const zo          = this.machine.zOffset;
 
     const fa    = Math.max(0, finishAllowance);
@@ -1070,10 +1127,14 @@ export class GCodeGenerator {
 
     for (let pass = 1; pass <= passes; pass++) {
       const z      = -(depthStart + stepZ * pass);
-      const clearZ = z + clearance;
-      const reenter = () => {
+      // Dessus de la matière de cette couche (fond de la précédente). Le changement de ligne se
+      // fait 0,5 mm au-dessus : avant, à 1 mm du fond seulement, le G0 latéral traversait la
+      // matière non coupée dès que la passe dépassait 1 mm.
+      const layerTop = z + stepZ;
+      const clearZ   = layerTop + 0.5;
+      const reenter = path => {
         if (depthStart > 0) this.emit(`G0 Z${(-depthStart + zo).toFixed(3)}`);
-        this.plungeTo(z);
+        this.pocketEnter(path, z, layerTop, false);
       };
       this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}`);
       this.rapidZ(this.machine.safeZ);
@@ -1086,20 +1147,21 @@ export class GCodeGenerator {
           if (xCuts[k + 1] - xCuts[k] < 1e-6) continue;
           const xFrom = dir > 0 ? xCuts[k] : xCuts[k + 1];
           const xTo   = dir > 0 ? xCuts[k + 1] : xCuts[k];
+          const row = [{ x: xFrom, y }, { x: xTo, y }];
           if (firstMove) {
             this.rapidTo(xFrom, y);
-            reenter();
+            reenter(row);
             firstMove = false;
           } else if (!firstSegInRow) {
             // Même ligne, tronçon disjoint (forme concave) → retrait complet
             this.rapidZ(this.machine.safeZ);
             this.rapidTo(xFrom, y);
-            reenter();
+            reenter(row);
           } else {
-            // Nouvelle ligne → dégagement minimal (sans retour au safeZ)
+            // Nouvelle ligne → dégagement au-dessus de la couche (sans retour au safeZ)
             this.emit(`G0 Z${(clearZ + zo).toFixed(3)}`);
             this.rapidTo(xFrom, y);
-            this.plungeTo(z);
+            this.pocketEnter(row, z, layerTop, false);
           }
           this.lineTo(xTo, y);
           firstSegInRow = false;
@@ -1111,7 +1173,7 @@ export class GCodeGenerator {
       for (const loop of zone) {
         this.rapidZ(this.machine.safeZ);
         this.rapidTo(loop[0].x, loop[0].y);
-        reenter();
+        reenter(loop);
         for (let i = 1; i < loop.length; i++) this.lineTo(loop[i].x, loop[i].y);
         this.lineTo(loop[0].x, loop[0].y);
       }
