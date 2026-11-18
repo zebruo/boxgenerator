@@ -15,6 +15,15 @@ export function lipContour(bodyPts, d, toolDiameter) {
   return roundCorners(insetPolygon(bodyPts, d), lipRadius(toolDiameter));
 }
 
+/**
+ * Épaisseur des cloisons de la boîte à couvercle : la largeur de la feuillure (comme la lèvre,
+ * plutôt que la paroi pleine), sans dépasser l'épaisseur des parois.
+ */
+export function lidPartitionThickness(params) {
+  const wt = params.wallThickness ?? 6, rb = params.rabbet ?? 3;
+  return rb > 0 ? Math.min(rb, wt) : wt;
+}
+
 /** Logement de la lèvre (lèvre + jeu) : même rayon minimum, plus le jeu. */
 export function lipSeat(bodyPts, d, toolDiameter, clearance) {
   return roundCorners(insetPolygon(bodyPts, d), lipRadius(toolDiameter) + Math.max(clearance, 0));
@@ -190,7 +199,8 @@ export class LidBox {
       gen.machine.materialThickness = height - bFl;
       if (partitions > 0) {
         const cells = buildPartitionContours(W, D, wallThickness, partitions, partitionDir, machineParams.toolDiameter,
-          { minX: bb.minX, minY: bb.minY, cavity: gen.insetContour(bodyPts, wallThickness), split: params.partitionSplit });
+          { minX: bb.minX, minY: bb.minY, cavity: gen.insetContour(bodyPts, wallThickness), split: params.partitionSplit,
+            partitionThickness: lidPartitionThickness(params) });
         if (cells) {
           cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`, cavDepthStart));
         } else {
@@ -298,7 +308,8 @@ export class LidBox {
     const cells = (params.partitions ?? 0) > 0
       ? buildPartitionContours(W, D, wallThickness, params.partitions,
           partitionDir, machineParams.toolDiameter ?? 3.175,
-          { minX: bb.minX, minY: bb.minY, cavity, split: params.partitionSplit })
+          { minX: bb.minX, minY: bb.minY, cavity, split: params.partitionSplit,
+            partitionThickness: lidPartitionThickness(params) })
       : null;
     for (const c of cells ?? (cavity.length > 2 ? [cavity] : [])) items.push({ pts: c, face: 1, part: 'body' });
     if (cavity.length > 2) items.push({ pts: shift(mirrorPts(cavity)), face: 1, part: 'lid' });

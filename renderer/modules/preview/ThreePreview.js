@@ -2,7 +2,7 @@ import * as THREE from '../../lib/three.module.js';
 import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { FingerJointBox } from '../boxes/FingerJointBox.js';
-import { lipContour, lipSeat } from '../boxes/LidBox.js';
+import { lipContour, lipSeat, lidPartitionThickness } from '../boxes/LidBox.js';
 import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 
 // Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
@@ -544,7 +544,8 @@ export class ThreePreview {
     const wt = boxParams.wallThickness ?? 6;
     return buildPartitionContours(bb.width, bb.height, wt, n,
       boxParams.partitionDir === 'horizontal' ? 'horizontal' : 'vertical', machineParams.toolDiameter ?? 3.175,
-      { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(pts, wt), split: boxParams.partitionSplit });
+      { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(pts, wt), split: boxParams.partitionSplit,
+        partitionThickness: boxTypeKey === 'lid-box' ? lidPartitionThickness(boxParams) : wt });
   }
 
   /** Crée un THREE.Shape depuis un tableau de {x, y}. */

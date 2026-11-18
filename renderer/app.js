@@ -12,7 +12,7 @@ import { Polygon }        from './modules/shapes/Polygon.js';
 import { Bean }           from './modules/shapes/Bean.js';
 import { OpenTray }       from './modules/boxes/OpenTray.js';
 import { FingerJointBox } from './modules/boxes/FingerJointBox.js';
-import { LidBox }         from './modules/boxes/LidBox.js';
+import { LidBox, lidPartitionThickness } from './modules/boxes/LidBox.js';
 import { StackableBox }   from './modules/boxes/StackableBox.js';
 import { showHelpModal }         from './modules/HelpModal.js';
 import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
@@ -463,8 +463,9 @@ function updatePartitionWarning() {
   const td  = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 6;
   const bb  = state.shape?.getBoundingBox();
   if (!bb) return;
+  const partThick = state.boxTypeKey === 'lid-box' ? lidPartitionThickness(state.boxParams) : wallThickness;
   const { sizes, error, sum } = partitionSizes(bb.width, bb.height, wallThickness, partitions, partitionDir,
-    state.boxParams.partitionSplit ?? '');
+    state.boxParams.partitionSplit ?? '', partThick);
   const across = (partitionDir === 'vertical' ? bb.height : bb.width) - 2 * wallThickness;
   const smallest = Math.min(...sizes, across);
   const minCell = 3 * td;

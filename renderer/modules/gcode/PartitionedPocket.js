@@ -23,9 +23,9 @@ export function parseSplit(text, count) {
  * l'épaisseur des cloisons) est réparti selon `split`, ou en parts égales si `split` est vide
  * ou inutilisable (`error` dit alors pourquoi).
  */
-export function partitionSizes(W, D, wallThickness, partitions, partitionDir, split = '') {
+export function partitionSizes(W, D, wallThickness, partitions, partitionDir, split = '', partitionThickness = wallThickness) {
   const n = partitions + 1, wt = wallThickness;
-  const usable = (partitionDir === 'vertical' ? W : D) - 2 * wt - partitions * wt;
+  const usable = (partitionDir === 'vertical' ? W : D) - 2 * wt - partitions * partitionThickness;
   const parsed = parseSplit(split, n);
   const sizes = parsed?.fractions ? parsed.fractions.map(f => usable * f) : Array(n).fill(usable / n);
   return { sizes, error: parsed?.error ?? null, sum: parsed?.sum };
@@ -33,7 +33,7 @@ export function partitionSizes(W, D, wallThickness, partitions, partitionDir, sp
 
 /**
  * Calcule les contours des sous-poches séparées par des cloisons.
- * Chaque cloison a la même épaisseur que wallThickness.
+ * Les cloisons ont l'épaisseur `opts.partitionThickness` (par défaut celle des parois).
  * Les coins intérieurs sont naturellement arrondis au rayon de la fraise.
  *
  * Les compartiments sont d'abord des rectangles répartis sur la boîte englobante, puis
@@ -50,13 +50,14 @@ export function partitionSizes(W, D, wallThickness, partitions, partitionDir, sp
  * @param {number} [opts.minX=0], [opts.minY=0]  coin de la boîte englobante de la forme
  * @param {{x,y}[]} [opts.cavity]  contour de la cavité (forme rétrécie de l'épaisseur de paroi)
  * @param {string}  [opts.split]   répartition des compartiments (« 60/40 »), parts égales si vide
+ * @param {number}  [opts.partitionThickness=wallThickness]  épaisseur des cloisons (mm)
  * @returns {{x,y}[][]|null}     tableau de contours, ou null si les cellules sont trop petites
  */
 export function buildPartitionContours(W, D, wallThickness, partitions, partitionDir, toolDiameter, opts = {}) {
   const { minX = 0, minY = 0, cavity = null, split = '' } = opts;
-  const wt = wallThickness;
+  const wt = wallThickness, pt = opts.partitionThickness ?? wallThickness;
   const vertical = partitionDir === 'vertical';
-  const { sizes } = partitionSizes(W, D, wt, partitions, partitionDir, split);
+  const { sizes } = partitionSizes(W, D, wt, partitions, partitionDir, split, pt);
   const across = (vertical ? D : W) - 2 * wt;          // dimension non divisée
   const minCell = 3 * toolDiameter;
 
@@ -65,7 +66,7 @@ export function buildPartitionContours(W, D, wallThickness, partitions, partitio
   const contours = [];
   let pos = wt;
   for (const [k, size] of sizes.entries()) {
-    if (!split) pos = wt + k * (size + wt);   // parts égales : même calcul qu'avant (G-code inchangé)
+    if (!split) pos = wt + k * (size + pt);   // parts égales : même calcul qu'avant (G-code inchangé)
     const [x0, y0, cw, ch] = vertical
       ? [minX + pos, minY + wt, size, across]
       : [minX + wt, minY + pos, across, size];
@@ -75,7 +76,7 @@ export function buildPartitionContours(W, D, wallThickness, partitions, partitio
       { x: x0 + cw, y: y0 + ch },
       { x: x0,      y: y0 + ch }
     ]);
-    pos += size + wt;
+    pos += size + pt;
   }
   if (!cavity || cavity.length < 3) return contours;
 
