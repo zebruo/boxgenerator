@@ -105,3 +105,51 @@ export function clipToRegion(poly, region) {
 export function insetPolygon(points, d, opts) {
   return offsetPolygons(points, -d, opts)[0] ?? [];
 }
+
+/** Réunion de deux contours fermés : renvoie le plus grand contour extérieur, dans le sens de `a`. */
+export function unionPolygons(a, b) {
+  if (a.length < 3) return b;
+  if (b.length < 3) return a;
+  const C = clipper();
+  const c = new C.Clipper();
+  c.AddPath(toPath(a), C.PolyType.ptSubject, true);
+  c.AddPath(toPath(b), C.PolyType.ptClip, true);
+  const solution = new C.Paths();
+  c.Execute(C.ClipType.ctUnion, solution, C.PolyFillType.pftNonZero, C.PolyFillType.pftNonZero);
+  const sign = Math.sign(signedArea(a));
+  return solution
+    .filter(p => p.length >= 3 && C.Clipper.Orientation(p))
+    .map(p => {
+      const q = fromPath(p);
+      if (Math.sign(signedArea(q)) !== sign) q.reverse();
+      return q;
+    })
+    .sort((p, q) => Math.abs(signedArea(q)) - Math.abs(signedArea(p)))[0] ?? [];
+}
+
+/** Distance d'un point au contour fermé `poly` (segment le plus proche). */
+function distToPolygon(p, poly) {
+  let best = Infinity;
+  for (let i = 0, n = poly.length; i < n; i++) {
+    const a = poly[i], b = poly[(i + 1) % n];
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    best = Math.min(best, Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy));
+  }
+  return best;
+}
+
+/**
+ * Impose un rayon de coin minimum `rho` aux coins saillants d'un contour (ouverture
+ * morphologique : rétrécir de rho puis agrandir de rho, jonctions arrondies). Les coins déjà
+ * assez ronds, les courbes et les segments ne bougent pas : si aucun sommet du contour n'est
+ * déplacé de plus de `tol` mm, le tableau d'origine est renvoyé tel quel (même référence).
+ */
+export function roundCorners(points, rho, tol = 0.03) {
+  if (!points || points.length < 3 || !(rho > 0)) return points;
+  const eroded = offsetPolygons(points, -rho, { join: 'round' })[0];
+  if (!eroded) return points;
+  const opened = offsetPolygons(eroded, rho, { join: 'round' })[0];
+  if (!opened) return points;
+  return points.some(p => distToPolygon(p, opened) > tol) ? opened : points;
+}

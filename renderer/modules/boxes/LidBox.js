@@ -1,7 +1,7 @@
 import { GCodeGenerator } from '../gcode/GCodeGenerator.js';
 import { pocketConcentric } from '../gcode/PocketConcentric.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
-import { insetPolygon } from '../gcode/Offset.js';
+import { insetPolygon, offsetPolygons, unionPolygons, roundCorners } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
 
 /**
@@ -110,8 +110,20 @@ export class LidBox {
       if (dMin > dMax + 1e-6) {
         gen.comment(`ATTENTION: fraise Ø${td}mm trop large pour feuillure ${ringW.toFixed(1)}mm — utiliser Ø≤${(ringW).toFixed(1)}mm`);
       }
+      // Lèvre (partie qui reste haute, côté intérieur de la feuillure) : rayon de coin d'au moins
+      // Ø/2 + 0,4 mm. Un coin vif ne peut pas s'emboîter dans la poche du couvercle, dont la
+      // fraise arrondit forcément les coins. Si le contour a déjà des coins assez ronds,
+      // `lip === lipRaw` et rien ne change.
+      const rLip   = td / 2 + 0.4;
+      const lipRaw = gen.insetContour(bodyPts, ringW);
+      const lip    = roundCorners(lipRaw, rLip);
+      const rounded = lip !== lipRaw && lip.length > 2;
       // Anneaux jusqu'au bord exact de la feuillure (pas resserré dans les coins)
       const inset = d => gen.insetContour(bodyPts, d);
+      // Coin de lèvre arrondi : chaque anneau suit le plus extérieur de « contour décalé de d » et
+      // « lèvre agrandie de la fraise (+ surépaisseur) » ; le dernier anneau est la lèvre elle-même.
+      const around = e => offsetPolygons(lip, e, { join: 'round' })[0] ?? [];
+      const hug    = (d, e) => unionPolygons(inset(d), around(e));
       const faRing = entryOpts.finishAllowance ?? 0;
       if (dMin > dMax + 1e-6) {
         // rien à usiner : la fraise est plus large que la feuillure
@@ -120,12 +132,16 @@ export class LidBox {
         const lo = dMin + faRing, hi = dMax - faRing;
         const roughD = hi >= lo - 1e-9 ? gen.ringInsets(bodyPts, lo, hi) : [(dMin + dMax) / 2];
         const finD = dMax - dMin > 1e-6 ? [dMin, dMax] : [dMin];
-        gen.cutBandRings(roughD.map(inset).filter(c => c.length > 2), finD.map(inset).filter(c => c.length > 2),
-          t('gcode.op_body_rabbet_ext'));
+        const rough = rounded ? roughD.map(d => hug(d, td / 2 + faRing)) : roughD.map(inset);
+        const fin = rounded ? finD.map(d => (d === dMax && finD.length > 1 ? around(td / 2) : hug(d, td / 2))) : finD.map(inset);
+        gen.cutBandRings(rough.filter(c => c.length > 2), fin.filter(c => c.length > 2), t('gcode.op_body_rabbet_ext'));
       } else {
         // Sans finition : mêmes anneaux, avec le détour dans les coins vifs à la dernière passe
-        const ringContours = gen.ringInsets(bodyPts, dMin, dMax).map(inset).filter(c => c.length > 2);
-        gen.cutBandRings(ringContours, [], t('gcode.op_body_rabbet_ext'));
+        const ds = gen.ringInsets(bodyPts, dMin, dMax);
+        const rings = rounded
+          ? ds.map((d, i) => (i === ds.length - 1 && ds.length > 1 ? around(td / 2) : hug(d, td / 2)))
+          : ds.map(inset);
+        gen.cutBandRings(rings.filter(c => c.length > 2), [], t('gcode.op_body_rabbet_ext'));
       }
     }
 
@@ -197,7 +213,9 @@ export class LidBox {
       // 1. Feuillure (peu profond)
       if (W > 2 * rabbet && D > 2 * rabbet) {
         gen.machine.materialThickness = rabbetDepth;
-        doPocket(mirrorPts(gen.insetContour(bodyPts, rabbet)), t('gcode.op_lid_rabbet_pocket'));
+        // Poche = lèvre du corps + jeu : même rayon de coin minimum que la lèvre, plus le jeu
+        const rPocket = gen.machine.toolDiameter / 2 + 0.4 + Math.max(clearance, 0);
+        doPocket(mirrorPts(roundCorners(gen.insetContour(bodyPts, rabbet), rPocket)), t('gcode.op_lid_rabbet_pocket'));
       }
       // 2. Cavité (depthStart=rabbetDepth, feuillure déjà usinée)
       const lidCavDepth1 = lidHeight - bFll;
