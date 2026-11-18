@@ -30,9 +30,10 @@ export function stockHeaderLines(thickness, depthPerPass) {
  */
 const CORNER_THR   = 1;   // degrés — au-delà : changement de direction
 const CORNER_CLEAR = 1;   // dégagement mini (mm) entre le trajet relevé et chaque coin
+const SHARP_THR    = 20;  // degrés — un vrai angle (et non un arrondi discrétisé) : jamais de tab dessus
 
 /** Abscisses curvilignes de tous les coins du contour fermé (toutes directions confondues). */
-function cornerDistances(pts, segLengths) {
+function cornerDistances(pts, segLengths, thr = CORNER_THR) {
   const n = pts.length, dists = [];
   let cd = 0;
   for (let i = 0; i < n; i++) {
@@ -41,7 +42,7 @@ function cornerDistances(pts, segLengths) {
     const d2x = next.x - curr.x, d2y = next.y - curr.y;
     const l1  = Math.hypot(d1x, d1y) || 1, l2 = Math.hypot(d2x, d2y) || 1;
     const cosA = Math.max(-1, Math.min(1, (d1x/l1)*(d2x/l2) + (d1y/l1)*(d2y/l2)));
-    if (Math.acos(cosA) * 180 / Math.PI > CORNER_THR) dists.push(cd);
+    if (Math.acos(cosA) * 180 / Math.PI > thr) dists.push(cd);
     cd += segLengths[i];
   }
   return dists;
@@ -88,6 +89,34 @@ function spreadTabs(segs, count, perimeter) {
 }
 
 /** Signe du décalage d'outil selon le côté : dehors −1, dedans +1, sur le trait 0. */
+/** Distance curviligne la plus courte entre deux abscisses d'un contour fermé. */
+const loopDist = (a, b, perimeter) => {
+  const d = Math.abs(a - b);
+  return Math.min(d, perimeter - d);
+};
+
+/**
+ * Complète les tabs déjà placés (milieux de segments droits) quand il n'y a pas assez de
+ * segments : ajoute, un à un, la position la plus éloignée des tabs existants, hors du
+ * voisinage d'un vrai angle. Sert aux contours presque lisses (haricot) dont le seuil de coin
+ * bas ne laisse qu'un seul « segment » sur tout le périmètre.
+ */
+function completeTabs(centers, count, perimeter, sharpDists, width) {
+  const out = [...centers];
+  const N = 360, clear = width / 2 + CORNER_CLEAR;
+  const cands = Array.from({ length: N }, (_, k) => (perimeter * (k + 0.5)) / N)
+    .filter(c => sharpDists.every(d => loopDist(c, d, perimeter) >= clear));
+  while (out.length < count && cands.length) {
+    let best = -1, bestMin = -1;
+    cands.forEach((c, i) => {
+      const m = Math.min(...out.map(o => loopDist(c, o, perimeter)));
+      if (m > bestMin) { bestMin = m; best = i; }
+    });
+    out.push(cands.splice(best, 1)[0]);
+  }
+  return out;
+}
+
 const SIDE_SIGN = { outside: -1, inside: 1 };
 const sideSign = side => SIDE_SIGN[side] ?? 0;
 
@@ -867,13 +896,20 @@ export class GCodeGenerator {
    * Les tabs sont placés au milieu des portions droites du contour (les plus longues,
    * réparties au mieux), jamais dans un angle ou un arrondi ; à défaut de portion droite
    * (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre.
-   * Peut en renvoyer moins que `count` si le contour n'a pas assez de portions droites.
+   * Si les portions droites sont moins nombreuses que `count`, les tabs manquants sont ajoutés
+   * sur les parties lisses, loin des vrais angles (peut donc en renvoyer moins que `count`
+   * seulement si les angles ne laissent aucune place).
    * @param {number} width - longueur relevée d'un tab sur le trajet (pont + Ø)
    */
   _placeTabs(pts, segLengths, perimeter, count, width) {
     const corners = cornerDistances(pts, segLengths);
     const segs = corners.length ? straightSegments(corners, perimeter, width) : [];
-    if (segs.length > 0) return spreadTabs(segs, count, perimeter);
+    if (segs.length > 0) {
+      const centers = spreadTabs(segs, count, perimeter);
+      if (centers.length >= count) return centers;
+      // Moins de segments droits que de tabs : on complète sur les parties lisses
+      return completeTabs(centers, count, perimeter, cornerDistances(pts, segLengths, SHARP_THR), width);
+    }
     // Forme sans portion droite assez longue (cercle, ovale, haricot) : répartition uniforme,
     // premier tab à la moitié de l'intervalle
     return Array.from({ length: count }, (_, t) => (perimeter / count) * (t + 0.5));
