@@ -123,8 +123,9 @@ export class LidBox {
         gen.cutBandRings(roughD.map(inset).filter(c => c.length > 2), finD.map(inset).filter(c => c.length > 2),
           t('gcode.op_body_rabbet_ext'));
       } else {
+        // Sans finition : mêmes anneaux, avec le détour dans les coins vifs à la dernière passe
         const ringContours = gen.ringInsets(bodyPts, dMin, dMax).map(inset).filter(c => c.length > 2);
-        if (ringContours.length) gen.cutContoursInterleaved(ringContours, 'center', entryOpts, t('gcode.op_body_rabbet_ext'));
+        gen.cutBandRings(ringContours, [], t('gcode.op_body_rabbet_ext'));
       }
     }
 

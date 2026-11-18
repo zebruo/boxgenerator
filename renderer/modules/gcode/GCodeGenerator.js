@@ -30,6 +30,7 @@ export function stockHeaderLines(thickness, depthPerPass) {
  */
 const CORNER_THR   = 1;   // degrés — au-delà : changement de direction
 const CORNER_CLEAR = 1;   // dégagement mini (mm) entre le trajet relevé et chaque coin
+const CORNER_RELIEF_MIN = 0.5;   // rad (≈ 29°) — en deçà : arrondi discrétisé, pas de détour
 const SHARP_THR    = 20;  // degrés — un vrai angle (et non un arrondi discrétisé) : jamais de tab dessus
 
 /** Abscisses curvilignes de tous les coins du contour fermé (toutes directions confondues). */
@@ -689,11 +690,46 @@ export class GCodeGenerator {
     const rough = roughContours.filter(p => p?.length >= 2).map(prep);
     const fin   = finContours.filter(p => p?.length >= 2).map(prep);
     if (rough.length === 0) return;
-    this._emitRings(rough, fin.length ? fin : null, 'center', label);
+    this._emitRings(rough, fin.length ? fin : null, 'center', label, true);
   }
 
-  /** Émet les passes d'anneaux : ébauche à chaque profondeur, puis finition à pleine profondeur. */
-  _emitRings(allPts, allPtsFin, side, label) {
+  /**
+   * Détour dans chaque coin vif du trajet `pts` d'un anneau collé au bord de la pièce
+   * (feuillure extérieure, dont la paroi extérieure est le contour de la pièce). Une fraise
+   * ronde laisse dans un angle vif un pilier de matière : l'outil, centré à Ø/2 de chaque
+   * paroi, n'atteint pas le sommet du coin. L'outil va donc, en diagonale, jusqu'à 0,85 R du
+   * sommet puis revient ; le disque déborde un peu hors de la pièce, dans la chute que le
+   * contour extérieur détache ensuite. Les arrondis (rayon de coin, formes courbes) en sont
+   * exempts : leurs sommets tournent de moins de CORNER_RELIEF_MIN.
+   */
+  _withCornerRelief(pts) {
+    const r = this.machine.toolDiameter / 2;
+    const n = pts.length, out = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[(i - 1 + n) % n], v = pts[i], b = pts[(i + 1) % n];
+      out.push(v);
+      const ux = v.x - a.x, uy = v.y - a.y, wx = b.x - v.x, wy = b.y - v.y;
+      const lu = Math.hypot(ux, uy), lw = Math.hypot(wx, wy);
+      if (lu < 1e-9 || lw < 1e-9) continue;
+      const turn = Math.atan2(ux * wy - uy * wx, ux * wx + uy * wy);   // > 0 : coin saillant (contour CCW)
+      if (turn < CORNER_RELIEF_MIN) continue;
+      let ox = ux / lu - wx / lw, oy = uy / lu - wy / lw;            // vers l'extérieur du coin
+      const lo = Math.hypot(ox, oy);
+      if (lo < 1e-9) continue;
+      ox /= lo; oy /= lo;
+      const reach = r / Math.cos(turn / 2) - 0.85 * r;                 // V → Q : sommet du coin P à 0,85 R de Q
+      if (reach <= 1e-6) continue;
+      out.push({ x: v.x + ox * reach, y: v.y + oy * reach }, v);
+    }
+    return out;
+  }
+
+  /**
+   * Émet les passes d'anneaux : ébauche à chaque profondeur, puis finition à pleine profondeur.
+   * @param {boolean} relief - détour dans les coins vifs du premier anneau (paroi extérieure),
+   *   à pleine profondeur : à la passe de finition, sinon à la dernière passe d'ébauche
+   */
+  _emitRings(allPts, allPtsFin, side, label, relief = false) {
     const { depth, passes, stepZ } = this._passPlan();
 
     this.comment(`─── ${label} (${side}, ${allPts.length} anneaux fusionnés) ───`);
@@ -701,24 +737,26 @@ export class GCodeGenerator {
     for (let pass = 1; pass <= passes; pass++) {
       const z = -(stepZ * pass);
       this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}`);
-      for (const pts of allPts) {
+      allPts.forEach((ring, k) => {
+        const pts = relief && !allPtsFin && pass === passes && k === 0 ? this._withCornerRelief(ring) : ring;
         this.rapidZ(this.machine.safeZ);
         this.rapidTo(pts[0].x, pts[0].y);
         this.plungeTo(z);
         this._loop(pts);
-      }
+      });
     }
 
     if (allPtsFin) {
       const zFin = -depth;
       this.comment(`Passe finition paroi — Z=${zFin.toFixed(3)}`);
-      for (const pts of allPtsFin) {
+      allPtsFin.forEach((ring, k) => {
+        const pts = relief && k === 0 ? this._withCornerRelief(ring) : ring;
         this.rapidZ(this.machine.safeZ);
         this.rapidTo(pts[0].x, pts[0].y);
         this.plungeTo(zFin);
         this._loop(pts);
         this._emitOvercut(pts);
-      }
+      });
     }
 
     this.rapidZ(this.machine.safeZ);
