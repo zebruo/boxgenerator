@@ -4,6 +4,7 @@ import { ThreePreview }   from './modules/preview/ThreePreview.js';
 import { TechnicalView }  from './modules/preview/TechnicalView.js';
 import { buildFabricationSVG } from './modules/export/SvgExport.js';
 import { stockHeaderLines } from './modules/gcode/GCodeGenerator.js';
+import { partitionSizes } from './modules/gcode/PartitionedPocket.js';
 import { Rectangle }      from './modules/shapes/Rectangle.js';
 import { Circle }         from './modules/shapes/Circle.js';
 import { Oval }           from './modules/shapes/Oval.js';
@@ -314,6 +315,28 @@ function renderShapeParams() {
         state.boxParams[d.id] = e.target.checked;
         updatePreview();
       });
+    } else if (d.type === 'text') {
+      // ── Param texte (ex: répartition des compartiments « 60/40 ») ─────────
+      const currentVal = state.boxParams[d.id] ?? d.value ?? '';
+      if (state.boxParams[d.id] === undefined) state.boxParams[d.id] = currentVal;
+      row.innerHTML = `
+        <label title="${t(d.label)}">${t(d.label)}</label>
+        <input type="text" data-param="${d.id}" placeholder="${d.placeholder ?? ''}" spellcheck="false" autocomplete="off">
+        <span class="param-unit">${d.unit ?? ''}</span>
+      `;
+      const inp = row.querySelector('input');
+      inp.value = currentVal;   // affecté après coup : aucun échappement HTML à gérer
+      inp.addEventListener('input', e => {
+        state.boxParams[d.id] = e.target.value;
+        updatePartitionWarning();
+        updatePreview();
+      });
+      if (d.id === 'partitionSplit') {
+        const noteEl = document.createElement('div');
+        noteEl.className = 'param-note';
+        noteEl.id = 'partition-split-note';
+        row.appendChild(noteEl);
+      }
     } else if (d.options) {
       // ── Param de type sélecteur (ex: rabbetSide) ──────────────────────────
       const currentVal = state.boxParams[d.id] ?? d.options[0].value;
@@ -329,6 +352,7 @@ function renderShapeParams() {
         const raw = e.target.value;
         state.boxParams[d.id] = Number.isNaN(Number(raw)) || raw === '' ? raw : Number.parseInt(raw);
         updateRabbetToolWarning();
+        updatePartitionWarning();
         updatePreview();
       });
     } else {
@@ -426,24 +450,32 @@ function updateShapeInputWarnings() {
 
 function updatePartitionWarning() {
   const el = document.querySelector('[data-param="partitions"]');
+  const splitEl = document.querySelector('[data-param="partitionSplit"]');
+  const note = document.getElementById('partition-split-note');
+  const setWarn = (input, msg) => { if (!input) return; input.classList.toggle('input-warn', !!msg); input.title = msg || ''; };
   if (!el) return;
   const partitions = Number.parseInt(el.value) || 0;
-  if (partitions === 0) { el.classList.remove('input-warn'); el.title = ''; return; }
+  // Répartition : utile seulement s'il y a des cloisons
+  if (splitEl) splitEl.closest('.param-row').style.opacity = partitions > 0 ? '' : '0.4';
+  if (partitions === 0) { setWarn(el, ''); setWarn(splitEl, ''); if (note) note.textContent = ''; return; }
   const partitionDir  = (state.boxParams.partitionDir === 'horizontal') ? 'horizontal' : 'vertical';
   const wallThickness = state.boxParams.wallThickness ?? 6;
   const td  = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 6;
   const bb  = state.shape?.getBoundingBox();
   if (!bb) return;
-  const cols  = partitionDir === 'vertical'   ? partitions + 1 : 1;
-  const rows  = partitionDir === 'horizontal' ? partitions + 1 : 1;
-  const cellW = (bb.width  - 2 * wallThickness - (cols - 1) * wallThickness) / cols;
-  const cellH = (bb.height - 2 * wallThickness - (rows - 1) * wallThickness) / rows;
+  const { sizes, error } = partitionSizes(bb.width, bb.height, wallThickness, partitions, partitionDir,
+    state.boxParams.partitionSplit ?? '');
+  const across = (partitionDir === 'vertical' ? bb.height : bb.width) - 2 * wallThickness;
+  const smallest = Math.min(...sizes, across);
   const minCell = 3 * td;
-  const warn = cellW < minCell || cellH < minCell;
-  el.classList.toggle('input-warn', warn);
-  el.title = warn
-    ? t('warn.partition_small', { cell: Math.min(cellW, cellH).toFixed(0), min: minCell.toFixed(0), td })
-    : '';
+  const tooSmall = smallest < minCell
+    ? t('warn.partition_small', { cell: smallest.toFixed(0), min: minCell.toFixed(0), td }) : '';
+  setWarn(el, tooSmall);
+  // Saisie de la répartition inutilisable : parts égales (avertissement orange)
+  setWarn(splitEl, error === 'count' ? t('warn.partition_split_count', { n: partitions + 1 })
+    : error === 'invalid' ? t('warn.partition_split_invalid') : tooSmall);
+  const fmt = v => (currentLang() === 'fr' ? v.toFixed(1).replace('.', ',') : v.toFixed(1));
+  if (note) note.textContent = sizes.map(fmt).join(' / ') + ' mm';
 }
 
 function updateRabbetToolWarning() {

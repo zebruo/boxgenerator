@@ -544,7 +544,7 @@ export class ThreePreview {
     const wt = boxParams.wallThickness ?? 6;
     return buildPartitionContours(bb.width, bb.height, wt, n,
       boxParams.partitionDir === 'horizontal' ? 'horizontal' : 'vertical', machineParams.toolDiameter ?? 3.175,
-      { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(pts, wt) });
+      { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(pts, wt), split: boxParams.partitionSplit });
   }
 
   /** Crée un THREE.Shape depuis un tableau de {x, y}. */

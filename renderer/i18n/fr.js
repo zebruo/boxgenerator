@@ -44,6 +44,7 @@ export const fr = {
     clearance:           "Jeu d'assemblage",
     partitions:          'Cloisons',
     partition_dir:       'Direction',
+    partition_split:     'Répartition',
     finger_width:        'Larg. encoche',
     mat_thickness:       'Épaiss. matière',
     with_lid:            'Avec couvercle',
@@ -117,6 +118,8 @@ export const fr = {
   warn: {
     pin_depth:          '⚠ Prof. > brut ({{brut}} mm) : le trou pénètre dans le martyr pour loger les goupilles de repositionnement',
     partition_small:    '⚠ Compartiment trop petit ({{cell}} mm) — min. {{min}} mm (3 × Ø {{td}} mm)',
+    partition_split_count: '⚠ Il faut {{n}} valeurs (une par compartiment), ex. 60/40 — parts égales en attendant',
+    partition_split_invalid: '⚠ Saisie non valide : nombres positifs séparés par « / », ex. 60/40 — parts égales en attendant',
     tool_too_large:    '⚠ Fraise Ø{{td}}mm ≥ feuillure+jeu ({{ringW}}mm) — utiliser Ø < {{ringW}}mm',
     bean_ratio:        '⚠ Ratio hors plage CNC recommandée (0.5 – 1.5)',
     radius_clamped: 'Rayon trop grand pour ces dimensions — limité à {{value}} mm (moitié de la plus petite cote).',

@@ -55,7 +55,9 @@ export class LidBox {
           { value: 'vertical',   label: 'option.partition_vertical' },
           { value: 'horizontal', label: 'option.partition_horizontal' }
         ]
-      }
+      },
+      // Répartition des compartiments (« 60/40 ») ; vide = parts égales
+      { id: 'partitionSplit', label: 'param.partition_split', type: 'text', unit: '', value: '', placeholder: '60/40' }
     ];
   }
 
@@ -170,7 +172,7 @@ export class LidBox {
       gen.machine.materialThickness = height - bFl;
       if (partitions > 0) {
         const cells = buildPartitionContours(W, D, wallThickness, partitions, partitionDir, machineParams.toolDiameter,
-          { minX: bb.minX, minY: bb.minY, cavity: gen.insetContour(bodyPts, wallThickness) });
+          { minX: bb.minX, minY: bb.minY, cavity: gen.insetContour(bodyPts, wallThickness), split: params.partitionSplit });
         if (cells) {
           cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`, cavDepthStart));
         } else {
@@ -278,7 +280,7 @@ export class LidBox {
     const cells = (params.partitions ?? 0) > 0
       ? buildPartitionContours(W, D, wallThickness, params.partitions,
           partitionDir, machineParams.toolDiameter ?? 3.175,
-          { minX: bb.minX, minY: bb.minY, cavity })
+          { minX: bb.minX, minY: bb.minY, cavity, split: params.partitionSplit })
       : null;
     for (const c of cells ?? (cavity.length > 2 ? [cavity] : [])) items.push({ pts: c, face: 1, part: 'body' });
     if (cavity.length > 2) items.push({ pts: shift(mirrorPts(cavity)), face: 1, part: 'lid' });

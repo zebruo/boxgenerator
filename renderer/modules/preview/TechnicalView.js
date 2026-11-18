@@ -126,7 +126,7 @@ export class TechnicalView {
     const partDir = boxParams.partitionDir === 'horizontal' ? 'horizontal' : 'vertical';
     const cells = nParts > 0 && (boxTypeKey === 'open-tray' || boxTypeKey === 'lid-box')
       ? buildPartitionContours(W, D, wt, nParts, partDir, machineParams.toolDiameter ?? 3.175,
-          { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(shape.getContourPoints(), wt) })
+          { minX: bb.minX, minY: bb.minY, cavity: insetPolygon(shape.getContourPoints(), wt), split: boxParams.partitionSplit })
       : null;
 
     // Modèle en couches (élévations et coupe) : étendue verticale réelle de ce qui est dessiné

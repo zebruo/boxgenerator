@@ -44,6 +44,7 @@ export const en = {
     clearance:           'Fit clearance',
     partitions:          'Partitions',
     partition_dir:       'Direction',
+    partition_split:     'Split',
     finger_width:        'Finger width',
     mat_thickness:       'Material thick.',
     with_lid:            'With lid',
@@ -117,6 +118,8 @@ export const en = {
   warn: {
     pin_depth:          '⚠ Depth > stock ({{brut}} mm): the hole goes into the spoilboard to hold the locating pins',
     partition_small:    '⚠ Compartment too small ({{cell}} mm) — min. {{min}} mm (3 × Ø {{td}} mm)',
+    partition_split_count: '⚠ {{n}} values needed (one per compartment), e.g. 60/40 — equal parts meanwhile',
+    partition_split_invalid: '⚠ Invalid entry: positive numbers separated by “/”, e.g. 60/40 — equal parts meanwhile',
     tool_too_large:    '⚠ Tool Ø{{td}}mm ≥ rabbet+clearance ({{ringW}}mm) — use Ø < {{ringW}}mm',
     bean_ratio:        '⚠ Ratio outside recommended CNC range (0.5 – 1.5)',
     radius_clamped: 'Radius too large for these dimensions — limited to {{value}} mm (half the smallest dimension).',

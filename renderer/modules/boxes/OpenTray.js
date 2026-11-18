@@ -45,7 +45,7 @@ export class OpenTray {
       const cavity = gen.insetContour(pts, wallThickness);
       const cells = partitions > 0
         ? buildPartitionContours(bb.width, bb.height, wallThickness, partitions, partitionDir, machineParams.toolDiameter,
-            { minX: bb.minX, minY: bb.minY, cavity })
+            { minX: bb.minX, minY: bb.minY, cavity, split: params.partitionSplit })
         : null;
       if (cells) cells.forEach((cellPts, i) => doPocket(cellPts, `${t('gcode.op_body_compartment')} ${i + 1}`));
       else       doPocket(cavity, t('gcode.op_cavity'));
@@ -73,7 +73,7 @@ export class OpenTray {
     const cells = (params.partitions ?? 0) > 0
       ? buildPartitionContours(bb.width, bb.height, wt, params.partitions,
           partitionDir, machineParams.toolDiameter ?? 3.175,
-          { minX: bb.minX, minY: bb.minY, cavity })
+          { minX: bb.minX, minY: bb.minY, cavity, split: params.partitionSplit })
       : null;
     const inner = cells ?? (cavity.length > 2 ? [cavity] : []);
     return [{ pts, face: 1, outer: true }, ...inner.map(c => ({ pts: c, face: 1 }))];
@@ -91,7 +91,9 @@ export class OpenTray {
           { value: 'vertical',   label: 'option.partition_vertical' },
           { value: 'horizontal', label: 'option.partition_horizontal' }
         ]
-      }
+      },
+      // Répartition des compartiments (« 60/40 ») ; vide = parts égales
+      { id: 'partitionSplit', label: 'param.partition_split', type: 'text', unit: '', value: '', placeholder: '60/40' }
     ];
   }
 }
