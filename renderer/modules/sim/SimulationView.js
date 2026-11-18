@@ -535,7 +535,7 @@ export class SimulationView {
   }
 
   _buildTool() {
-    const len = Math.max(20, (this.stock.top - this.stock.bottom) * 1.6);
+    const len = Math.max(12, this.stock.top - this.stock.bottom);   // longueur visible de la fraise
     const geo = new THREE.CylinderGeometry(this.toolR, this.toolR, len, 24);
     geo.rotateX(Math.PI / 2);
     geo.translate(0, 0, len / 2);       // origine du maillage = bout de la fraise
