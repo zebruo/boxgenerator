@@ -783,7 +783,8 @@ export class GCodeGenerator {
   }
 
   /**
-   * Émet les passes d'anneaux : ébauche à chaque profondeur, puis finition à pleine profondeur.
+   * Émet les passes d'anneaux : ébauche à chaque profondeur (entrée en rampe si l'export la
+   * demande), puis finition à pleine profondeur (plongée : la bande est déjà vidée).
    * @param {boolean} relief - détour dans les coins vifs du premier anneau (paroi extérieure),
    *   à pleine profondeur : à la passe de finition, sinon à la dernière passe d'ébauche
    */
@@ -799,7 +800,9 @@ export class GCodeGenerator {
         const pts = relief && !allPtsFin && pass === passes && k === 0 ? this._withCornerRelief(ring) : ring;
         this.rapidZ(this.machine.safeZ);
         this.rapidTo(pts[0].x, pts[0].y);
-        this.plungeTo(z);
+        // Matière de la couche au départ de l'anneau : du fond de la couche précédente à z
+        // (plongée, ou rampe le long de l'anneau selon l'export)
+        this.pocketEnter(pts, z, z + stepZ);
         this._loop(pts);
       });
     }
