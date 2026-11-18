@@ -97,6 +97,67 @@ function applyTheme(light) {
   if (technicalView)  technicalView.setTheme(light);
 }
 
+// ─── Barres d'outils : boutons à état, fenêtres Z0 / Brut ───────────────────
+// Un seul bouton actif parmi ceux du sélecteur (classe .active pour le style, aria-pressed pour l'accessibilité)
+function setPressed(selector, active) {
+  document.querySelectorAll(selector).forEach(b => {
+    b.classList.toggle('active', b === active);
+    b.setAttribute('aria-pressed', String(b === active));
+  });
+}
+
+const TOOLBAR_POPS = [['btn-z0', 'pop-z0'], ['btn-stock', 'pop-stock']];
+
+function closeToolbarPops() {
+  for (const [b, p] of TOOLBAR_POPS) {
+    document.getElementById(p).hidden = true;
+    document.getElementById(b).setAttribute('aria-expanded', 'false');
+  }
+}
+
+// Fenêtre sous son bouton, sans sortir de l'écran
+function placeToolbarPop(btn, pop) {
+  const r = btn.getBoundingClientRect();
+  pop.style.top  = `${r.bottom + 6}px`;
+  pop.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8))}px`;
+}
+
+function initToolbarPopovers() {
+  for (const [b, p] of TOOLBAR_POPS) {
+    const btn = document.getElementById(b), pop = document.getElementById(p);
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const wasClosed = pop.hidden;
+      closeToolbarPops();
+      if (!wasClosed) return;
+      pop.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      placeToolbarPop(btn, pop);
+    });
+  }
+  document.addEventListener('click', e => { if (!e.target.closest('.tb-pop')) closeToolbarPops(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeToolbarPops(); });
+  // Fenêtre redimensionnée : la barre se réorganise, la fenêtre ouverte suit son bouton
+  window.addEventListener('resize', () => {
+    for (const [b, p] of TOOLBAR_POPS) {
+      const pop = document.getElementById(p);
+      if (!pop.hidden) placeToolbarPop(document.getElementById(b), pop);
+    }
+  });
+}
+
+// Résumé de l'état sur les boutons Z0 et Brut (lisible sans ouvrir la fenêtre)
+function updateToolbarSummaries() {
+  const z0 = getZ0Settings();
+  const zs = document.getElementById('z0-summary');
+  if (zs) zs.textContent = `${t(`tip.z0_${z0.pos.replace('-', '_')}`)} · ${t(z0.level === 'top' ? 'ui.z0_top_short' : 'ui.z0_bottom_short')}`;
+  const ss = document.getElementById('stock-summary');
+  if (ss) {
+    const so = stockOffsets(), f = v => +v.toFixed(1);
+    ss.textContent = so.two ? `+${f(so.body)} / +${f(so.lid)} mm` : `+${f(so.body)} mm`;
+  }
+}
+
 // ─── i18n — mise à jour des éléments statiques du DOM ──────────────────────
 function updateI18n() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -111,6 +172,7 @@ function updateI18n() {
   // Sync le sélecteur de langue avec la langue courante
   const switcher = document.getElementById('lang-switcher');
   if (switcher) switcher.value = currentLang();
+  updateToolbarSummaries();
 }
 
 // ─── Init ──────────────────────────────────────────────────────────────────
@@ -119,6 +181,7 @@ function init() {
   selectShape('rectangle');
   selectBoxType('open-tray');
   bindEvents();
+  initToolbarPopovers();
   updateI18n();
   resizeCanvases();
   updatePreview();
@@ -140,12 +203,12 @@ function bindEvents() {
   // View toggle
   document.querySelectorAll('.view-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      setPressed('.view-btn', btn);
       state.view = btn.dataset.view;
       canvas2d.classList.toggle('hidden', state.view !== '3d');
       canvas3d.classList.toggle('hidden', state.view !== 'tech');
       document.getElementById('toolbar-3d').classList.toggle('hidden', state.view !== '3d');
+      closeToolbarPops();
       updateBoxNameOverlay();
       updatePreview();
     });
@@ -154,8 +217,8 @@ function bindEvents() {
   // Z0 position (XY)
   document.querySelectorAll('.z0-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.z0-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      setPressed('.z0-btn', btn);
+      updateToolbarSummaries();
       if (threePreview) { threePreview.z0Pos = btn.dataset.pos; updatePreview(); }
     });
   });
@@ -163,8 +226,8 @@ function bindEvents() {
   // Z0 niveau (bas / haut)
   document.querySelectorAll('.z0-lvl-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.z0-lvl-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      setPressed('.z0-lvl-btn', btn);
+      updateToolbarSummaries();
       if (threePreview) { threePreview.z0Level = btn.dataset.level; updatePreview(); }
     });
   });
@@ -172,7 +235,7 @@ function bindEvents() {
   // Boîte à couvercle : à plat (comme usinée) / assemblée
   document.querySelectorAll('.lid-layout-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.lid-layout-btn').forEach(b => b.classList.toggle('active', b === btn));
+      setPressed('.lid-layout-btn', btn);
       if (threePreview) { threePreview.lidLayout = btn.dataset.layout; updatePreview(); }
     });
   });
@@ -184,14 +247,14 @@ function bindEvents() {
 
   // Offset brut
   for (const id of ['stock-offset', 'stock-offset-lid']) document.getElementById(id).addEventListener('input', () => {
+    updateToolbarSummaries();
     updatePreview();
   });
 
   // Côté offset brut (haut / bas)
   document.querySelectorAll('.stock-side-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.stock-side-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      setPressed('.stock-side-btn', btn);
       if (threePreview) { threePreview.stockSide = btn.dataset.side; updatePreview(); }
     });
   });
@@ -904,6 +967,7 @@ function updateStockRows({ two, h, lidH, body, lid }) {
     document.getElementById('stock-body').value = (h + body).toFixed(1);
     document.getElementById('stock-lid').value  = (lidH + lid).toFixed(1);
   }
+  updateToolbarSummaries();
 }
 
 // Taille de plaque conseillée : emprise réelle des pièces (mêmes contours que le G-code,
@@ -1541,8 +1605,9 @@ function restoreMachineParams(mp, depthPerPass) {
 
 // Restaure la position et le niveau du repère Z0
 function restoreZ0(z0) {
-  document.querySelectorAll('.z0-btn').forEach(b => b.classList.toggle('active', b.dataset.pos === z0.pos));
-  document.querySelectorAll('.z0-lvl-btn').forEach(b => b.classList.toggle('active', b.dataset.level === z0.level));
+  setPressed('.z0-btn', [...document.querySelectorAll('.z0-btn')].find(b => b.dataset.pos === z0.pos));
+  setPressed('.z0-lvl-btn', [...document.querySelectorAll('.z0-lvl-btn')].find(b => b.dataset.level === z0.level));
+  updateToolbarSummaries();
   // Le repère Z0 de la vue 3D suit les boutons (l'export les lit déjà)
   if (threePreview) {
     const cur = getZ0Settings();

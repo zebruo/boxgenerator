@@ -127,6 +127,16 @@ const FRAG_UNDER = FRAG_COMMON + /* glsl */`
     gl_FragColor = vec4(uColor * 0.85 * (1.0 - 0.28 * depth) * light(faceNormal()), 1.0);
   }`;
 
+// Icônes des boutons d'affichage de la barre de simulation
+const svg = d => `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  tool:    svg('<path d="M12 2v8"/><path d="M8 10h8l-1.5 11h-5z"/>'),
+  paths:   svg('<path d="M4 18 9 8l5 8 6-11"/>'),
+  rapids:  svg('<path d="M3 12h3M10.5 12h3M18 12h3"/>'),
+  drawing: svg('<path d="M4 20l1-4 11-11 3 3L8 19z"/>'),
+  part:    svg('<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12 4 7.5"/>'),
+};
+
 export class SimulationView {
   /**
    * @param {HTMLElement} host   conteneur (zone centrale) dans lequel le panneau se superpose
@@ -188,19 +198,25 @@ export class SimulationView {
     const partOpts = this.parts.map((p, i) => `<option value="${i}">${p.label}</option>`).join('');
     el.innerHTML = `
       <div class="sim-toolbar">
-        <span class="sim-title">${t('sim.title')}</span>
-        <label class="sim-lbl">${t('sim.speed')} <select class="sim-speed">${speedOpts}</select></label>
-        ${this.parts.length > 1 ? `<label class="sim-lbl" title="${t('sim.part_tip')}">${t('sim.part')} <select class="sim-part">${partOpts}</select></label>` : ''}
-        ${twoFaces ? `<label class="sim-lbl" title="${t('sim.view_tip')}">${t('sim.view')} <select class="sim-view">
-          <option value="auto">${t('sim.view_auto')}</option>
-          <option value="1">${t('sim.view_face1')}</option>
-          <option value="2">${t('sim.view_face2')}</option>
-        </select></label>` : ''}
-        <label class="sim-lbl"><input type="checkbox" class="sim-show-tool" checked> ${t('sim.tool')}</label>
-        <label class="sim-lbl"><input type="checkbox" class="sim-show-paths" checked> ${t('sim.paths')}</label>
-        <label class="sim-lbl" title="${t('sim.rapids_tip')}"><input type="checkbox" class="sim-show-rapids"> ${t('sim.rapids')}</label>
-        ${hasDrawing ? `<label class="sim-lbl" title="${t('sim.drawing_tip')}"><input type="checkbox" class="sim-show-drawing" checked> ${t('sim.drawing')}</label>
-        <label class="sim-lbl" title="${t('sim.part_only_tip')}"><input type="checkbox" class="sim-part-only"> ${t('sim.part_only')}</label>` : ''}
+        <div class="sim-tools">
+        <div class="tb-grp">
+          <span class="sim-title">${t('sim.title')}</span>
+          ${this.parts.length > 1 ? `<select class="sim-part tb-select" title="${t('sim.part_tip')}" aria-label="${t('sim.part')}">${partOpts}</select>` : ''}
+          ${twoFaces ? `<label class="sim-lbl" title="${t('sim.view_tip')}">${t('sim.view')} <select class="sim-view tb-select">
+            <option value="auto">${t('sim.view_auto')}</option>
+            <option value="1">${t('sim.view_face1')}</option>
+            <option value="2">${t('sim.view_face2')}</option>
+          </select></label>` : ''}
+        </div>
+        <div class="tb-grp" role="group" aria-label="${t('sim.show')}">
+          <span class="tb-grp-label">${t('sim.show')}</span>
+          <label class="tb-chip" title="${t('sim.tool')}"><input type="checkbox" class="sim-show-tool" checked>${ICON.tool}<span class="tb-lab">${t('sim.tool')}</span></label>
+          <label class="tb-chip" title="${t('sim.paths')}"><input type="checkbox" class="sim-show-paths" checked>${ICON.paths}<span class="tb-lab">${t('sim.paths')}</span></label>
+          <label class="tb-chip" title="${t('sim.rapids')} : ${t('sim.rapids_tip')}"><input type="checkbox" class="sim-show-rapids">${ICON.rapids}<span class="tb-lab">${t('sim.rapids_short')}</span></label>
+          ${hasDrawing ? `<label class="tb-chip" title="${t('sim.drawing_tip')}"><input type="checkbox" class="sim-show-drawing" checked>${ICON.drawing}<span class="tb-lab">${t('sim.drawing')}</span></label>` : ''}
+          ${hasDrawing ? `<label class="tb-chip" title="${t('sim.part_only_tip')}"><input type="checkbox" class="sim-part-only">${ICON.part}<span class="tb-lab">${t('sim.part_only')}</span></label>` : ''}
+        </div>
+        </div>
         <button class="sim-btn sim-close" title="${t('sim.close')}"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="sim-stage">
@@ -221,6 +237,7 @@ export class SimulationView {
             <input type="range" class="sim-progress" min="0" max="10000" step="1" value="0">
             <span class="sim-total"></span>
           </div>
+          <label class="sim-lbl sim-speed-wrap">${t('sim.speed')} <select class="sim-speed">${speedOpts}</select></label>
         </div>
         <div class="sim-legend">
           <span><i style="background:#2f80ed"></i>${t('sim.kind_pocket')}</span>

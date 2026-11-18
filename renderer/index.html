@@ -207,50 +207,86 @@
       <!-- Zone centrale: Prévisualisation -->
       <main class="panel-center">
         <div class="preview-toolbar">
-          <div class="view-controls">
-            <button class="view-btn active" data-view="3d" data-i18n="ui.btn_3d" data-i18n-title="tip.btn_3d" title="Prévisualisation 3D">3D</button>
-            <button class="view-btn" data-view="tech" data-i18n="ui.btn_2d" data-i18n-title="tip.btn_2d" title="Vues techniques 2D avec cotes">Vues 2D</button>
+          <div class="tb-seg view-controls" role="group" data-i18n-aria="tip.tb_view" aria-label="Type de vue">
+            <button class="view-btn active" aria-pressed="true" data-view="3d" data-i18n="ui.btn_3d" data-i18n-title="tip.btn_3d" title="Prévisualisation 3D">3D</button>
+            <button class="view-btn" aria-pressed="false" data-view="tech" data-i18n="ui.btn_2d" data-i18n-title="tip.btn_2d" title="Vues techniques 2D avec cotes">Vues 2D</button>
           </div>
-          <!-- Contrôles 3D : Z0 + brut (masqués en mode Vues 2D) -->
+          <!-- Contrôles 3D (masqués en mode Vues 2D) : à gauche ce qui change la vue, à droite l'usinage (Z0, brut) -->
           <div id="toolbar-3d" class="toolbar-3d-extra">
-            <span class="ctrl-sep">|</span>
-            <span class="ctrl-label-sm">Z0</span>
-            <div class="z0-level" data-i18n-title="tip.z0_level" title="Niveau Z0 : bas ou haut de la boîte">
-              <button class="z0-lvl-btn active" data-level="top" data-i18n-title="tip.z0_top" title="Haut de la boîte">▲</button>
-              <button class="z0-lvl-btn" data-level="bottom" data-i18n-title="tip.z0_bottom" title="Bas de la boîte">▼</button>
-            </div>
-            <div class="z0-grid" data-i18n-title="tip.z0_grid" title="Position de l'origine Z0 sur le brut">
-              <button class="z0-btn" data-pos="back-left" data-i18n-title="tip.z0_back_left" title="Arrière gauche">↖</button>
-              <button class="z0-btn" data-pos="back-right" data-i18n-title="tip.z0_back_right" title="Arrière droit">↗</button>
-              <button class="z0-btn active" data-pos="center" data-i18n-title="tip.z0_center" title="Centre">⊕</button>
-              <button class="z0-btn" data-pos="front-left" data-i18n-title="tip.z0_front_left" title="Avant gauche">↙</button>
-              <button class="z0-btn" data-pos="front-right" data-i18n-title="tip.z0_front_right" title="Avant droit">↘</button>
-            </div>
-            <span class="ctrl-sep">|</span>
-            <span class="ctrl-label-sm" id="stock-offset-label" data-i18n="ui.stock_offset">Brut +</span>
-            <input type="number" id="stock-offset" value="0" min="0" max="200" step="0.1" aria-labelledby="stock-offset-label"
-              data-i18n-title="tip.stock_offset" title="Offset du brut par rapport à la boîte">
-            <span class="ctrl-label-sm">mm</span>
-            <!-- Boîte à couvercle de hauteurs différentes : un surplus de brut par pièce (corps ci-dessus) -->
-            <span class="stock-lid-group" id="stock-lid-group" hidden>
-              <span class="ctrl-label-sm" id="stock-offset-lid-label" data-i18n="ui.stock_offset_lid">couvercle</span>
-              <input type="number" id="stock-offset-lid" value="0" min="0" max="200" step="0.1" aria-labelledby="stock-offset-lid-label"
-                data-i18n-title="tip.stock_offset_lid" title="Offset du brut du couvercle">
-              <span class="ctrl-label-sm">mm</span>
-            </span>
-            <div class="z0-level" data-i18n-title="tip.stock_offset_lvl" title="Appliquer l'offset en haut ou en bas de la boîte">
-              <button class="stock-side-btn active" data-side="top" data-i18n-title="tip.stock_top" title="Offset au-dessus">▲</button>
-              <button class="stock-side-btn" data-side="bottom" data-i18n-title="tip.stock_bottom" title="Offset en dessous">▼</button>
-            </div>
-            <span class="ctrl-sep">|</span>
-            <label class="ctrl-label-sm xray-label" data-i18n-title="tip.xray" title="Voir à travers les parois (X-Ray)">
-              <input type="checkbox" id="xray-toggle"> X-Ray
-            </label>
             <!-- Boîte à couvercle : corps et couvercle côte à côte (comme usinés) ou assemblés -->
-            <span class="ctrl-sep lid-layout-ctrl">|</span>
-            <div class="lid-layout lid-layout-ctrl" data-i18n-title="tip.lid_layout" title="Pièces à plat (comme usinées) ou boîte assemblée">
-              <button class="lid-layout-btn active" data-layout="flat" data-i18n="ui.lid_flat">À plat</button>
-              <button class="lid-layout-btn" data-layout="assembled" data-i18n="ui.lid_assembled">Assemblé</button>
+            <div class="tb-grp lid-layout-ctrl">
+              <div class="tb-seg lid-layout" role="group" data-i18n-title="tip.lid_layout" title="Pièces à plat (comme usinées) ou boîte assemblée">
+                <button class="lid-layout-btn active" aria-pressed="true" data-layout="flat" data-i18n="ui.lid_flat">À plat</button>
+                <button class="lid-layout-btn" aria-pressed="false" data-layout="assembled" data-i18n="ui.lid_assembled">Assemblé</button>
+              </div>
+            </div>
+            <div class="tb-grp">
+              <label class="tb-chip xray-label" data-i18n-title="tip.xray" title="Voir à travers les parois (X-Ray)">
+                <input type="checkbox" id="xray-toggle">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span class="tb-lab">X-Ray</span>
+              </label>
+            </div>
+            <div class="tb-grp tb-right">
+              <span class="tb-grp-label" data-i18n="ui.tb_machining">Usinage</span>
+              <button class="tb-btn" id="btn-z0" aria-haspopup="dialog" aria-expanded="false" aria-controls="pop-z0" data-i18n-title="tip.z0_btn" title="Origine Z0 : position et niveau">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+                <span class="tb-lab-opt">Z0</span><b id="z0-summary"></b>
+                <svg class="tb-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <button class="tb-btn" id="btn-stock" aria-haspopup="dialog" aria-expanded="false" aria-controls="pop-stock" data-i18n-title="tip.stock_btn" title="Surplus de brut autour de la boîte">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1.5" stroke-dasharray="3 2.5"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+                <span class="tb-lab-opt" data-i18n="ui.tb_stock">Brut</span><b id="stock-summary"></b>
+                <svg class="tb-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- Fenêtres des boutons Z0 et Brut (positionnées sous le bouton par app.js) -->
+        <div class="tb-pop" id="pop-z0" role="dialog" data-i18n-aria="ui.z0_title" aria-label="Origine Z0" hidden>
+          <h3 data-i18n="ui.z0_title">Origine Z0</h3>
+          <div class="pop-row">
+            <span class="pop-cap" data-i18n="ui.z0_pos_cap">Position sur le brut : clique un point</span>
+            <span class="pop-cap pop-cap-c" data-i18n="ui.z0_back">Arrière</span>
+            <div class="z0-sheet" data-i18n-title="tip.z0_grid" title="Position de l'origine Z0 sur le brut">
+              <button class="z0-btn" aria-pressed="false" data-pos="back-left"   style="left:12%;top:16%" data-i18n-title="tip.z0_back_left"   data-i18n-aria="tip.z0_back_left"   title="Arrière gauche" aria-label="Arrière gauche"></button>
+              <button class="z0-btn" aria-pressed="false" data-pos="back-right"  style="left:88%;top:16%" data-i18n-title="tip.z0_back_right"  data-i18n-aria="tip.z0_back_right"  title="Arrière droit"  aria-label="Arrière droit"></button>
+              <button class="z0-btn active" aria-pressed="true" data-pos="center" style="left:50%;top:50%" data-i18n-title="tip.z0_center"      data-i18n-aria="tip.z0_center"      title="Centre"         aria-label="Centre"></button>
+              <button class="z0-btn" aria-pressed="false" data-pos="front-left"  style="left:12%;top:84%" data-i18n-title="tip.z0_front_left"  data-i18n-aria="tip.z0_front_left"  title="Avant gauche"   aria-label="Avant gauche"></button>
+              <button class="z0-btn" aria-pressed="false" data-pos="front-right" style="left:88%;top:84%" data-i18n-title="tip.z0_front_right" data-i18n-aria="tip.z0_front_right" title="Avant droit"    aria-label="Avant droit"></button>
+            </div>
+            <span class="pop-cap pop-cap-c" data-i18n="ui.z0_front">Avant</span>
+          </div>
+          <div class="pop-row">
+            <span class="pop-cap" data-i18n="ui.z0_level_cap">Hauteur du zéro</span>
+            <div class="tb-seg" role="group" data-i18n-title="tip.z0_level" title="Niveau Z0 : bas ou haut de la boîte">
+              <button class="z0-lvl-btn active" aria-pressed="true" data-level="top" data-i18n="tip.z0_top">Haut de la boîte</button>
+              <button class="z0-lvl-btn" aria-pressed="false" data-level="bottom" data-i18n="tip.z0_bottom">Bas de la boîte</button>
+            </div>
+          </div>
+        </div>
+        <div class="tb-pop" id="pop-stock" role="dialog" data-i18n-aria="ui.stock_title" aria-label="Surplus de brut" hidden>
+          <h3 data-i18n="ui.stock_title">Surplus de brut</h3>
+          <div class="pop-row">
+            <div class="pop-field">
+              <label id="stock-offset-label" for="stock-offset" data-i18n="ui.stock_offset">Surplus</label>
+              <input type="number" id="stock-offset" value="0" min="0" max="200" step="0.1"
+                data-i18n-title="tip.stock_offset" title="Offset du brut par rapport à la boîte">
+              <span>mm</span>
+            </div>
+            <!-- Boîte à couvercle de hauteurs différentes : un surplus de brut par pièce (corps ci-dessus) -->
+            <div class="pop-field" id="stock-lid-group" hidden>
+              <label id="stock-offset-lid-label" for="stock-offset-lid" data-i18n="ui.stock_offset_lid">Couvercle</label>
+              <input type="number" id="stock-offset-lid" value="0" min="0" max="200" step="0.1"
+                data-i18n-title="tip.stock_offset_lid" title="Offset du brut du couvercle">
+              <span>mm</span>
+            </div>
+          </div>
+          <div class="pop-row">
+            <span class="pop-cap" data-i18n="ui.stock_side_cap">Où ajouter le surplus</span>
+            <div class="tb-seg" role="group" data-i18n-title="tip.stock_offset_lvl" title="Appliquer l'offset en haut ou en bas de la boîte">
+              <button class="stock-side-btn active" aria-pressed="true" data-side="top" data-i18n="ui.stock_above" data-i18n-title="tip.stock_top" title="Offset au-dessus">Au-dessus</button>
+              <button class="stock-side-btn" aria-pressed="false" data-side="bottom" data-i18n="ui.stock_below" data-i18n-title="tip.stock_bottom" title="Offset en dessous">En dessous</button>
             </div>
           </div>
         </div>

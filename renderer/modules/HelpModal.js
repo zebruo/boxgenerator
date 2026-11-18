@@ -56,7 +56,7 @@ export function showHelpModal(machine = {}) {
           <dd>Paramètres propres à la forme sélectionnée (largeur, hauteur, rayon…) et au modèle de boîte (hauteur paroi, épaisseur, jeu d'assemblage…). Ces valeurs alimentent directement la génération G-code et la prévisualisation 3D.</dd>
           <dt>Matière &amp; Outil</dt>
           <dd>
-            <strong>Brut</strong> — épaisseur totale calculée automatiquement depuis la hauteur de boîte + surplus de brut <em>Brut +</em> de la barre 3D (lecture seule). Boîte à couvercle de hauteurs différentes : deux lignes, <strong>Brut corps</strong> et <strong>Brut couvercle</strong> (deux bruts), chacun avec son propre surplus : la barre 3D affiche alors deux champs <em>Brut +</em> (corps, couvercle) ; saisir par exemple 0,3 pour une planche de 8,6 mm sous un couvercle de 8,3 mm.<br>
+            <strong>Brut</strong> — épaisseur totale calculée automatiquement depuis la hauteur de boîte + surplus de brut réglé par le bouton <em>Brut</em> de la barre 3D (lecture seule). Boîte à couvercle de hauteurs différentes : deux lignes, <strong>Brut corps</strong> et <strong>Brut couvercle</strong> (deux bruts), chacun avec son propre surplus : la fenêtre du bouton <em>Brut</em> propose alors deux champs (corps, couvercle) ; saisir par exemple 0,3 pour une planche de 8,6 mm sous un couvercle de 8,3 mm.<br>
             <strong>Diam. fraise</strong> — diamètre de l'outil en mm ; utilisé pour l'offset de contour et les valeurs par défaut de la modale d'export.<br>
             <strong>Prof./passe</strong> — profondeur de coupe par passe Z ; le nombre de passes est déduit automatiquement (⌈brut ÷ prof.⌉).<br>
             <strong>Vitesse XY / Z</strong> — avance en mm/min pour les mouvements de coupe (G1) et de plongée.<br>
@@ -95,11 +95,11 @@ export function showHelpModal(machine = {}) {
         <h4>Aperçus et simulation</h4>
         <dl class="help-dl">
           <dt>3D</dt>
-          <dd>Boîte et brut (cadre jaune) avec le repère <strong>Z0</strong> : position dans le plan (centre ou un coin) et niveau (▲ dessus, ▼ dessous du brut), tel qu'il sera dans le G-code. <em>Brut +</em> ajoute du brut autour de la boîte, <em>X-Ray</em> rend la matière transparente. Boîtes à couvercle et à encoches : <strong>À plat</strong> (pièces disposées comme dans le G-code) ou <strong>Assemblé</strong>. Double-clic : recadrer la vue.</dd>
+          <dd>Boîte et brut (cadre jaune) avec le repère <strong>Z0</strong> : tel qu'il sera dans le G-code. Le bouton <em>Z0</em> (groupe <em>Usinage</em>) ouvre une fenêtre : clic sur un point du schéma du brut pour la position dans le plan (centre ou un coin), puis hauteur du zéro (haut ou bas de la boîte). Le bouton <em>Brut</em> ajoute du brut autour de la boîte, au-dessus ou en dessous ; chaque bouton affiche son réglage actuel. <em>X-Ray</em> rend la matière transparente. Boîtes à couvercle et à encoches : <strong>À plat</strong> (pièces disposées comme dans le G-code) ou <strong>Assemblé</strong>. Double-clic : recadrer la vue.</dd>
           <dt>Vues 2D</dt>
           <dd>Dessus (avec le plan de coupe <strong>A-A</strong>), face, côté et coupe A-A hachurée, avec leurs cotes. La boîte à encoches se présente en panneaux à plat.</dd>
           <dt>Simuler</dt>
-          <dd>Rejoue l'usinage sur le brut : fraise, trajets, matière enlevée, temps estimé. <strong>Dessin</strong> superpose les contours théoriques, <strong>Pièce finie seule</strong> masque la chute. Boîte empilable : choix de la face (dessus, dessous retourné). Boîte à couvercle de hauteurs différentes : choix de la pièce, chacune sur son brut.</dd>
+          <dd>Rejoue l'usinage sur le brut : fraise, trajets, matière enlevée, temps estimé. Les boutons <strong>Outil</strong>, <strong>Parcours</strong>, <strong>À vide</strong> (déplacements rapides) et <strong>Dessin</strong> (contours théoriques) affichent ou masquent chaque élément ; <strong>Pièce finie seule</strong> masque la chute. La vitesse de lecture se règle à côté de la ligne de temps. Boîte empilable : choix de la face (dessus, dessous retourné). Boîte à couvercle de hauteurs différentes : choix de la pièce, chacune sur son brut.</dd>
         </dl>
       </section>
 
