@@ -1,7 +1,7 @@
 import { GCodeGenerator } from '../gcode/GCodeGenerator.js';
 import { pocketConcentric } from '../gcode/PocketConcentric.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
-import { insetPolygon, offsetPolygons, unionPolygons, roundCorners } from '../gcode/Offset.js';
+import { insetPolygon, offsetPolygons, unionPolygons, roundCorners, clipToRegion, signedArea, distToPolygon } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
 
 /**
@@ -138,10 +138,30 @@ export class LidBox {
       const rounded = lip !== lipRaw && lip.length > 2;
       // Anneaux jusqu'au bord exact de la feuillure (pas resserré dans les coins)
       const inset = d => gen.insetContour(bodyPts, d);
-      // Coin de lèvre arrondi : chaque anneau suit le plus extérieur de « contour décalé de d » et
-      // « lèvre agrandie de la fraise (+ surépaisseur) » ; le dernier anneau est la lèvre elle-même.
+      // Coin de lèvre arrondi : l'anneau extérieur suit le contour (décalé de d), les autres
+      // suivent la lèvre agrandie (arrondis concentriques à celui de la lèvre), rognés par
+      // l'anneau extérieur. Dans les coins, des anneaux intermédiaires s'ajoutent tant que
+      // l'écart avec l'anneau extérieur dépasse 0,6 Ø (sinon il resterait de la matière).
       const around = e => offsetPolygons(lip, e, { join: 'round' })[0] ?? [];
       const hug    = (d, e) => unionPolygons(inset(d), around(e));
+      const bandRings = ds => {            // ds : distances au contour, de l'extérieur vers la lèvre
+        if (ds.length < 2) return ds.map(d => hug(d, ringW - d));
+        const outer = inset(ds[0]);
+        if (outer.length < 3) return [];
+        const clip = e => clipToRegion(around(e), outer)
+          .sort((p, q) => Math.abs(signedArea(q)) - Math.abs(signedArea(p)))[0] ?? [];
+        const gap = ring => (ring.length < 3 ? 0 : Math.max(...outer.map(v => distToPolygon(v, ring))));
+        const es = ds.slice(1).map(d => ringW - d);            // extérieur → lèvre
+        const maxStep = 0.6 * td;
+        let eOut = es[0], ringOut = clip(eOut);
+        const extra = [];
+        for (let k = 0; k < 20 && ringOut.length > 2 && gap(ringOut) > maxStep; k++) {
+          eOut += maxStep;
+          ringOut = clip(eOut);
+          if (ringOut.length > 2) extra.unshift(ringOut);
+        }
+        return [outer, ...extra, ...es.map(clip)];
+      };
       const faRing = entryOpts.finishAllowance ?? 0;
       if (dMin > dMax + 1e-6) {
         // rien à usiner : la fraise est plus large que la feuillure
@@ -150,15 +170,13 @@ export class LidBox {
         const lo = dMin + faRing, hi = dMax - faRing;
         const roughD = hi >= lo - 1e-9 ? gen.ringInsets(bodyPts, lo, hi) : [(dMin + dMax) / 2];
         const finD = dMax - dMin > 1e-6 ? [dMin, dMax] : [dMin];
-        const rough = rounded ? roughD.map(d => hug(d, td / 2 + faRing)) : roughD.map(inset);
+        const rough = rounded ? bandRings(roughD) : roughD.map(inset);
         const fin = rounded ? finD.map(d => (d === dMax && finD.length > 1 ? around(td / 2) : hug(d, td / 2))) : finD.map(inset);
         gen.cutBandRings(rough.filter(c => c.length > 2), fin.filter(c => c.length > 2), t('gcode.op_body_rabbet_ext'));
       } else {
         // Sans finition : mêmes anneaux, avec le détour dans les coins vifs à la dernière passe
         const ds = gen.ringInsets(bodyPts, dMin, dMax);
-        const rings = rounded
-          ? ds.map((d, i) => (i === ds.length - 1 && ds.length > 1 ? around(td / 2) : hug(d, td / 2)))
-          : ds.map(inset);
+        const rings = rounded ? bandRings(ds) : ds.map(inset);
         gen.cutBandRings(rings.filter(c => c.length > 2), [], t('gcode.op_body_rabbet_ext'));
       }
     }

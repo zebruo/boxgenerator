@@ -128,7 +128,7 @@ export function unionPolygons(a, b) {
 }
 
 /** Distance d'un point au contour fermé `poly` (segment le plus proche). */
-function distToPolygon(p, poly) {
+export function distToPolygon(p, poly) {
   let best = Infinity;
   for (let i = 0, n = poly.length; i < n; i++) {
     const a = poly[i], b = poly[(i + 1) % n];

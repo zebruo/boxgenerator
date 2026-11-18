@@ -744,11 +744,32 @@ export class GCodeGenerator {
    * @param {Array<{x,y}[]>} finContours   - trajets de finition (un par paroi)
    */
   cutBandRings(roughContours, finContours, label = 'Contour') {
-    const prep = pts => this._reorderAt(pts, this._maxSegIdx(pts));
-    const rough = roughContours.filter(p => p?.length >= 2).map(prep);
-    const fin   = finContours.filter(p => p?.length >= 2).map(prep);
-    if (rough.length === 0) return;
-    this._emitRings(rough, fin.length ? fin : null, 'center', label, true);
+    // Départ du premier anneau au milieu de son plus long segment, celui des suivants au point
+    // le plus proche : on passe d'un anneau au suivant par un court pas radial dans la bande,
+    // sans traverser la pièce.
+    const ok = roughContours.filter(p => p?.length >= 3);
+    if (ok.length === 0) return;
+    const first = this._reorderAt(ok[0], this._maxSegIdx(ok[0]));
+    const start = first[0];
+    const rough = [first, ...ok.slice(1).map(p => this._reorderNear(p, start))];
+    const fin   = finContours.filter(p => p?.length >= 3).map(p => this._reorderNear(p, start));
+    this._emitRings(rough, fin.length ? fin : null, 'center', label, true, true);
+  }
+
+  /** Contour fermé `pts` réordonné pour partir de son point le plus proche de `p`. */
+  _reorderNear(pts, p) {
+    const n = pts.length;
+    let best = Infinity, bi = 0, bq = pts[0];
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+      const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+      const q = { x: a.x + t * dx, y: a.y + t * dy }, d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < best) { best = d; bi = i; bq = q; }
+    }
+    const rest = [...pts.slice(bi + 1), ...pts.slice(0, bi + 1)];
+    const same = v => Math.hypot(v.x - bq.x, v.y - bq.y) < 1e-6;
+    return [bq, ...rest.filter((v, k) => !(same(v) && (k === 0 || k === rest.length - 1)))];
   }
 
   /**
@@ -787,36 +808,53 @@ export class GCodeGenerator {
    * demande), puis finition à pleine profondeur (plongée : la bande est déjà vidée).
    * @param {boolean} relief - détour dans les coins vifs du premier anneau (paroi extérieure),
    *   à pleine profondeur : à la passe de finition, sinon à la dernière passe d'ébauche
+   * @param {boolean} linked - anneaux emboîtés d'une même bande, départs alignés : on passe de
+   *   l'un à l'autre en G1 à la profondeur courante (pas radial dans la bande) au lieu de
+   *   remonter, si les départs sont à moins d'un Ø
    */
-  _emitRings(allPts, allPtsFin, side, label, relief = false) {
+  _emitRings(allPts, allPtsFin, side, label, relief = false, linked = false) {
     const { depth, passes, stepZ } = this._passPlan();
+    const td = this.machine.toolDiameter;
+    const near = (a, b) => linked && a && Math.hypot(a.x - b.x, a.y - b.y) <= td + 1e-6;
 
     this.comment(`─── ${label} (${side}, ${allPts.length} anneaux fusionnés) ───`);
 
     for (let pass = 1; pass <= passes; pass++) {
       const z = -(stepZ * pass);
       this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}`);
+      let prev = null;
       allPts.forEach((ring, k) => {
         const pts = relief && !allPtsFin && pass === passes && k === 0 ? this._withCornerRelief(ring) : ring;
-        this.rapidZ(this.machine.safeZ);
-        this.rapidTo(pts[0].x, pts[0].y);
-        // Matière de la couche au départ de l'anneau : du fond de la couche précédente à z
-        // (plongée, ou rampe le long de l'anneau selon l'export)
-        this.pocketEnter(pts, z, z + stepZ);
+        if (near(prev, pts[0])) {
+          this.lineTo(pts[0].x, pts[0].y);
+        } else {
+          this.rapidZ(this.machine.safeZ);
+          this.rapidTo(pts[0].x, pts[0].y);
+          // Matière de la couche au départ de l'anneau : du fond de la couche précédente à z
+          // (plongée, ou rampe le long de l'anneau selon l'export)
+          this.pocketEnter(pts, z, z + stepZ);
+        }
         this._loop(pts);
+        prev = pts[0];
       });
     }
 
     if (allPtsFin) {
       const zFin = -depth;
       this.comment(`Passe finition paroi — Z=${zFin.toFixed(3)}`);
+      let prev = null;
       allPtsFin.forEach((ring, k) => {
         const pts = relief && k === 0 ? this._withCornerRelief(ring) : ring;
-        this.rapidZ(this.machine.safeZ);
-        this.rapidTo(pts[0].x, pts[0].y);
-        this.plungeTo(zFin);
+        if (near(prev, pts[0])) {
+          this.lineTo(pts[0].x, pts[0].y);
+        } else {
+          this.rapidZ(this.machine.safeZ);
+          this.rapidTo(pts[0].x, pts[0].y);
+          this.plungeTo(zFin);
+        }
         this._loop(pts);
         this._emitOvercut(pts);
+        prev = pts[0];
       });
     }
 
