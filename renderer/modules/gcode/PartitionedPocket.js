@@ -1,9 +1,10 @@
 import { clipToRegion, insetPolygon } from './Offset.js';
 
 /**
- * Lit une répartition saisie (« 60/40 », « 1/2/1 », virgule décimale acceptée) pour `count`
- * compartiments. Renvoie null si le champ est vide, { error: 'invalid' | 'count' } si la
- * saisie est inutilisable, sinon { fractions } (somme = 1).
+ * Lit une répartition saisie en pourcentages (« 60/40 », « 25/50/25 », virgule décimale
+ * acceptée) pour `count` compartiments. Renvoie null si le champ est vide,
+ * { error: 'invalid' | 'count' | 'sum', sum } si la saisie est inutilisable (la somme doit
+ * faire 100 %, à 0,2 près pour « 33,3/33,3/33,3 »), sinon { fractions } (somme = 1).
  */
 export function parseSplit(text, count) {
   if (typeof text !== 'string' || !text.trim()) return null;
@@ -13,6 +14,7 @@ export function parseSplit(text, count) {
   if (nums.some(v => !(v > 0))) return { error: 'invalid' };
   if (nums.length !== count) return { error: 'count' };
   const sum = nums.reduce((a, b) => a + b, 0);
+  if (Math.abs(sum - 100) > 0.2) return { error: 'sum', sum };
   return { fractions: nums.map(v => v / sum) };
 }
 
@@ -26,7 +28,7 @@ export function partitionSizes(W, D, wallThickness, partitions, partitionDir, sp
   const usable = (partitionDir === 'vertical' ? W : D) - 2 * wt - partitions * wt;
   const parsed = parseSplit(split, n);
   const sizes = parsed?.fractions ? parsed.fractions.map(f => usable * f) : Array(n).fill(usable / n);
-  return { sizes, error: parsed?.error ?? null };
+  return { sizes, error: parsed?.error ?? null, sum: parsed?.sum };
 }
 
 /**

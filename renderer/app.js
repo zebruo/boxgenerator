@@ -463,7 +463,7 @@ function updatePartitionWarning() {
   const td  = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 6;
   const bb  = state.shape?.getBoundingBox();
   if (!bb) return;
-  const { sizes, error } = partitionSizes(bb.width, bb.height, wallThickness, partitions, partitionDir,
+  const { sizes, error, sum } = partitionSizes(bb.width, bb.height, wallThickness, partitions, partitionDir,
     state.boxParams.partitionSplit ?? '');
   const across = (partitionDir === 'vertical' ? bb.height : bb.width) - 2 * wallThickness;
   const smallest = Math.min(...sizes, across);
@@ -473,7 +473,8 @@ function updatePartitionWarning() {
   setWarn(el, tooSmall);
   // Saisie de la répartition inutilisable : parts égales (avertissement orange)
   setWarn(splitEl, error === 'count' ? t('warn.partition_split_count', { n: partitions + 1 })
-    : error === 'invalid' ? t('warn.partition_split_invalid') : tooSmall);
+    : error === 'invalid' ? t('warn.partition_split_invalid')
+    : error === 'sum' ? t('warn.partition_split_sum', { sum: +sum.toFixed(1) }) : tooSmall);
   const fmt = v => (currentLang() === 'fr' ? v.toFixed(1).replace('.', ',') : v.toFixed(1));
   const list = sizes.map(fmt).join(' / ') + ' mm';
   // Champ vide : on dit que ce sont des parts égales (l'exemple grisé n'est pas une valeur)

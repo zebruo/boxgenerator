@@ -56,7 +56,7 @@ export class LidBox {
           { value: 'horizontal', label: 'option.partition_horizontal' }
         ]
       },
-      // Répartition des compartiments (« 60/40 ») ; vide = parts égales
+      // Répartition des compartiments en % (« 60/40 ») ; vide = parts égales
       { id: 'partitionSplit', label: 'param.partition_split', type: 'text', unit: '', value: '', placeholder: 'param.partition_split_ph' }
     ];
   }
