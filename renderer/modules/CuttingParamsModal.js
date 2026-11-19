@@ -294,7 +294,7 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
 
   // ── Calcul : refait à chaque modification, les résultats et « Appliquer » sont toujours à jour ──
   function calcNow() {
-    const vcManual = man.vc ? Number.parseFloat(modal.querySelector('#cp-vc-manual').value) : NaN;
+    const vcManual = man.vc ? Number.parseFloat(modal.querySelector('#cp-vc-manual').value) : Number.NaN;
     const mat      = MATERIALS.find(m => m.id === selMatId);
     const fiche    = tool?.cutting[selMatId];
     const vc       = (vcManual > 0) ? vcManual : (fiche?.vc ?? mat.vc);
