@@ -165,7 +165,7 @@
               <select id="param-material" class="cut-select"></select>
             </div>
             <div class="param-row" data-tip="tip.tool_diameter">
-              <label for="param-tool-diameter" data-i18n="ui.tool_diameter">Diam. fraise</label>
+              <label for="param-tool-diameter" data-i18n="ui.tool_diameter">⌀ fraise</label>
               <input type="number" id="param-tool-diameter" value="3.175" min="0.5" max="25" step="any">
               <span class="param-unit">mm</span>
             </div>
@@ -191,11 +191,6 @@
             <div class="param-row" data-tip="tip.feed_z">
               <span class="param-lab"><label for="param-plunge" data-i18n="ui.feed_z">Vitesse Z</label><button type="button" class="cut-state" id="cut-state-plunge"></button></span>
               <input type="number" id="param-plunge" value="300" min="10" max="2000" step="10">
-              <span class="param-unit">mm/min</span>
-            </div>
-            <div class="param-row" data-tip="tip.feed_rapid">
-              <label for="param-rapid" data-i18n="ui.feed_rapid">Vitesse G0</label>
-              <input type="number" id="param-rapid" value="3000" min="100" max="30000" step="100">
               <span class="param-unit">mm/min</span>
             </div>
             <div class="param-row" data-tip="tip.spindle">
@@ -230,6 +225,11 @@
             <div class="param-row">
               <label for="cut-max-feedz" data-i18n="cut.max_feedz">Avance Z max</label>
               <input type="number" id="cut-max-feedz" min="10" max="30000" step="10">
+              <span class="param-unit" data-i18n="cut.u_feed">mm/min</span>
+            </div>
+            <div class="param-row" data-tip="tip.feed_rapid">
+              <label for="param-rapid" data-i18n="ui.feed_rapid">Vitesse G0</label>
+              <input type="number" id="param-rapid" value="750" min="100" max="30000" step="10">
               <span class="param-unit" data-i18n="cut.u_feed">mm/min</span>
             </div>
           </details>

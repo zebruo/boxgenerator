@@ -97,7 +97,10 @@ export function initCuttingPanel({ t, lang, onChange }) {
     const mode = $('cut-spindle-mode');
     mode.textContent = st.spindleFixed ? t('cut.fixed') : t('cut.auto');
     mode.title = t(st.spindleFixed ? 'cut.tip_spindle_fixed' : 'cut.tip_spindle_auto');
-    $('cut-machine-sum').textContent = `${fmt(st.machine.spindle)} ${t('cut.u_rpm')} · ${fmt(st.machine.feed)} ${t('cut.u_feed')}`;
+    // Une seule ligne même avec des valeurs à 4-5 chiffres : l'unité de broche n'est donnée que dans l'infobulle
+    const sumEl = $('cut-machine-sum');
+    sumEl.textContent = `${fmt(st.machine.spindle)} · ${fmt(st.machine.feed)} ${t('cut.u_feed')}`;
+    sumEl.parentElement.title = `${fmt(st.machine.spindle)} ${t('cut.u_rpm')} · ${fmt(st.machine.feed)} ${t('cut.u_feed')}`;
     renderSummary(r);
   }
 
