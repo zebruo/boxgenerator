@@ -117,7 +117,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     const tool = findTool(st.toolRef), info = $('cut-tool-info');
     info.hidden = !tool;
     if (!tool) return;
-    info.textContent = t('cut.tool_info', { type: t(`cut.type_${tool.type}`), coating: tool.coating ? t('cut.tool_coating', { coating: tool.coating }) : '', lu: fmt(tool.cuttingLength), shank: fmt(tool.shank, Number.isInteger(tool.shank) ? 0 : 3).replace(/0$/, '') });
+    info.textContent = t('cut.tool_info', { type: t(`cut.type_${tool.type}`), coating: (tool.nose ? t(`cut.nose_${tool.nose}`) : '') + (tool.coating ? t('cut.tool_coating', { coating: tool.coating }) : ''), lu: fmt(tool.cuttingLength), shank: fmt(tool.shank, Number.isInteger(tool.shank) ? 0 : 3).replace(/0$/, '') });
   }
 
   function renderSummary(r) {
@@ -163,10 +163,19 @@ export function initCuttingPanel({ t, lang, onChange }) {
     const manual = document.createElement('option');
     manual.value = ''; manual.textContent = t('cut.tool_manual');
     toolSel.appendChild(manual);
-    for (const tool of TOOLS) {
+    // Classées par diamètre, puis par longueur utile
+    const sorted = [...TOOLS].sort((a, b) => a.diameter - b.diameter || a.cuttingLength - b.cuttingLength || a.ref.localeCompare(b.ref));
+    let group = null;                  // un groupe par diamètre, avec son titre
+    for (const tool of sorted) {
+      if (!group || group.dataset.d !== String(tool.diameter)) {
+        group = document.createElement('optgroup');
+        group.dataset.d = String(tool.diameter);
+        group.label = t('cut.tool_group', { d: String(tool.diameter).replace('.', lang() === 'fr' ? ',' : '.') });
+        toolSel.appendChild(group);
+      }
       const o = document.createElement('option');
       o.value = tool.ref; o.textContent = toolLabel(tool);
-      toolSel.appendChild(o);
+      group.appendChild(o);
     }
     toolSel.value = st.toolRef;
   }

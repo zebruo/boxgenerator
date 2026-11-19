@@ -1032,3 +1032,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-panel); border-top: 1px solid var(--border); flex-shrink: 0;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* Liste des fraises : titres de groupe (un par diamètre) en gris, sans orange (réservé aux avertissements) */
+#param-tool optgroup { font-weight: 700; color: var(--text-muted); font-style: normal; }
+#param-tool option { font-weight: 400; color: var(--text); }
