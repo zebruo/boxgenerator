@@ -46,12 +46,13 @@ export function initCuttingPanel({ t, lang, onChange }) {
     matId:        MATERIALS.some(m => m.id === saved.matId) ? saved.matId : '200',
     flutes:       [1, 2, 3, 4].includes(saved.flutes) ? saved.flutes : 2,
     toolRef:      findTool(saved.toolRef) ? saved.toolRef : '',      // '' = saisie manuelle
-    spindleFixed: saved.spindleFixed ?? true,
+    spindleFixed: saved.spindleFixed ?? false,                 // auto par défaut : n = vc ramenée à la broche max machine
     manual:       { feed: false, plunge: false, passes: false },
     machine: {                         // TTC450 Pro : 12 000 tr/min, 750 mm/min ($110/$111)
       spindle: saved.machine?.spindle > 0 ? saved.machine.spindle : 12000,
       feed:    saved.machine?.feed    > 0 ? saved.machine.feed    : 750,
       feedZ:   saved.machine?.feedZ   > 0 ? saved.machine.feedZ   : 750,
+      apK:     saved.machine?.apK >= 0.1 && saved.machine.apK <= 0.6 ? saved.machine.apK : 0.4,   // ap max = k x diamètre
     },
   };
 
@@ -71,7 +72,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     const spindle = num('param-spindle');
     const r = calculate({
       vc: mat.vc, diameter, flutes: st.flutes, matId: st.matId, manualFz: fiche?.fz,
-      maxSpindle: st.machine.spindle, maxFeed: st.machine.feed, maxFeedZ: st.machine.feedZ,
+      maxSpindle: st.machine.spindle, maxFeed: st.machine.feed, maxFeedZ: st.machine.feedZ, maxApK: st.machine.apK,
       spindle: st.spindleFixed && spindle > 0 ? spindle : 0,
     });
     return { ...r, mat, diameter };
@@ -139,6 +140,8 @@ export function initCuttingPanel({ t, lang, onChange }) {
       add(true, t('cut.w_rubbing', { fz: fmt(fzEff, 3), pct: Math.round(ratio * 100), rec: fmt(r.fz, 3) }));
     else if (st.manual.feed && ratio > 1.5)
       add(true, t('cut.w_heavy', { fz: fmt(fzEff, 3), pct: Math.round(ratio * 100) }));
+    if (!st.manual.passes && r.apCapped)
+      add(false, t('cut.i_ap_cap', { k: fmt(st.machine.apK, 2).replace(/0$/, ''), table: fmt(r.apTable, 1) }));
     if (!st.manual.feed && r.vfCapped)
       add(false, t('cut.i_feed_cap', { feed: fmt(st.machine.feed) }));
     if (st.spindleFixed && num('param-spindle') > st.machine.spindle)
@@ -234,12 +237,13 @@ export function initCuttingPanel({ t, lang, onChange }) {
   });
 
   // ── Limites machine ─────────────────────────────────────────────────────────
-  const mach = { spindle: $('cut-max-spindle'), feed: $('cut-max-feed'), feedZ: $('cut-max-feedz') };
+  const mach = { spindle: $('cut-max-spindle'), feed: $('cut-max-feed'), feedZ: $('cut-max-feedz'), apK: $('cut-max-apk') };
   for (const [key, el] of Object.entries(mach)) {
     el.value = st.machine[key];
     el.addEventListener('input', () => {
       const v = Number.parseFloat(el.value);
-      if (v > 0) { st.machine[key] = v; savePrefs(); update(); }
+      const ok = key === 'apK' ? v >= 0.1 && v <= 0.6 : v > 0;
+      if (ok) { st.machine[key] = v; st.manual.passes = false; savePrefs(); update(); }
     });
   }
 

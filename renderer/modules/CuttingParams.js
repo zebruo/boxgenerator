@@ -37,21 +37,32 @@ const FZ = {
   '8':     { '150':0.025,'200':0.031,'250':0.033,'350':0.040,'300':0.088,'201.01':0.065,'120':0.028,'120.01':0.023 },
 };
 
-// coefficient ap = coeff × diamètre
-const AP_COEFF = {
-  '1':     { '150':0.2,'200':0.2,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.2,'120.01':0.1 },
-  '2':     { '150':0.2,'200':0.2,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.2,'120.01':0.1 },
-  '2.5':   { '150':0.2,'200':0.2,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.2,'120.01':0.1 },
-  '3':     { '150':0.3,'200':0.4,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.4,'120.01':0.1 },
-  '3.175': { '150':0.3,'200':0.4,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.4,'120.01':0.1 },
-  '4':     { '150':0.4,'200':0.5,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.5,'120.01':0.2 },
-  '5':     { '150':0.4,'200':0.5,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.5,'120.01':0.25},
-  '6':     { '150':0.4,'200':0.5,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.5,'120.01':0.3 },
-  '8':     { '150':0.4,'200':0.5,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.5,'120.01':0.3 },
+// Coefficient k de profondeur de passe (ap = k × diamètre) : tableau du fournisseur, par plage de
+// diamètre (colonnes ⌀ ≥ 2, 3, 4, 5, 6 mm) et famille de matière. Sous 2 mm le tableau indique « NC » :
+// on garde les valeurs d'avant (AP_COEFF_SMALL). Les familles : tendre (bois tendre, contreplaqué,
+// mousses), aluminium, et durs (tout le reste : bois durs, MDF, plastiques, HPL, mélaminé, cuivre…).
+const AP_STEPS = [2, 3, 4, 5, 6];
+const AP_K = {
+  tendre: [0.5, 0.8, 1, 1, 1],
+  durs:   [0.2, 0.4, 0.5, 0.6, 1],
+  alu:    [0.1, 0.2, 0.25, 0.35, 0.35],
+};
+const AP_FAMILY = { '250': 'tendre', tendre: 'tendre', mousse: 'tendre', '120': 'alu' };
+const AP_COEFF_SMALL = {
+  '150':0.2, '200':0.2, '250':0.5, '350':0.5, '300':0.5, '201.01':0.5, '120':0.2, '120.01':0.1,
+  tendre:0.5, acetate:0.5, hpl:0.2, melamine:0.5, mousse:0.5,
 };
 
-// Bois tendre : mêmes fz et profondeurs que le contreplaqué ; acétate : mêmes que le PVC. Les fiches
-// fournisseur (3,175 et 6 mm) donnent des valeurs identiques ; seule la vitesse de coupe diffère.
+/** Coefficient k du tableau du fournisseur pour une matière et un diamètre (sans plafond machine). */
+export function apCoefficient(matId, diameter) {
+  if (!(diameter >= AP_STEPS[0])) return AP_COEFF_SMALL[matId] ?? null;
+  let i = 0;
+  while (i + 1 < AP_STEPS.length && diameter >= AP_STEPS[i + 1]) i++;
+  return AP_K[AP_FAMILY[matId] ?? 'durs'][i];
+}
+
+// Bois tendre : même fz que le contreplaqué ; acétate : même que le PVC. Les fiches fournisseur
+// (3,175 et 6 mm) donnent des valeurs identiques ; seule la vitesse de coupe diffère.
 // Compact HPL, mélaminé/aggloméré et mousses : fz des fiches fournisseur (catalogue des fraises à
 // 2 dents). Le 3 mm prend les valeurs du 3,175 et le 2,5 mm celles du 2 mm, comme les autres matières.
 // Non fournis par les fiches, donc estimés : le 5 mm (milieu des 4 et 6 mm) et le 1 mm du mélaminé
@@ -61,16 +72,13 @@ const FZ_SPECIAL = {
   melamine: { '1':0.008, '2':0.024, '2.5':0.024, '3':0.036, '3.175':0.036, '4':0.048, '5':0.054, '6':0.060, '8':0.072 },
   mousse:   { '1':0.020, '2':0.060, '2.5':0.060, '3':0.090, '3.175':0.090, '4':0.120, '5':0.135, '6':0.150, '8':0.180 },
 };
-// Profondeur par passe (non fournie par les fiches) : HPL comme l'aluminium (matière dure et abrasive),
-// mélaminé comme le MDF, mousses comme le PVC.
-const AP_SPECIAL = { hpl: '120', melamine: '350', mousse: '300' };
 for (const dk of Object.keys(FZ)) {
-  for (const [id, fzs] of Object.entries(FZ_SPECIAL)) { FZ[dk][id] = fzs[dk]; AP_COEFF[dk][id] = AP_COEFF[dk][AP_SPECIAL[id]]; }
+  for (const [id, fzs] of Object.entries(FZ_SPECIAL)) FZ[dk][id] = fzs[dk];
 }
 
 for (const dk of Object.keys(FZ)) {
-  FZ[dk].tendre = FZ[dk]['250'];     AP_COEFF[dk].tendre = AP_COEFF[dk]['250'];
-  FZ[dk].acetate = FZ[dk]['300'];    AP_COEFF[dk].acetate = AP_COEFF[dk]['300'];
+  FZ[dk].tendre = FZ[dk]['250'];
+  FZ[dk].acetate = FZ[dk]['300'];
 }
 
 /**
@@ -88,9 +96,8 @@ function nearestDiamKey(d) {
 export function getDefaults(matId, diameter) {
   const dk = nearestDiamKey(diameter);
   const fz = FZ[dk]?.[matId] ?? null;
-  const ap = (AP_COEFF[dk]?.[matId] != null)
-    ? +((AP_COEFF[dk][matId] * diameter).toFixed(2))
-    : null;
+  const k  = apCoefficient(matId, diameter);
+  const ap = k != null ? +((k * diameter).toFixed(2)) : null;
   return { fz, ap };
 }
 
@@ -105,14 +112,18 @@ export function getDefaults(matId, diameter) {
  * @param {number} p.maxFeedZ    avance Z max (mm/min)
  * @param {number} [p.manualFz]  fz saisi manuellement (optionnel)
  * @param {number} [p.manualAp]  ap saisi manuellement (optionnel)
+ * @param {number} [p.maxApK]    profondeur de passe max en fraction du diamètre (ap <= maxApK x diamètre), sinon tableau seul
  * @param {number} [p.spindle]   broche imposée (tr/min, plafonnée par maxSpindle) : sinon calculée depuis vc
  * @returns {{ n, vf, vfZ, ap, fz, vcEff, warnings[] }}
  */
 export function calculate(p) {
   const dk  = nearestDiamKey(p.diameter);
   const fz  = (p.manualFz > 0) ? p.manualFz : (FZ[dk]?.[p.matId] ?? 0.01);
-  const apRaw = (p.manualAp > 0) ? p.manualAp
-              : +(((AP_COEFF[dk]?.[p.matId] ?? 0.3) * p.diameter).toFixed(2));
+  // Profondeur de passe : tableau du fournisseur, plafonné par k max de la machine (maxApK)
+  const kTable   = apCoefficient(p.matId, p.diameter) ?? 0.3;
+  const kUsed    = p.maxApK > 0 ? Math.min(kTable, p.maxApK) : kTable;
+  const apRaw    = (p.manualAp > 0) ? p.manualAp : +(kUsed * p.diameter).toFixed(2);
+  const apCapped = !(p.manualAp > 0) && kUsed < kTable;
 
   const nTheo  = (1000 * p.vc) / (Math.PI * p.diameter);
   const fixedN = p.spindle > 0;
@@ -147,6 +158,7 @@ export function calculate(p) {
     vfCapped: vfLimited,   // l'avance calculée à la broche réellement utilisée dépasse l'avance max machine
     vfZ, vfZTarget,
     ap: apRaw, fz,
+    apTable: +(kTable * p.diameter).toFixed(2), apCapped,   // valeur du tableau du fournisseur, et plafond machine appliqué
     vcEff: Math.round(vcEff), vcTarget: p.vc,
     vcPct,
     warnings,
