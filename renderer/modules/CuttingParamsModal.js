@@ -3,22 +3,23 @@ import { MATERIALS, DIAMETERS, calculate, getDefaults } from './CuttingParams.js
 /**
  * Ouvre la modale de calcul des paramètres de coupe.
  * @param {number}   toolDiameter  diamètre pré-sélectionné depuis BoxGenerator
- * @param {function} onApply       callback(result) — reçoit le résultat complet de calculate() + diameter
+ * @param {function} onApply       callback(result) — reçoit le résultat complet de calculate() + diameter, matId, flutes
+ * @param {object}   [opts]        matière, dents et limites machine du panneau (sinon dernières valeurs mémorisées)
  */
-export function showCuttingParamsModal(toolDiameter = 3.175, onApply) {
+export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {}) {
 
   // ── État interne ───────────────────────────────────────────────────────────
   const STORAGE_KEY = 'bg-cutting-params';
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 
-  let selMatId   = saved.matId     ?? '200';
+  let selMatId   = opts.matId      ?? saved.matId     ?? '200';
   let selDiam    = DIAMETERS.reduce((a, b) => Math.abs(b - toolDiameter) < Math.abs(a - toolDiameter) ? b : a, DIAMETERS[0]);
-  let selFlutes  = saved.flutes    ?? 2;
+  let selFlutes  = opts.flutes     ?? saved.flutes    ?? 2;
   let manualFz   = null;
   let manualAp   = null;
-  let maxFeed    = saved.maxFeed    ?? 800;
-  let maxFeedZ   = saved.maxFeedZ   ?? 300;
-  let maxSpindle = saved.maxSpindle ?? 12000;
+  let maxFeed    = opts.maxFeed     ?? saved.maxFeed    ?? 800;
+  let maxFeedZ   = opts.maxFeedZ    ?? saved.maxFeedZ   ?? 300;
+  let maxSpindle = opts.maxSpindle  ?? saved.maxSpindle ?? 12000;
   let lastResult = null;
 
   function savePrefs() {
@@ -266,7 +267,9 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply) {
     const mat      = MATERIALS.find(m => m.id === selMatId);
     const vc       = (vcManual > 0) ? vcManual : mat.vc;
 
-    lastResult = { diameter: selDiam, ...calculate({
+    lastResult = { diameter: selDiam, matId: selMatId, flutes: selFlutes,
+      manual: { feed: vcManual > 0 || manualFz != null, passes: manualAp != null },   // valeurs réglées à la main
+      ...calculate({
       vc, diameter: selDiam, flutes: selFlutes,
       matId: selMatId, maxSpindle, maxFeed, maxFeedZ,
       manualFz, manualAp,

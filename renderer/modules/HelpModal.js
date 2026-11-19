@@ -57,11 +57,12 @@ export function showHelpModal(machine = {}) {
           <dt>Matière &amp; Outil</dt>
           <dd>
             <strong>Brut</strong> — épaisseur totale calculée automatiquement depuis la hauteur de boîte + surplus de brut réglé par le bouton <em>Brut</em> de la barre 3D (lecture seule). Boîte à couvercle de hauteurs différentes : deux lignes, <strong>Brut corps</strong> et <strong>Brut couvercle</strong> (deux bruts), chacun avec son propre surplus : la fenêtre du bouton <em>Brut</em> propose alors deux champs (corps, couvercle) ; saisir par exemple 0,3 pour une planche de 8,6 mm sous un couvercle de 8,3 mm.<br>
-            <strong>Diam. fraise</strong> — diamètre de l'outil en mm ; utilisé pour l'offset de contour et les valeurs par défaut de la modale d'export.<br>
+            <strong>Matière</strong>, <strong>Diam. fraise</strong> et <strong>Dents</strong> — l'avance XY, la plongée et la profondeur par passe se calculent seules à partir de ces trois réglages et de la broche (mêmes tables que <em>Détails du calcul</em>). Le diamètre sert aussi à l'offset de contour et aux valeurs par défaut de la fenêtre d'export.<br>
             <strong>Prof./passe</strong> — profondeur de coupe par passe Z ; le nombre de passes est déduit automatiquement (⌈brut ÷ prof.⌉).<br>
             <strong>Vitesse XY / Z</strong> — avance en mm/min pour les mouvements de coupe (G1) et de plongée.<br>
+            <strong>auto / ↺ auto</strong> — l'étiquette à côté d'un champ dit s'il est calculé (<em>auto</em>) ou saisi à la main (<em>↺ auto</em> : un clic remet la valeur calculée). Changer la matière recalcule tout. Une avance saisie trop basse (fz sous 60 % du conseillé) déclenche un avertissement : la fraise frotte et le bois peut brûler.<br>
             <strong>Vitesse G0</strong> — vitesse des déplacements rapides de la machine ; sert au temps estimé de la simulation.<br>
-            <strong>Broche</strong> — vitesse de rotation en tr/min (commande <span class="help-mono">S…M3</span>).<br>
+            <strong>Broche</strong> — vitesse de rotation en tr/min (commande <span class="help-mono">S…M3</span>). <em>fixe</em> : tu règles les tr/min et les avances s'y adaptent ; <em>auto</em> : les tr/min sont calculés depuis la vitesse de coupe de la matière. <strong>Limites machine</strong> : broche et avances maximales, qui plafonnent les calculs (mémorisées sur l'ordinateur).<br>
             <strong>Survol Z</strong> — hauteur de sécurité entre opérations (commande <span class="help-mono">G0 Z…</span>).<br>
             <strong>Arcs G2/G3</strong> — regroupe les petits segments en vrais arcs et ne répète pas les mots inchangés : le fichier est beaucoup plus court et la machine plus fluide.
           </dd>

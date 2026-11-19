@@ -16,6 +16,7 @@ import { LidBox, lidPartitionThickness } from './modules/boxes/LidBox.js';
 import { StackableBox }   from './modules/boxes/StackableBox.js';
 import { showHelpModal }         from './modules/HelpModal.js';
 import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
+import { initCuttingPanel } from './modules/CuttingPanel.js';
 
 // ─── Tooltip global (réutilisé dans les modales) ────────────────────────────
 let _tipEl  = null;
@@ -73,6 +74,7 @@ const state = {
   view:       '3d', // '3d' | 'tech'
   exportOpts: null  // options de la fenêtre d'export (initialisées après EXPORT_OPTS_DEFAULT)
 };
+let cuttingPanel = null;   // réglages de coupe du panneau « Matière & Outil » (voir CuttingPanel.js)
 
 let threePreview   = null;  // instancié à la première ouverture de la vue 3D
 let technicalView  = null;  // instancié à la première ouverture de la vue technique
@@ -173,6 +175,7 @@ function updateI18n() {
   const switcher = document.getElementById('lang-switcher');
   if (switcher) switcher.value = currentLang();
   updateToolbarSummaries();
+  cuttingPanel?.refresh();
 }
 
 // ─── Init ──────────────────────────────────────────────────────────────────
@@ -283,16 +286,7 @@ function bindEvents() {
   // Calcul paramètres de coupe
   document.getElementById('btn-cutting-params').addEventListener('click', () => {
     const td = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 3.175;
-    showCuttingParamsModal(td, ({ n, vf, vfZ, ap, diameter }) => {
-      document.getElementById('param-tool-diameter').value = diameter;
-      document.getElementById('param-feedrate').value      = vf;
-      document.getElementById('param-plunge').value        = vfZ;
-      document.getElementById('param-spindle').value       = n;
-      document.getElementById('param-passes').value        = ap;
-      ['param-tool-diameter','param-feedrate','param-plunge','param-spindle','param-passes'].forEach(id =>
-        document.getElementById(id).dispatchEvent(new Event('change'))
-      );
-    });
+    showCuttingParamsModal(td, result => cuttingPanel.applyDetails(result), cuttingPanel.modalOptions());
   });
 
   // Bouton paramètres ⚙ — ouvre/ferme le panel
@@ -322,6 +316,13 @@ function bindEvents() {
     renderShapeParams();
     updateBoxNameOverlay();
     updatePreview();
+  });
+
+  // Réglages de coupe : doit s'enregistrer avant les écouteurs ci-dessous, pour que les valeurs
+  // calculées soient à jour quand l'aperçu se reconstruit
+  cuttingPanel = initCuttingPanel({
+    t, lang: currentLang,
+    onChange: () => { updateRabbetToolWarning(); updatePartitionWarning(); updatePreview(); },
   });
 
   // Machine params — live update
@@ -1529,6 +1530,7 @@ async function saveSession() {
     shapeParams:   { ...state.shape.params },
     boxParams:     { ...state.boxParams },
     machineParams: getMachineParams(),
+    cutting:       cuttingPanel.getState(),
     z0:            getZ0Settings(),
   };
 
@@ -1563,7 +1565,10 @@ async function loadSession() {
     renderShapeParams();
   }
 
-  if (session.machineParams) restoreMachineParams(session.machineParams, session.depthPerPass);
+  if (session.machineParams) {
+    restoreMachineParams(session.machineParams, session.depthPerPass);
+    cuttingPanel.setState(session.cutting);   // anciennes sessions : valeurs du fichier gardées telles quelles
+  }
   if (session.z0) restoreZ0(session.z0);
 
   updatePreview();

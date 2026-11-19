@@ -74,6 +74,7 @@ export function getDefaults(matId, diameter) {
  * @param {number} p.maxFeedZ    avance Z max (mm/min)
  * @param {number} [p.manualFz]  fz saisi manuellement (optionnel)
  * @param {number} [p.manualAp]  ap saisi manuellement (optionnel)
+ * @param {number} [p.spindle]   broche imposée (tr/min, plafonnée par maxSpindle) : sinon calculée depuis vc
  * @returns {{ n, vf, vfZ, ap, fz, vcEff, warnings[] }}
  */
 export function calculate(p) {
@@ -83,7 +84,8 @@ export function calculate(p) {
               : +(((AP_COEFF[dk]?.[p.matId] ?? 0.3) * p.diameter).toFixed(2));
 
   const nTheo  = (1000 * p.vc) / (Math.PI * p.diameter);
-  const n      = Math.min(nTheo, p.maxSpindle);
+  const fixedN = p.spindle > 0;
+  const n      = Math.min(fixedN ? p.spindle : nTheo, p.maxSpindle);
   const vcEff  = (Math.PI * p.diameter * n) / 1000;
 
   const vfTheo   = nTheo * fz * p.flutes;
@@ -93,7 +95,7 @@ export function calculate(p) {
   const vfZ      = Math.min(vfZTarget, p.maxFeedZ);
 
   const vcPct        = Math.round((n / nTheo) * 100);
-  const nLimited     = nTheo > p.maxSpindle;
+  const nLimited     = !fixedN && nTheo > p.maxSpindle;
   const vfLimited    = (n * fz * p.flutes) > p.maxFeed;
   const zLimited     = vfZTarget > p.maxFeedZ;
   const doubleLimited = nLimited && vfLimited;
