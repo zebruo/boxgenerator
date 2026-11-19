@@ -13,6 +13,9 @@ export const MATERIALS = [
   { id: 'tendre', label: 'Bois tendre',      detail: 'Pin, sapin, peuplier…',              vc: 300, color: '#D9C08A' },
   { id: '350',    label: 'MDF / Valcromat',  detail: 'Panneau de fibres, médium',          vc: 300, color: '#9B8B7A' },
   { id: '300',    label: 'PVC / Forex',      detail: 'PVC expansé, Komacel, Forex…',      vc: 200, color: '#E0E0E0' },
+  { id: 'hpl',     label: 'Compact HPL',      detail: 'Stratifié compact, Trespa…',         vc: 120, color: '#7A8A99' },
+  { id: 'melamine', label: 'Mélaminé / Aggloméré', detail: 'Panneaux mélaminés, particules', vc: 200, color: '#D8CBB4' },
+  { id: 'mousse', label: 'Mousses',          detail: 'Mousses synthétiques, PU, PE…',      vc: 250, color: '#E8DDA0' },
   { id: '201.01', label: 'PMMA / Acrylique', detail: 'Plexiglas, thermoplastiques',        vc: 200, color: '#A8D0E8' },
   { id: 'acetate', label: 'Acétate',         detail: 'Acétate de cellulose',               vc: 180, color: '#B5D6C9' },
   { id: '120',    label: 'Aluminium',        detail: '2017A, 5083, 6061…',                vc: 120, color: '#B0C0D0' },
@@ -49,6 +52,22 @@ const AP_COEFF = {
 
 // Bois tendre : mêmes fz et profondeurs que le contreplaqué ; acétate : mêmes que le PVC. Les fiches
 // fournisseur (3,175 et 6 mm) donnent des valeurs identiques ; seule la vitesse de coupe diffère.
+// Compact HPL, mélaminé/aggloméré et mousses : fz des fiches fournisseur (catalogue des fraises à
+// 2 dents). Le 3 mm prend les valeurs du 3,175 et le 2,5 mm celles du 2 mm, comme les autres matières.
+// Non fournis par les fiches, donc estimés : le 5 mm (milieu des 4 et 6 mm) et le 1 mm du mélaminé
+// et des mousses (proportionnel au 1,5 mm).
+const FZ_SPECIAL = {
+  hpl:      { '1':0.005, '2':0.012, '2.5':0.012, '3':0.016, '3.175':0.016, '4':0.020, '5':0.022, '6':0.024, '8':0.033 },
+  melamine: { '1':0.008, '2':0.024, '2.5':0.024, '3':0.036, '3.175':0.036, '4':0.048, '5':0.054, '6':0.060, '8':0.072 },
+  mousse:   { '1':0.020, '2':0.060, '2.5':0.060, '3':0.090, '3.175':0.090, '4':0.120, '5':0.135, '6':0.150, '8':0.180 },
+};
+// Profondeur par passe (non fournie par les fiches) : HPL comme l'aluminium (matière dure et abrasive),
+// mélaminé comme le MDF, mousses comme le PVC.
+const AP_SPECIAL = { hpl: '120', melamine: '350', mousse: '300' };
+for (const dk of Object.keys(FZ)) {
+  for (const [id, fzs] of Object.entries(FZ_SPECIAL)) { FZ[dk][id] = fzs[dk]; AP_COEFF[dk][id] = AP_COEFF[dk][AP_SPECIAL[id]]; }
+}
+
 for (const dk of Object.keys(FZ)) {
   FZ[dk].tendre = FZ[dk]['250'];     AP_COEFF[dk].tendre = AP_COEFF[dk]['250'];
   FZ[dk].acetate = FZ[dk]['300'];    AP_COEFF[dk].acetate = AP_COEFF[dk]['300'];
