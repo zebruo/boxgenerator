@@ -201,6 +201,9 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 }
 .cut-state.manual, .cut-state.fix { color: var(--text); border-color: var(--accent2); cursor: pointer; }
 .cut-state.manual:hover, .cut-state.fix:hover { background: var(--bg-hover); }
+/* pastille de la broche : cliquable dans les deux sens, mise en évidence seulement quand la valeur est imposée (« fixe ») */
+.cut-state.togl { cursor: pointer; }
+.cut-state.togl:hover { background: var(--bg-hover); }
 .cut-state:focus-visible, .cut-select:focus-visible, .cut-machine summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .param-row input.auto-val { background: color-mix(in srgb, var(--accent) 7%, var(--bg-dark)); }
 .param-row input[readonly].auto-val { color: var(--text-muted); }

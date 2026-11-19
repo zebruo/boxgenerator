@@ -102,6 +102,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     spindle.readOnly = !st.spindleFixed;
     spindle.classList.toggle('auto-val', !st.spindleFixed);
     const mode = $('cut-spindle-mode');
+    mode.classList.toggle('fix', st.spindleFixed);
     mode.textContent = st.spindleFixed ? t('cut.fixed') : t('cut.auto');
     mode.title = t(st.spindleFixed ? 'cut.tip_spindle_fixed' : 'cut.tip_spindle_auto');
     // Une seule ligne même avec des valeurs à 4-5 chiffres : l'unité de broche n'est donnée que dans l'infobulle
@@ -224,16 +225,19 @@ export function initCuttingPanel({ t, lang, onChange }) {
   $('param-tool-diameter').addEventListener('input', () => { st.manual.passes = false; render(); });
   for (const [key, id] of Object.entries(FIELDS)) {
     $(id).addEventListener('input', () => { st.manual[key] = true; render(); });
-    $(`cut-state-${key}`).addEventListener('click', () => { st.manual[key] = false; update(); });
+    $(`cut-state-${key}`).addEventListener('click', e => { st.manual[key] = false; update(); e.currentTarget.blur(); });
   }
   $('param-spindle').addEventListener('input', () => {
     if (!st.spindleFixed) return;
     st.manual.feed = false; st.manual.plunge = false; render();
   });
-  $('cut-spindle-mode').addEventListener('click', () => {
+  $('cut-spindle-mode').addEventListener('click', e => {
     st.spindleFixed = !st.spindleFixed;
     st.manual.feed = false; st.manual.plunge = false;
     savePrefs(); update();
+    // Le focus ne reste pas sur la pastille : en « fixe » il passe au champ à saisir, en « auto » il est libéré
+    if (st.spindleFixed) { const f = $('param-spindle'); f.focus(); f.select(); }
+    else e.currentTarget.blur();
   });
 
   // ── Limites machine ─────────────────────────────────────────────────────────
