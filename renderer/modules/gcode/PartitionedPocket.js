@@ -9,7 +9,8 @@ import { clipToRegion, insetPolygon } from './Offset.js';
 export function parseSplit(text, count) {
   if (typeof text !== 'string' || !text.trim()) return null;
   const vals = text.split('/').map(v => v.trim().replace(',', '.'));
-  if (vals.some(v => !/^\d*\.?\d+$/.test(v))) return { error: 'invalid' };
+  // Nombre décimal sans retour arrière : chiffres, ou chiffres.chiffres, ou .chiffres
+  if (vals.some(v => !/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(v))) return { error: 'invalid' };
   const nums = vals.map(Number);
   if (nums.some(v => !(v > 0))) return { error: 'invalid' };
   if (nums.length !== count) return { error: 'count' };
