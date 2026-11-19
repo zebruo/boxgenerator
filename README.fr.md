@@ -17,6 +17,7 @@ Application desktop de génération de boîtes paramétriques avec export G-code
 - **Onglets de maintien** sur les coupes de contour (8 × 2 mm par défaut ; largeur, hauteur, nombre configurables)
 - **Stratégies d'entrée** : plongée directe, rampe, hélicoïdale, lead-in tangentiel
 - **Finition des parois** : surépaisseur laissée aux passes, puis une passe à pleine profondeur sur la cote
+- **Calculateur de paramètres de coupe** : broche, avances XY et de plongée, profondeur de passe selon la matière, le diamètre et le nombre de dents, plafonnés par les limites de ta machine ; **catalogue de fraises** avec les valeurs de la fiche du fournisseur (hélicoïdales, droites et à compression), classées par diamètre
 - **Poche concentrique ou raster**, avec **cloisons** (compartiments)
 - **Dog-bone** aux coins intérieurs pour les finger joints
 - **Origine programme (WCS)** : centre, avant-gauche, avant-droit, arrière-gauche, arrière-droit — dessus ou dessous du brut

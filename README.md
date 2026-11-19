@@ -17,6 +17,7 @@ A desktop application for generating parametric boxes and trays with CNC G-code 
 - **Holding tabs** on contour cuts (8 × 2 mm by default ; configurable width, height, count)
 - **Entry strategies** : direct plunge, ramp, helix, tangent lead-in
 - **Wall finishing** : allowance left by the passes, then one full-depth pass on the final size
+- **Cutting parameters calculator** : spindle speed, XY and plunge feed, depth per pass from the material, tool diameter and flutes, capped by your machine limits ; **tool catalogue** with the supplier's datasheet values (helical, straight and compression end mills), tools sorted by diameter
 - **Concentric or raster pocket** fill, with **partitions** (compartments)
 - **Dog-bone fillets** at inside corners for finger joints
 - **Work origin (WCS)** : center, front-left, front-right, back-left, back-right — top or bottom of stock
