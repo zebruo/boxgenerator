@@ -144,6 +144,7 @@ export function calculate(p) {
   return {
     n: Math.round(n), nTheo: Math.round(nTheo),
     vf: Math.round(vf), vfTheo: Math.round(vfTheo),
+    vfCapped: vfLimited,   // l'avance calculée à la broche réellement utilisée dépasse l'avance max machine
     vfZ, vfZTarget,
     ap: apRaw, fz,
     vcEff: Math.round(vcEff), vcTarget: p.vc,

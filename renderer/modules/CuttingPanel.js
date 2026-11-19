@@ -122,7 +122,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
       add(true, t('cut.w_rubbing', { fz: fmt(fzEff, 3), pct: Math.round(ratio * 100), rec: fmt(r.fz, 3) }));
     else if (st.manual.feed && ratio > 1.5)
       add(true, t('cut.w_heavy', { fz: fmt(fzEff, 3), pct: Math.round(ratio * 100) }));
-    if (!st.manual.feed && r.vfTheo > st.machine.feed)
+    if (!st.manual.feed && r.vfCapped)
       add(false, t('cut.i_feed_cap', { feed: fmt(st.machine.feed) }));
     if (st.spindleFixed && num('param-spindle') > st.machine.spindle)
       add(false, t('cut.i_spindle_cap', { n: fmt(st.machine.spindle) }));
