@@ -310,7 +310,7 @@ export const fr = {
     stock_bottom:     'Offset en dessous',
     xray:             'Voir à travers les parois (X-Ray)',
     tool:             'Fraise du catalogue : fixe le diamètre et le nombre de dents, et reprend les vitesses de coupe et les avances par dent de la fiche du fournisseur',
-    max_apk:          'Profondeur de passe maximale en fraction du diamètre (ap = k × ⌀). Repères du fournisseur en rainurage : 0,3 en finition, 0,6 en ébauche. À baisser si la machine manque de rigidité',
+    max_apk:          'Profondeur de passe maximale en fraction du diamètre (ap = k × ⌀). Repères du fournisseur en rainurage : 0,3 en finition, 0,6 en ébauche ; 1 = tableau du fournisseur sans plafond. À baisser si la machine manque de rigidité',
     material:         'Matière usinée : détermine la vitesse de coupe, l\'avance par dent et la profondeur par passe conseillées',
     flutes:           'Nombre de dents (arêtes de coupe) de la fraise',
   },

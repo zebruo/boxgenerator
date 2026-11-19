@@ -1,10 +1,11 @@
-import { MATERIALS, DIAMETERS, calculate, getDefaults } from './CuttingParams.js';
+import { MATERIALS, calculate, getDefaults } from './CuttingParams.js';
 
 /**
  * Ouvre la modale de calcul des paramètres de coupe.
  * @param {number}   toolDiameter  diamètre pré-sélectionné depuis BoxGenerator
  * @param {function} onApply       callback(result) — reçoit le résultat complet de calculate() + diameter, matId, flutes
- * @param {object}   [opts]        matière, dents et limites machine du panneau (sinon dernières valeurs mémorisées)
+ * @param {object}   [opts]        matière, dents, limites machine (dont maxApK) et fraise du catalogue (tool) du panneau ;
+ *                                 sinon dernières valeurs mémorisées
  */
 export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {}) {
 
@@ -12,23 +13,27 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
   const STORAGE_KEY = 'bg-cutting-params';
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
 
+  const tool     = opts.tool ?? null;          // fraise du catalogue : diamètre, dents et matières imposés, valeurs de la fiche
   let selMatId   = opts.matId      ?? saved.matId     ?? '200';
-  let selDiam    = DIAMETERS.reduce((a, b) => Math.abs(b - toolDiameter) < Math.abs(a - toolDiameter) ? b : a, DIAMETERS[0]);
-  let selFlutes  = opts.flutes     ?? saved.flutes    ?? 2;
+  if (tool && !tool.cutting[selMatId]) selMatId = Object.keys(tool.cutting)[0];
+  let selDiam    = toolDiameter > 0 ? toolDiameter : 3.175;     // diamètre libre (les tables prennent le diamètre le plus proche)
+  let selFlutes  = tool ? tool.flutes : (opts.flutes ?? saved.flutes ?? 2);
   let manualFz   = null;
+  const man      = { vc: false, fz: false, ap: false };   // champ saisi à la main (sinon valeur calculée, pastille « auto »)
   let manualAp   = null;
-  let maxFeed    = opts.maxFeed     ?? saved.maxFeed    ?? 800;
-  let maxFeedZ   = opts.maxFeedZ    ?? saved.maxFeedZ   ?? 300;
+  let maxFeed    = opts.maxFeed     ?? saved.maxFeed    ?? 750;
+  let maxFeedZ   = opts.maxFeedZ    ?? saved.maxFeedZ   ?? 750;
   let maxSpindle = opts.maxSpindle  ?? saved.maxSpindle ?? 12000;
+  let maxApK     = opts.maxApK      ?? saved.maxApK     ?? 0.4;     // profondeur de passe max, en fraction du diamètre
   let lastResult = null;
 
   function savePrefs() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ matId: selMatId, flutes: selFlutes, maxFeed, maxFeedZ, maxSpindle }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ matId: selMatId, flutes: selFlutes, maxFeed, maxFeedZ, maxSpindle, maxApK }));
   }
 
   // ── DOM ───────────────────────────────────────────────────────────────────
   const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
+  overlay.className = 'modal-overlay cp-overlay';   // sans flou : le panneau de gauche reste lisible
 
   const modal = document.createElement('div');
   modal.className = 'cp-modal';
@@ -46,31 +51,33 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
         <div class="cp-mat-grid" id="cp-mat-grid"></div>
         <div class="cp-manual-row">
           <span class="cp-muted">Vc (m/min)</span>
-          <span class="cp-default-badge" id="cp-vc-badge">—</span>
-          <input type="number" id="cp-vc-manual" class="cp-input-sm" min="10" max="1000" step="1"
-                 placeholder="Saisie manuelle">
+          <input type="number" id="cp-vc-manual" class="cp-input-sm" min="10" max="1000" step="1">
+          <button type="button" class="cut-state" data-for="cp-vc-manual">auto</button>
         </div>
       </div>
 
       <!-- ÉTAPE 2 : Fraise -->
       <div class="cp-step">
         <div class="cp-step-label">2 — Fraise</div>
+        ${tool ? `<div class="cp-muted" style="margin-bottom:6px">Fraise du catalogue ${tool.ref} : diamètre, dents et valeurs de la fiche du fournisseur.</div>` : ''}
         <div class="cp-row-label">Diamètre (mm)</div>
-        <div class="cp-pills" id="cp-diam-pills"></div>
+        <div class="cp-manual-row" style="margin-top:0">
+          <input type="number" id="cp-diam" class="cp-input-sm" min="0.5" max="25" step="0.1" value="${selDiam}"${tool ? ' readonly' : ''}>
+        </div>
         <div class="cp-row-label" style="margin-top:8px">Nombre de dents</div>
         <div class="cp-pills" id="cp-flutes-pills">
-          ${[1,2,3,4].map(n => `<button class="cp-pill${n===selFlutes?' active':''}" data-val="${n}">${n}</button>`).join('')}
+          ${[1,2,3,4].map(n => `<button class="cp-pill${n===selFlutes?' active':''}" data-val="${n}"${tool ? ' disabled' : ''}>${n}</button>`).join('')}
         </div>
         <div class="cp-defaults-row" style="margin-top:10px">
           <div class="cp-default-item">
             <span class="cp-muted">fz (mm/dent)</span>
-            <span class="cp-default-badge" id="cp-fz-badge">—</span>
-            <input type="number" id="cp-fz-manual" class="cp-input-sm" min="0.001" max="1" step="0.001" placeholder="Saisie manuelle">
+            <input type="number" id="cp-fz-manual" class="cp-input-sm" min="0.001" max="1" step="0.001">
+          <button type="button" class="cut-state" data-for="cp-fz-manual">auto</button>
           </div>
           <div class="cp-default-item">
             <span class="cp-muted">ap (mm)</span>
-            <span class="cp-default-badge" id="cp-ap-badge">—</span>
-            <input type="number" id="cp-ap-manual" class="cp-input-sm" min="0.1" max="50" step="0.1" placeholder="Saisie manuelle">
+            <input type="number" id="cp-ap-manual" class="cp-input-sm" min="0.1" max="50" step="0.1">
+          <button type="button" class="cut-state" data-for="cp-ap-manual">auto</button>
           </div>
         </div>
       </div>
@@ -92,8 +99,13 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
           <label>Broche max</label>
           <input type="range" id="cp-sl-spindle" min="5000" max="30000" step="1000" value="${maxSpindle}">
           <span id="cp-sl-spindle-val">${maxSpindle}</span><span class="cp-muted">tr/min</span>
-
         </div>
+        <div class="cp-slider-row">
+          <label>Prof. max</label>
+          <input type="range" id="cp-sl-apk" min="0.1" max="1" step="0.05" value="${maxApK}">
+          <span id="cp-sl-apk-val">${maxApK}</span><span class="cp-muted">× ⌀</span>
+        </div>
+        <div class="cp-muted">Prof. max : profondeur de passe maximale en fraction du diamètre. Repères du fournisseur en rainurage : 0,3 en finition, 0,6 en ébauche ; 1 revient au tableau du fournisseur sans plafond. À baisser si la machine manque de rigidité.</div>
       </div>
 
       <!-- RÉSULTATS -->
@@ -180,9 +192,8 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
     </div><!-- /cp-body -->
 
     <div class="cp-footer">
-      <button class="btn btn-secondary cp-btn-cancel">Annuler</button>
       <button class="btn btn-ghost" id="cp-btn-reset" title="Remettre les valeurs par défaut">↺ Réinitialiser</button>
-      <button class="btn btn-secondary" id="cp-btn-calc">Calculer</button>
+      <button class="btn btn-secondary cp-btn-cancel">Annuler</button>
       <button class="btn btn-primary" id="cp-btn-apply" disabled>Appliquer</button>
     </div>
   `;
@@ -193,15 +204,21 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
   // ── Badges fz / ap live ───────────────────────────────────────────────────
   function updateDefaultBadges() {
     const mat = MATERIALS.find(m => m.id === selMatId);
-    modal.querySelector('#cp-vc-badge').textContent = mat ? mat.vc : '—';
-    const { fz, ap } = getDefaults(selMatId, selDiam);
-    modal.querySelector('#cp-fz-badge').textContent = fz != null ? fz.toFixed(3) : '—';
-    modal.querySelector('#cp-ap-badge').textContent = ap != null ? ap            : '—';
+    const fiche = tool?.cutting[selMatId];                       // valeurs de la fiche fournisseur, si fraise du catalogue
+    const vc  = fiche ? fiche.vc : mat?.vc;
+    const def = getDefaults(selMatId, selDiam);
+    const fz = fiche ? fiche.fz : def.fz;
+    const ap = def.ap != null ? Math.min(def.ap, +(maxApK * selDiam).toFixed(2)) : null;   // tableau du fournisseur plafonné par Prof. max
+    // Un champ non saisi à la main affiche la valeur calculée
+    const auto = { vc, fz: fz != null ? +fz.toFixed(3) : null, ap };
+    for (const k of ['vc', 'fz', 'ap'])
+      if (!man[k]) modal.querySelector(`#cp-${k}-manual`).value = auto[k] ?? '';
+    syncAutoPills();
   }
 
   // ── Matériaux ─────────────────────────────────────────────────────────────
   const matGrid = modal.querySelector('#cp-mat-grid');
-  MATERIALS.forEach(m => {
+  MATERIALS.filter(m => !tool || tool.cutting[m.id]).forEach(m => {
     const card = document.createElement('button');
     card.className = 'cp-mat-card' + (m.id === selMatId ? ' active' : '');
     card.dataset.id = m.id;
@@ -209,13 +226,13 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
       <span class="cp-mat-dot" style="background:${m.color}"></span>
       <span class="cp-mat-name">${m.label}</span>
       <span class="cp-mat-detail">${m.detail}</span>
-      <span class="cp-mat-vc">vc ${m.vc} m/min</span>
+      <span class="cp-mat-vc">vc ${tool ? tool.cutting[m.id].vc : m.vc} m/min</span>
     `;
     card.addEventListener('click', () => {
       matGrid.querySelectorAll('.cp-mat-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
       selMatId = m.id;
-      modal.querySelector('#cp-vc-manual').value = '';
+      man.vc = false;
       updateDefaultBadges();
       savePrefs();
     });
@@ -223,18 +240,9 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
   });
 
   // ── Diamètres ─────────────────────────────────────────────────────────────
-  const diamPills = modal.querySelector('#cp-diam-pills');
-  DIAMETERS.forEach(d => {
-    const btn = document.createElement('button');
-    btn.className = 'cp-pill' + (d === selDiam ? ' active' : '');
-    btn.textContent = d;
-    btn.addEventListener('click', () => {
-      diamPills.querySelectorAll('.cp-pill').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selDiam = d;
-      updateDefaultBadges();
-    });
-    diamPills.appendChild(btn);
+  modal.querySelector('#cp-diam').addEventListener('input', e => {
+    const v = Number.parseFloat(e.target.value);
+    if (v > 0) { selDiam = v; updateDefaultBadges(); }
   });
 
   // ── Dents ─────────────────────────────────────────────────────────────────
@@ -256,23 +264,48 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
   bindSlider('cp-sl-feed',   'cp-sl-feed-val',   v => maxFeed    = v);
   bindSlider('cp-sl-feedz',  'cp-sl-feedz-val',  v => maxFeedZ   = v);
   bindSlider('cp-sl-spindle','cp-sl-spindle-val', v => maxSpindle = v);
+  bindSlider('cp-sl-apk',    'cp-sl-apk-val',    v => { maxApK = v; updateDefaultBadges(); });
 
   // ── Inputs manuels ────────────────────────────────────────────────────────
-  modal.querySelector('#cp-fz-manual').addEventListener('input', e => { manualFz = Number.parseFloat(e.target.value) || null; });
-  modal.querySelector('#cp-ap-manual').addEventListener('input', e => { manualAp = Number.parseFloat(e.target.value) || null; });
 
-  // ── Calculer ──────────────────────────────────────────────────────────────
-  modal.querySelector('#cp-btn-calc').addEventListener('click', () => {
-    const vcManual = Number.parseFloat(modal.querySelector('#cp-vc-manual').value);
+  // Pastilles « auto » comme dans le panneau : « ↺ auto » dès qu'une valeur est saisie, un clic revient à la valeur calculée
+  function syncAutoPills() {
+    modal.querySelectorAll('.cut-state[data-for]').forEach(btn => {
+      const manual = man[btn.dataset.for.split('-')[1]];
+      btn.classList.toggle('manual', manual);
+      btn.textContent = manual ? '↺ auto' : 'auto';
+      btn.title = manual ? 'Valeur saisie à la main : cliquer pour revenir à la valeur calculée' : 'Valeur calculée automatiquement';
+    });
+  }
+  modal.querySelectorAll('.cut-state[data-for]').forEach(btn => {
+    const input = modal.querySelector('#' + btn.dataset.for);
+    const k = btn.dataset.for.split('-')[1];
+    const sync = () => {
+      manualFz = man.fz ? Number.parseFloat(modal.querySelector('#cp-fz-manual').value) || null : null;
+      manualAp = man.ap ? Number.parseFloat(modal.querySelector('#cp-ap-manual').value) || null : null;
+      man.fz = manualFz != null; man.ap = manualAp != null;
+    };
+    input.addEventListener('input', () => {
+      man[k] = input.value !== '';                // une saisie passe le champ en manuel, un champ vidé revient à auto
+      sync(); updateDefaultBadges();
+    });
+    btn.addEventListener('click', () => { man[k] = false; sync(); updateDefaultBadges(); btn.blur(); });
+  });
+
+  // ── Calcul : refait à chaque modification, les résultats et « Appliquer » sont toujours à jour ──
+  function calcNow() {
+    const vcManual = man.vc ? Number.parseFloat(modal.querySelector('#cp-vc-manual').value) : NaN;
     const mat      = MATERIALS.find(m => m.id === selMatId);
-    const vc       = (vcManual > 0) ? vcManual : mat.vc;
+    const fiche    = tool?.cutting[selMatId];
+    const vc       = (vcManual > 0) ? vcManual : (fiche?.vc ?? mat.vc);
 
-    lastResult = { diameter: selDiam, matId: selMatId, flutes: selFlutes,
+    lastResult = { diameter: selDiam, matId: selMatId, flutes: selFlutes, toolRef: tool?.ref ?? '',
+      machine: { spindle: maxSpindle, feed: maxFeed, feedZ: maxFeedZ, apK: maxApK },   // limites machine réglées dans la fenêtre
       manual: { feed: vcManual > 0 || manualFz != null, passes: manualAp != null },   // valeurs réglées à la main
       ...calculate({
       vc, diameter: selDiam, flutes: selFlutes,
-      matId: selMatId, maxSpindle, maxFeed, maxFeedZ,
-      manualFz, manualAp,
+      matId: selMatId, maxSpindle, maxFeed, maxFeedZ, maxApK,
+      manualFz: manualFz ?? fiche?.fz, manualAp,
     }) };
 
     const r = lastResult;
@@ -316,7 +349,9 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
 
     modal.querySelector('#cp-results').classList.remove('hidden');
     modal.querySelector('#cp-btn-apply').disabled = false;
-  });
+  }
+  modal.querySelector('.cp-body').addEventListener('input', calcNow);
+  modal.querySelector('.cp-body').addEventListener('click', calcNow);   // cartes matière, pastilles dents et auto (après leurs propres gestionnaires)
 
   // ── Appliquer ─────────────────────────────────────────────────────────────
   modal.querySelector('#cp-btn-apply').addEventListener('click', () => {
@@ -326,43 +361,36 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
 
   // ── Fermeture ─────────────────────────────────────────────────────────────
   function close() { overlay.remove(); }
-  function resetResults() {
-    modal.querySelector('#cp-results').classList.add('hidden');
-    modal.querySelector('#cp-btn-apply').disabled = true;
-    lastResult = null;
-  }
 
   // ── Réinitialiser ─────────────────────────────────────────────────────────
   function resetAll() {
-    selMatId  = '200';
-    selDiam   = DIAMETERS.reduce((a, b) => Math.abs(b - toolDiameter) < Math.abs(a - toolDiameter) ? b : a, DIAMETERS[0]);
-    selFlutes = 2;
+    selMatId  = tool ? Object.keys(tool.cutting)[0] : '200';
+    selDiam   = toolDiameter > 0 ? toolDiameter : 3.175;
+    selFlutes = tool ? tool.flutes : 2;
     manualFz  = null;
     manualAp  = null;
-    maxFeed   = 800;
-    maxFeedZ  = 300;
+    maxFeed   = 750;        // TTC450 Pro ($110 à $112)
+    maxFeedZ  = 750;
     maxSpindle = 12000;
+    maxApK    = 0.4;
 
     // Matériau
     modal.querySelectorAll('.cp-mat-card').forEach(c => c.classList.toggle('active', c.dataset.id === selMatId));
     // Diamètre
-    modal.querySelectorAll('#cp-diam-pills .cp-pill').forEach(b => b.classList.toggle('active', +b.textContent === selDiam));
+    modal.querySelector('#cp-diam').value = selDiam;
     // Dents
     modal.querySelectorAll('#cp-flutes-pills .cp-pill').forEach(b => b.classList.toggle('active', +b.dataset.val === selFlutes));
-    // Vc manuel
-    modal.querySelector('#cp-vc-manual').value = '';
-    // fz / ap manuels
-    modal.querySelector('#cp-fz-manual').value = '';
-    modal.querySelector('#cp-ap-manual').value = '';
+    // vc, fz, ap : retour aux valeurs calculées
+    man.vc = man.fz = man.ap = false;
     // Sliders
     modal.querySelector('#cp-sl-feed').value    = maxFeed;    modal.querySelector('#cp-sl-feed-val').textContent    = maxFeed;
     modal.querySelector('#cp-sl-feedz').value   = maxFeedZ;   modal.querySelector('#cp-sl-feedz-val').textContent   = maxFeedZ;
     modal.querySelector('#cp-sl-spindle').value = maxSpindle; modal.querySelector('#cp-sl-spindle-val').textContent = maxSpindle;
+    modal.querySelector('#cp-sl-apk').value     = maxApK;      modal.querySelector('#cp-sl-apk-val').textContent     = maxApK;
 
     savePrefs();
     updateDefaultBadges();
-    resetResults();
-    modal.querySelector('#cp-btn-calc').click();
+    calcNow();
   }
 
   modal.querySelector('#cp-btn-reset').addEventListener('click', resetAll);
@@ -372,5 +400,5 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
 
   // Initialisation badges + calcul automatique à l'ouverture
   updateDefaultBadges();
-  modal.querySelector('#cp-btn-calc').click();
+  calcNow();
 }

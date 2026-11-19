@@ -310,7 +310,7 @@ export const en = {
     stock_bottom:     'Offset below',
     xray:             'See through walls (X-Ray)',
     tool:             'Catalogue cutter: sets the diameter and number of flutes, and uses the cutting speeds and feeds per tooth from the supplier datasheet',
-    max_apk:          'Maximum depth of cut as a fraction of the diameter (ap = k × ⌀). Supplier guides for slotting: 0.3 for finishing, 0.6 for roughing. Lower it if the machine lacks rigidity',
+    max_apk:          'Maximum depth of cut as a fraction of the diameter (ap = k × ⌀). Supplier guides for slotting: 0.3 for finishing, 0.6 for roughing; 1 = supplier table without a cap. Lower it if the machine lacks rigidity',
     material:         'Machined material: sets the recommended cutting speed, feed per tooth and depth per pass',
     flutes:           'Number of flutes (cutting edges) of the cutter',
   },

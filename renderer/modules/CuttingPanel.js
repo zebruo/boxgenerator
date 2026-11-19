@@ -52,7 +52,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
       spindle: saved.machine?.spindle > 0 ? saved.machine.spindle : 12000,
       feed:    saved.machine?.feed    > 0 ? saved.machine.feed    : 750,
       feedZ:   saved.machine?.feedZ   > 0 ? saved.machine.feedZ   : 750,
-      apK:     saved.machine?.apK >= 0.1 && saved.machine.apK <= 0.6 ? saved.machine.apK : 0.4,   // ap max = k x diamètre
+      apK:     saved.machine?.apK >= 0.1 && saved.machine.apK <= 1 ? saved.machine.apK : 0.4,   // ap max = k x diamètre
     },
   };
 
@@ -246,7 +246,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     el.value = st.machine[key];
     el.addEventListener('input', () => {
       const v = Number.parseFloat(el.value);
-      const ok = key === 'apK' ? v >= 0.1 && v <= 0.6 : v > 0;
+      const ok = key === 'apK' ? v >= 0.1 && v <= 1 : v > 0;
       if (ok) { st.machine[key] = v; st.manual.passes = false; savePrefs(); update(); }
     });
   }
@@ -276,8 +276,11 @@ export function initCuttingPanel({ t, lang, onChange }) {
     },
 
     /** Réglages choisis dans la fenêtre « Détails du calcul » : matière, dents, valeurs de coupe. */
-    applyDetails({ matId, flutes, diameter, vf, vfZ, ap, manual }) {
-      st.toolRef = '';                    // la fenêtre de calcul sort du catalogue : saisie manuelle
+    applyDetails({ matId, flutes, diameter, vf, vfZ, ap, manual, toolRef, machine }) {
+      // Limites machine réglées dans la fenêtre : reportées dans le panneau
+      for (const [key, el] of Object.entries(mach))
+        if (machine?.[key] > 0) { st.machine[key] = machine[key]; el.value = machine[key]; }
+      st.toolRef = findTool(toolRef) ? toolRef : '';   // la fraise du catalogue est gardée, sinon saisie manuelle
       syncTool(false);
       if (MATERIALS.some(m => m.id === matId)) { st.matId = matId; sel.value = matId; }
       if ([1, 2, 3, 4].includes(flutes)) { st.flutes = flutes; showFlutes(); }
@@ -291,7 +294,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     },
 
     /** Réglages à transmettre à la fenêtre « Détails du calcul ». */
-    modalOptions: () => ({ matId: st.matId, flutes: st.flutes, maxSpindle: st.machine.spindle, maxFeed: st.machine.feed, maxFeedZ: st.machine.feedZ }),
+    modalOptions: () => ({ matId: st.matId, flutes: st.flutes, maxSpindle: st.machine.spindle, maxFeed: st.machine.feed, maxFeedZ: st.machine.feedZ, maxApK: st.machine.apK, tool: findTool(st.toolRef) }),
 
     /** Retraduit les libellés dynamiques (changement de langue). */
     refresh() {

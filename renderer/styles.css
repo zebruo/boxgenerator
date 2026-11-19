@@ -388,6 +388,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 ::-webkit-scrollbar-corner { background: var(--bg-panel); }
 
 /* ── Modale export G-code ── */
+.modal-overlay.cp-overlay { backdrop-filter: none; background: rgba(0,0,0,.3); }
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,.65); backdrop-filter: blur(3px);
@@ -816,10 +817,11 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .cp-close:hover { color: var(--text); }
 .cp-body   { overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
 .cp-footer {
-  display: flex; gap: 8px; justify-content: flex-end;
+  display: flex; gap: 8px;
   padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0;
 }
 
+.cp-footer .cp-btn-cancel { margin-left: auto; }   /* Calculer et Réinitialiser à gauche, Annuler et Appliquer à droite */
 .cp-step { display: flex; flex-direction: column; gap: 6px; }
 .cp-step-label { font-size: 14px; font-weight: 700; color: var(--accent2); text-transform: uppercase; letter-spacing: .04em; }
 .cp-row-label  { font-size: 13px; color: var(--text-muted); }
@@ -888,6 +890,9 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   padding: 3px 6px; font-size: 13px;
 }
 .cp-input-sm::placeholder { color: var(--text-muted); }
+.cp-manual-row .cut-state, .cp-default-item .cut-state { flex: none; }
+.cp-input-sm { width: 70px; text-align: right; }
+.cp-input-sm[readonly] { color: var(--text-muted); cursor: default; border-style: dashed; }
 
 /* Résultats */
 .cp-results        { display: flex; flex-direction: column; gap: 8px; }

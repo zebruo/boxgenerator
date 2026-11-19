@@ -141,7 +141,7 @@ export function calculate(p) {
   const vfLimited    = (n * fz * p.flutes) > p.maxFeed;
   const zLimited     = vfZTarget > p.maxFeedZ;
   const doubleLimited = nLimited && vfLimited;
-  const rubbingRisk  = vfLimited && (fzEff < fz * 0.5);
+  const rubbingRisk  = vfLimited && (fzEff < fz * 0.6);
   const heavyCap     = nLimited && vcPct < 65;
 
   const warnings = [];
@@ -149,7 +149,8 @@ export function calculate(p) {
   if (heavyCap)      warnings.push({ level: 'warn', text: `Broche très limitante (${vcPct}% de la vc optimale) — envisagez un diamètre plus grand ou une vc plus basse.` });
   if (vfLimited)     warnings.push({ level: 'info', text: `Avance max machine atteinte — fz effectif : ${fzEff.toFixed(3)} mm/dent au lieu de ${fz} mm/dent` });
   if (doubleLimited) warnings.push({ level: 'warn', text: `Double limitation machine — broche ET avance plafonnées simultanément, conditions de coupe fortement dégradées.` });
-  if (rubbingRisk)   warnings.push({ level: 'warn', text: `Risque de frottement — fz effectif (${fzEff.toFixed(3)}) < 50% du recommandé.` });
+  if (rubbingRisk)   warnings.push({ level: 'warn', text: `Risque de frottement : fz ${fzEff.toFixed(3)} mm/dent, soit ${Math.round(fzEff / fz * 100)} % du conseillé (${fz.toFixed(3)}). Le bois peut brûler.` });
+  if (apCapped)      warnings.push({ level: 'info', text: `Profondeur de passe limitée à ${p.maxApK} × ⌀ par les limites machine (tableau du fournisseur : ${(kTable * p.diameter).toFixed(2)} mm)` });
   if (zLimited)      warnings.push({ level: 'info', text: `Avance Z plafonnée à ${p.maxFeedZ} mm/min (vf/2 cible : ${Math.round(vf / 2)} mm/min)` });
 
   return {
