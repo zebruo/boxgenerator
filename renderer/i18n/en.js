@@ -339,6 +339,8 @@ export const en = {
     mat_150:         'Exotic wood',
     mat_250:         'Plywood',
     mat_350:         'MDF / Valchromat',
+    mat_tendre:      'Softwood',
+    mat_acetate:     'Acetate',
     mat_300:         'PVC / Foamed PVC',
     mat_20101:       'PMMA / Acrylic',
     mat_120:         'Aluminium',

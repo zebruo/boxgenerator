@@ -18,3 +18,6 @@ ParamCoupe/
 
 # Réglages de l'éditeur
 .vscode/
+
+# Outils personnels (fiches fraises), non suivis pour le moment
+cncFraises/

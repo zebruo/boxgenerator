@@ -3,13 +3,18 @@
  * Logique extraite de ParamCoupe/script/cnc.js — sans dépendance DOM.
  */
 
+// Vitesses de coupe (vc) : fiches fraises carbure du fournisseur (bois dur 300, contreplaqué 350,
+// MDF et Valchromat 300, thermoplastiques 200, aluminium et non ferreux 120), identiques pour
+// les diamètres 3,175 et 6 mm, avec ou sans revêtement.
 export const MATERIALS = [
-  { id: '200',    label: 'Bois massif',      detail: 'Chêne, hêtre, noyer, bambou…',      vc: 200, color: '#6B3F1E' },
-  { id: '150',    label: 'Bois exotique',    detail: 'Teck, iroko, merbau, padouk…',      vc: 150, color: '#3B1A08' },
-  { id: '250',    label: 'Contreplaqué',     detail: 'CTP, pin, sapin, bois tendre…',     vc: 250, color: '#C4A265' },
-  { id: '350',    label: 'MDF / Valcromat',  detail: 'Panneau de fibres, médium',          vc: 350, color: '#9B8B7A' },
-  { id: '300',    label: 'PVC / Forex',      detail: 'PVC expansé, Komacel, Forex…',      vc: 300, color: '#E0E0E0' },
+  { id: '200',    label: 'Bois massif',      detail: 'Chêne, hêtre, noyer, bambou…',      vc: 300, color: '#6B3F1E' },
+  { id: '150',    label: 'Bois exotique',    detail: 'Teck, iroko, merbau, padouk…',      vc: 300, color: '#3B1A08' },
+  { id: '250',    label: 'Contreplaqué',     detail: 'CTP, panneaux lamellés…',            vc: 350, color: '#C4A265' },
+  { id: 'tendre', label: 'Bois tendre',      detail: 'Pin, sapin, peuplier…',              vc: 300, color: '#D9C08A' },
+  { id: '350',    label: 'MDF / Valcromat',  detail: 'Panneau de fibres, médium',          vc: 300, color: '#9B8B7A' },
+  { id: '300',    label: 'PVC / Forex',      detail: 'PVC expansé, Komacel, Forex…',      vc: 200, color: '#E0E0E0' },
   { id: '201.01', label: 'PMMA / Acrylique', detail: 'Plexiglas, thermoplastiques',        vc: 200, color: '#A8D0E8' },
+  { id: 'acetate', label: 'Acétate',         detail: 'Acétate de cellulose',               vc: 180, color: '#B5D6C9' },
   { id: '120',    label: 'Aluminium',        detail: '2017A, 5083, 6061…',                vc: 120, color: '#B0C0D0' },
   { id: '120.01', label: 'Cuivre / Laiton',  detail: 'Cuivre, laiton, bronze',            vc: 120, color: '#B87333' },
 ];
@@ -41,6 +46,13 @@ const AP_COEFF = {
   '6':     { '150':0.4,'200':0.5,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.5,'120.01':0.3 },
   '8':     { '150':0.4,'200':0.5,'250':0.5,'350':0.5,'300':0.5,'201.01':0.5,'120':0.5,'120.01':0.3 },
 };
+
+// Bois tendre : mêmes fz et profondeurs que le contreplaqué ; acétate : mêmes que le PVC. Les fiches
+// fournisseur (3,175 et 6 mm) donnent des valeurs identiques ; seule la vitesse de coupe diffère.
+for (const dk of Object.keys(FZ)) {
+  FZ[dk].tendre = FZ[dk]['250'];     AP_COEFF[dk].tendre = AP_COEFF[dk]['250'];
+  FZ[dk].acetate = FZ[dk]['300'];    AP_COEFF[dk].acetate = AP_COEFF[dk]['300'];
+}
 
 /**
  * Trouve la clé diamètre la plus proche dans les tables.

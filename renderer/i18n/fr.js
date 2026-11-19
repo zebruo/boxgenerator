@@ -339,6 +339,8 @@ export const fr = {
     mat_150:         'Bois exotique',
     mat_250:         'Contreplaqué',
     mat_350:         'MDF / Valcromat',
+    mat_tendre:      'Bois tendre',
+    mat_acetate:     'Acétate',
     mat_300:         'PVC / Forex',
     mat_20101:       'PMMA / Acrylique',
     mat_120:         'Aluminium',
