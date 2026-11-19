@@ -117,7 +117,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     const tool = findTool(st.toolRef), info = $('cut-tool-info');
     info.hidden = !tool;
     if (!tool) return;
-    info.textContent = t('cut.tool_info', { type: t(`cut.type_${tool.type}`), lu: fmt(tool.cuttingLength), shank: fmt(tool.shank) });
+    info.textContent = t('cut.tool_info', { type: t(`cut.type_${tool.type}`), coating: tool.coating ? t('cut.tool_coating', { coating: tool.coating }) : '', lu: fmt(tool.cuttingLength), shank: fmt(tool.shank, Number.isInteger(tool.shank) ? 0 : 3).replace(/0$/, '') });
   }
 
   function renderSummary(r) {
