@@ -191,6 +191,9 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-dark); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
 .cut-flutes { grid-column: 2 / 4; display: flex; }
+.cut-flutes.tb-seg > button:disabled:not(.active) { opacity: .35; cursor: default; }
+.cut-tool-info { margin: -2px 0 0; font-size: 11px; line-height: 1.4; color: var(--text-muted); }
+.cut-tool-info[hidden] { display: none; }
 .cut-flutes.tb-seg > button { flex: 1; height: 24px; padding: 0; font-size: 12px; }
 .cut-state {
   height: 16px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--border); background: transparent;

@@ -1,4 +1,5 @@
 import { MATERIALS, DIAMETERS, calculate } from './CuttingParams.js';
+import { TOOLS, findTool } from './ToolCatalog.js';
 
 /**
  * Réglages de coupe du panneau « Matière & Outil ».
@@ -12,6 +13,9 @@ import { MATERIALS, DIAMETERS, calculate } from './CuttingParams.js';
  * Mode de broche : « fixe » (l'utilisateur règle les tr/min, les avances en découlent) ou
  * « auto » (tr/min calculés depuis la vitesse de coupe de la matière).
  * Limites machine (broche, avances) : mémorisées sur l'ordinateur, communes à toutes les pièces.
+ *
+ * Fraise du catalogue (ToolCatalog.js) : fixe le diamètre et les dents, limite les matières à celles
+ * de la fiche fournisseur et reprend sa vc et son fz. Sans fraise (saisie manuelle), tables génériques.
  */
 
 const STORAGE_KEY = 'bg-cutting-panel';
@@ -41,6 +45,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
   const st = {
     matId:        MATERIALS.some(m => m.id === saved.matId) ? saved.matId : '200',
     flutes:       [1, 2, 3, 4].includes(saved.flutes) ? saved.flutes : 2,
+    toolRef:      findTool(saved.toolRef) ? saved.toolRef : '',      // '' = saisie manuelle
     spindleFixed: saved.spindleFixed ?? true,
     manual:       { feed: false, plunge: false, passes: false },
     machine: {                         // TTC450 Pro : 12 000 tr/min, 750 mm/min ($110/$111)
@@ -53,7 +58,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
   const fmt = (v, d = 0) => v.toLocaleString(lang() === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 
   function savePrefs() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ matId: st.matId, flutes: st.flutes, spindleFixed: st.spindleFixed, machine: st.machine })); }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ matId: st.matId, toolRef: st.toolRef, flutes: st.flutes, spindleFixed: st.spindleFixed, machine: st.machine })); }
     catch { /* stockage indisponible */ }
   }
 
@@ -61,10 +66,11 @@ export function initCuttingPanel({ t, lang, onChange }) {
   function compute() {
     const diameter = num('param-tool-diameter');
     if (!(diameter > 0)) return null;
-    const mat = MATERIALS.find(m => m.id === st.matId);
+    const fiche = findTool(st.toolRef)?.cutting[st.matId];          // valeurs de la fiche fournisseur
+    const mat = { ...MATERIALS.find(m => m.id === st.matId), ...(fiche && { vc: fiche.vc }) };
     const spindle = num('param-spindle');
     const r = calculate({
-      vc: mat.vc, diameter, flutes: st.flutes, matId: st.matId,
+      vc: mat.vc, diameter, flutes: st.flutes, matId: st.matId, manualFz: fiche?.fz,
       maxSpindle: st.machine.spindle, maxFeed: st.machine.feed, maxFeedZ: st.machine.feedZ,
       spindle: st.spindleFixed && spindle > 0 ? spindle : 0,
     });
@@ -101,7 +107,15 @@ export function initCuttingPanel({ t, lang, onChange }) {
     const sumEl = $('cut-machine-sum');
     sumEl.textContent = `${fmt(st.machine.spindle)} · ${fmt(st.machine.feed)} ${t('cut.u_feed')}`;
     sumEl.parentElement.title = `${fmt(st.machine.spindle)} ${t('cut.u_rpm')} · ${fmt(st.machine.feed)} ${t('cut.u_feed')}`;
+    renderToolInfo();
     renderSummary(r);
+  }
+
+  function renderToolInfo() {
+    const tool = findTool(st.toolRef), info = $('cut-tool-info');
+    info.hidden = !tool;
+    if (!tool) return;
+    info.textContent = t('cut.tool_info', { type: t(`cut.type_${tool.type}`), lu: fmt(tool.cuttingLength), shank: fmt(tool.shank) });
   }
 
   function renderSummary(r) {
@@ -137,6 +151,38 @@ export function initCuttingPanel({ t, lang, onChange }) {
   /** Écrit les valeurs, met à jour l'affichage, prévient l'application. */
   function update() { render(); onChange?.(); }
 
+  // ── Fraise du catalogue ─────────────────────────────────────────────────────
+  const toolSel = $('param-tool');
+  const toolLabel = tool => t('cut.tool_label', { ref: tool.ref, d: String(tool.diameter).replace('.', lang() === 'fr' ? ',' : '.'), z: tool.flutes });
+  function fillToolList() {
+    toolSel.textContent = '';
+    const manual = document.createElement('option');
+    manual.value = ''; manual.textContent = t('cut.tool_manual');
+    toolSel.appendChild(manual);
+    for (const tool of TOOLS) {
+      const o = document.createElement('option');
+      o.value = tool.ref; o.textContent = toolLabel(tool);
+      toolSel.appendChild(o);
+    }
+    toolSel.value = st.toolRef;
+  }
+
+  /** Verrouille ou libère diamètre, dents et matières selon la fraise ; `write` impose ses valeurs. */
+  function syncTool(write) {
+    const tool = findTool(st.toolRef);
+    if (tool) {
+      if (!tool.cutting[st.matId]) st.matId = Object.keys(tool.cutting)[0];
+      st.flutes = tool.flutes;
+      if (write) $('param-tool-diameter').value = tool.diameter;
+    }
+    $('param-tool-diameter').readOnly = !!tool;
+    fluteBtns.forEach(b => { b.disabled = !!tool; });
+    for (const o of sel.options) o.hidden = o.disabled = !!tool && !tool.cutting[o.value];
+    sel.value = st.matId;
+    toolSel.value = st.toolRef;
+    showFlutes();
+  }
+
   // ── Matière, dents ──────────────────────────────────────────────────────────
   const sel = $('param-material');
   sel.textContent = '';
@@ -161,6 +207,14 @@ export function initCuttingPanel({ t, lang, onChange }) {
     st.flutes = Number(b.dataset.n); showFlutes(); savePrefs(); update();
   }));
   showFlutes();
+
+  fillToolList();
+  toolSel.addEventListener('change', () => {
+    st.toolRef = toolSel.value;
+    st.manual = { feed: false, plunge: false, passes: false };   // nouvelle fraise : tout se recalcule
+    syncTool(true); savePrefs(); update();
+  });
+  syncTool(true);
 
   // ── Champs du panneau ───────────────────────────────────────────────────────
   // Un événement « input » vient toujours de l'utilisateur (les valeurs écrites par le code n'en émettent pas)
@@ -193,13 +247,14 @@ export function initCuttingPanel({ t, lang, onChange }) {
 
   return {
     /** État propre à la pièce, enregistré dans la session. */
-    getState: () => ({ matId: st.matId, flutes: st.flutes, spindleFixed: st.spindleFixed, manual: { ...st.manual } }),
+    getState: () => ({ matId: st.matId, toolRef: st.toolRef, flutes: st.flutes, spindleFixed: st.spindleFixed, manual: { ...st.manual } }),
 
     /**
      * Restaure l'état d'une session. Sans état (ancienne session), toutes les valeurs du
      * fichier sont gardées telles quelles (manuelles), la broche reste celle du fichier.
      */
     setState(s) {
+      st.toolRef = findTool(s?.toolRef) ? s.toolRef : '';
       if (s) {
         if (MATERIALS.some(m => m.id === s.matId)) st.matId = s.matId;
         if ([1, 2, 3, 4].includes(s.flutes)) st.flutes = s.flutes;
@@ -209,11 +264,13 @@ export function initCuttingPanel({ t, lang, onChange }) {
         st.spindleFixed = true;
         st.manual = { feed: true, plunge: true, passes: true };
       }
-      sel.value = st.matId; showFlutes(); savePrefs(); render();
+      syncTool(false); savePrefs(); render();    // le diamètre du fichier est gardé tel quel
     },
 
     /** Réglages choisis dans la fenêtre « Détails du calcul » : matière, dents, valeurs de coupe. */
     applyDetails({ matId, flutes, diameter, vf, vfZ, ap, manual }) {
+      st.toolRef = '';                    // la fenêtre de calcul sort du catalogue : saisie manuelle
+      syncTool(false);
       if (MATERIALS.some(m => m.id === matId)) { st.matId = matId; sel.value = matId; }
       if ([1, 2, 3, 4].includes(flutes)) { st.flutes = flutes; showFlutes(); }
       if (diameter > 0 && nearestKey(num('param-tool-diameter')) !== diameter) $('param-tool-diameter').value = diameter;
@@ -231,6 +288,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     /** Retraduit les libellés dynamiques (changement de langue). */
     refresh() {
       for (const o of sel.options) o.textContent = t(o.dataset.key);
+      fillToolList();
       render();
     },
   };
