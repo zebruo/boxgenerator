@@ -3,7 +3,38 @@
  * Explique les sections de l'interface et les options d'export.
  * Les valeurs par défaut sont calculées dynamiquement depuis getMachineParams().
  */
+import { MATERIALS, DIAMETERS, getDefaults, apCoefficient } from './CuttingParams.js';
+
+// Onglet Abaque : tables lues dans CuttingParams.js, donc toujours celles de l'application
+const frNum = (v, d, fixed = false) => v.toLocaleString('fr-FR', { minimumFractionDigits: fixed ? d : 0, maximumFractionDigits: d });
+const abaqueHead = first => `<thead><tr><th>${first}</th><th>vc m/min</th>${DIAMETERS.map(d => `<th>Ø ${frNum(d, 3)}</th>`).join('')}</tr></thead>`;
+
+/** Avance par dent (mm/dent) : matières × diamètres. */
+function abaqueFzTable() {
+  const rows = MATERIALS.map(m => {
+    const cells = DIAMETERS.map(d => {
+      const fz = getDefaults(m.id, d).fz;
+      return `<td>${fz == null ? '—' : frNum(fz, 3, true)}</td>`;
+    }).join('');
+    return `<tr><td>${m.label}</td><td>${m.vc}</td>${cells}</tr>`;
+  }).join('');
+  return `<table class="help-table">${abaqueHead('Matière')}<tbody>${rows}</tbody></table>`;
+}
+
+/** Coefficient k de profondeur de passe (ap = k × Ø, avant plafond « Prof. max »). */
+function abaqueApTable() {
+  const rows = MATERIALS.map(m => {
+    const cells = DIAMETERS.map(d => {
+      const k = apCoefficient(m.id, d);
+      return `<td>${k == null ? '—' : frNum(k, 2)}</td>`;
+    }).join('');
+    return `<tr><td>${m.label}</td><td>${m.vc}</td>${cells}</tr>`;
+  }).join('');
+  return `<table class="help-table">${abaqueHead('Matière')}<tbody>${rows}</tbody></table>`;
+}
+
 export function showHelpModal(machine = {}) {
+  const version = window.electronAPI?.version ?? '';
   const td        = machine.toolDiameter ?? 3.175;
   const dpp       = machine.depthPerPass ?? 2;
   const defRamp   = +(td * 2).toFixed(1);
@@ -25,6 +56,7 @@ export function showHelpModal(machine = {}) {
       <button class="help-tab" data-tab="boxes">Modèles de boîtes</button>
       <button class="help-tab" data-tab="formules">Formules</button>
       <button class="help-tab" data-tab="abaque">Abaque</button>
+      <button class="help-tab" data-tab="apropos">À propos</button>
     </div>
     <div class="help-body">
 
@@ -89,7 +121,7 @@ export function showHelpModal(machine = {}) {
             <span class="help-chip chip-cmd">M/S machine</span>
           </dd>
           <dt>Export G-code</dt>
-          <dd>Ouvre la fenêtre d'export avec les options d'entrée outil, lead-in/out, tabs de maintien et sélection des sections à exporter. Le G-code est <strong>re-généré</strong> avec ces options au moment de l'export — le visualiseur affiche toujours la version sans options.</dd>
+          <dd>Ouvre la fenêtre d'export avec les options d'entrée outil, lead-in/out, finition, stratégie de poche et la sélection des sections à exporter (les tabs se règlent avec le bouton <em>Tabs</em>, la fenêtre en rappelle le réglage). Ces options sont enregistrées avec la session. Le G-code est <strong>re-généré</strong> avec ces options au moment de l'export — le visualiseur affiche toujours la version sans options.</dd>
           <dt>SVG</dt>
           <dd>Exporte les pièces en SVG (mm, mêmes contours que le G-code, cloisons comprises). Trois calques : <strong>Découpe</strong> (rouge, contours traversants), <strong>Usinages</strong> (bleu, poches non traversantes) et <strong>Repères</strong> (noms des pièces, à masquer avant découpe). Pour la découpe laser ou la retouche dans Inkscape / Fusion 360.</dd>
         </dl>
@@ -100,7 +132,7 @@ export function showHelpModal(machine = {}) {
         <h4>Aperçus et simulation</h4>
         <dl class="help-dl">
           <dt>3D</dt>
-          <dd>Boîte et brut (cadre jaune) avec le repère <strong>Z0</strong> : tel qu'il sera dans le G-code. Le bouton <em>Z0</em> (groupe <em>Usinage</em>) ouvre une fenêtre : clic sur un point du schéma du brut pour la position dans le plan (centre ou un coin), puis hauteur du zéro (haut ou bas de la boîte). Le bouton <em>Brut</em> ajoute du brut autour de la boîte, au-dessus ou en dessous ; chaque bouton affiche son réglage actuel. <em>X-Ray</em> rend la matière transparente. Boîtes à couvercle et à encoches : <strong>À plat</strong> (pièces disposées comme dans le G-code) ou <strong>Assemblé</strong>. Double-clic : recadrer la vue.</dd>
+          <dd>Boîte et brut (cadre jaune) avec le repère <strong>Z0</strong> : tel qu'il sera dans le G-code. Le bouton <em>Z0</em> (groupe <em>Usinage</em>) ouvre une fenêtre : clic sur un point du schéma du brut pour la position dans le plan (centre ou un coin), puis hauteur du zéro (haut ou bas de la boîte). Le bouton <em>Brut</em> ajoute du brut autour de la boîte, au-dessus ou en dessous ; le bouton <em>Tabs</em> règle les tabs de maintien (voir « Tabs de maintien ») ; chaque bouton affiche son réglage actuel. <em>X-Ray</em> rend la matière transparente. Boîtes à couvercle et à encoches : <strong>À plat</strong> (pièces disposées comme dans le G-code) ou <strong>Assemblé</strong>. Double-clic : recadrer la vue.</dd>
           <dt>Vues 2D</dt>
           <dd>Dessus (avec le plan de coupe <strong>A-A</strong>), face, côté et coupe A-A hachurée, avec leurs cotes. La boîte à encoches se présente en panneaux à plat. Pour la boîte à couvercle, la coupe donne la <strong>hauteur utile</strong> : du dessus du fond jusqu'au dessous du couvercle posé (la lèvre repose sur le fond de la feuillure).
           <dt>Simuler</dt>
@@ -196,7 +228,9 @@ export function showHelpModal(machine = {}) {
       <!-- ── Tabs ────────────────────────────────────────── -->
       <section class="help-section">
         <h4>Tabs de maintien</h4>
-        <p>Ponts de matière laissés au fond de la coupe pour maintenir la pièce dans le brut : dès qu'une passe descend sous leur sommet, l'outil remonte automatiquement au-dessus de chaque tab. Ils se règlent avec le bouton <strong>Tabs</strong> de la barre <em>Usinage</em> (au-dessus de l'aperçu 3D) et sont enregistrés avec la session. L'icône <strong>crayon</strong> (<em>Placer à la main dans la vue 2D…</em>), sous la pastille <em>auto</em> de la même fenêtre, affiche le dessus de la boîte en grand : un clic sur le contour ajoute un tab, un clic sur un tab le retire, on le glisse pour le déplacer ; Échap ou <em>Terminer</em> pour finir, la pastille <em>↺ auto</em> (même fonctionnement que dans le panneau de gauche) pour revenir au placement automatique. Les tabs placés à la main valent pour le contour extérieur du corps, du couvercle (en miroir, comme la pièce retournée) et de la boîte empilable ; la boîte à encoches reste en placement automatique. Ils sont placés au milieu des côtés droits les plus longs, jamais dans un angle ni dans un arrondi ; avec plus de tabs que de côtés droits, chaque côté en reçoit au moins un et les autres vont aux côtés les plus longs, espacés régulièrement ; sur une forme sans côté droit (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre. Par défaut : 4 tabs de 8 mm de long et 2 mm de haut. La largeur saisie est la longueur réelle du pont de matière : l'outil reste au-dessus du tab sur cette largeur plus son diamètre, car il mord de son rayon de chaque côté.</p>
+        <p>Ponts de matière laissés au fond de la coupe pour maintenir la pièce dans le brut : dès qu'une passe descend sous leur sommet, l'outil remonte automatiquement au-dessus de chaque tab. Ils se règlent avec le bouton <strong>Tabs</strong> de la barre <em>Usinage</em> (au-dessus de l'aperçu 3D) : nombre par contour, largeur et hauteur. Par défaut : 4 tabs de 8 mm de long et 2 mm de haut. La largeur saisie est la longueur réelle du pont de matière : l'outil reste au-dessus du tab sur cette largeur plus son diamètre, car il mord de son rayon de chaque côté. Les réglages sont enregistrés avec la session.</p>
+        <p><strong>Répartition automatique.</strong> Les tabs sont placés au milieu des côtés droits les plus longs, jamais dans un angle ni dans un arrondi. Avec plus de tabs que de côtés droits, chaque côté en reçoit au moins un et les autres vont aux côtés les plus longs, espacés régulièrement. Sur une forme sans côté droit (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre.</p>
+        <p><strong>Placement à la main.</strong> L'icône <strong>crayon</strong> de la fenêtre <em>Tabs</em> (sous la pastille <em>auto</em>) affiche le dessus de la boîte en grand : un clic sur le contour ajoute un tab, un clic sur un tab le retire, on le glisse pour le déplacer. <em>Terminer</em> ou Échap ramène à la vue 3D ; la pastille <em>↺ auto</em> (même fonctionnement que dans le panneau de gauche) revient à la répartition automatique sans quitter la vue de placement. Les positions sont gardées en fraction du périmètre : elles suivent un changement de dimensions. Elles valent pour le contour extérieur du corps, du plateau, du couvercle (en miroir, comme la pièce retournée) et de la boîte empilable ; la boîte à encoches reste en répartition automatique.</p>
       </section>
 
       <!-- ── Finition des parois ───────────────────────────── -->
@@ -487,61 +521,69 @@ export function showHelpModal(machine = {}) {
         <section class="help-section">
           <h4>Avance par dent — fz (mm/dent)</h4>
           <div class="help-table-wrap">
-            <table class="help-table">
-              <thead>
-                <tr>
-                  <th>Matière</th><th>vc m/min</th>
-                  <th>≥ 1 mm</th><th>≥ 2 mm</th><th>≥ 3 mm</th>
-                  <th>≥ 4 mm</th><th>≥ 6 mm</th><th>≥ 8 mm</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>Bois exotique</td><td>150</td><td>0.003</td><td>0.010</td><td>0.013</td><td>0.015</td><td>0.018</td><td>0.025</td></tr>
-                <tr><td>Bois massif</td><td>200</td><td>0.004</td><td>0.012</td><td>0.016</td><td>0.018</td><td>0.022</td><td>0.031</td></tr>
-                <tr><td>CTP, bois tendres</td><td>250</td><td>0.005</td><td>0.012</td><td>0.016</td><td>0.020</td><td>0.024</td><td>0.033</td></tr>
-                <tr><td>MDF, Valcromat</td><td>350</td><td>0.006</td><td>0.013</td><td>0.018</td><td>0.020</td><td>0.027</td><td>0.040</td></tr>
-                <tr><td>PVC expansé, Forex</td><td>300</td><td>0.008</td><td>0.028</td><td>0.038</td><td>0.048</td><td>0.078</td><td>0.088</td></tr>
-                <tr><td>PMMA, thermoplastiques</td><td>200</td><td>0.006</td><td>0.020</td><td>0.028</td><td>0.035</td><td>0.055</td><td>0.065</td></tr>
-                <tr><td>Aluminium (2017A, 5083)</td><td>120</td><td>0.004</td><td>0.008</td><td>0.013</td><td>0.018</td><td>0.023</td><td>0.028</td></tr>
-                <tr><td>Bronze, cuivre, laiton</td><td>120</td><td>0.003</td><td>0.006</td><td>0.008</td><td>0.013</td><td>0.018</td><td>0.023</td></tr>
-              </tbody>
-            </table>
+            ${abaqueFzTable()}
           </div>
+          <p class="help-note" style="margin-top:8px">Valeurs génériques, utilisées quand aucune fraise du catalogue n'est choisie. Avec une fraise du catalogue, la vitesse de coupe et l'avance par dent de sa fiche remplacent ces valeurs.</p>
         </section>
 
         <section class="help-section">
-          <h4>Profondeur de passe — ap = k × D</h4>
+          <h4>Profondeur de passe — ap = k × Ø</h4>
           <div class="help-table-wrap">
-            <table class="help-table">
-              <thead>
-                <tr>
-                  <th>Ø mm</th><th>Bois exotique</th><th>Bois massif</th><th>CTP, tendres</th>
-                  <th>MDF</th><th>PVC, Forex</th><th>PMMA</th><th>Aluminium</th><th>Cuivre/Laiton</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>1</td><td>0.2</td><td>0.2</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.2</td><td>0.1</td></tr>
-                <tr><td>2</td><td>0.2</td><td>0.2</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.2</td><td>0.1</td></tr>
-                <tr><td>2.5</td><td>0.2</td><td>0.2</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.2</td><td>0.1</td></tr>
-                <tr><td>3</td><td>0.3</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.4</td><td>0.1</td></tr>
-                <tr><td>3.175</td><td>0.3</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.4</td><td>0.1</td></tr>
-                <tr><td>4</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.2</td></tr>
-                <tr><td>5</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.25</td></tr>
-                <tr><td>6</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.3</td></tr>
-                <tr><td>8</td><td>0.4</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.5</td><td>0.3</td></tr>
-              </tbody>
-            </table>
+            ${abaqueApTable()}
           </div>
-          <p class="help-note" style="margin-top:8px">Ex. MDF avec Ø3 mm → k = 0,5 → ap = 3 × 0,5 = 1,5 mm (approche prudente)</p>
+          <p class="help-note" style="margin-top:8px">Ex. bois massif avec Ø 6 mm → k = 1 dans le tableau, plafonné à 0,4 par <strong>Prof. max</strong> (réglage par défaut) → ap = 0,4 × 6 = 2,4 mm. Pour obtenir le coefficient du tableau, monter <em>Prof. max</em> à 1.</p>
           <p class="help-note">
-            Source : <em>cncfraises.fr</em>, adaptée pour une approche prudente sur machine amateur :<br>
-            · Vitesses réduites — vc et fz légèrement abaissées par rapport aux données d'origine, pour tenir compte de la rigidité limitée des portiques à usage amateur.<br>
-            · ap cohérentes entre diamètres — les coefficients k ont été homogénéisés pour éviter des sauts illogiques d'un pas de diamètre à l'autre.<br>
-            · PMMA ajusté — l'acrylique fond si le fz est trop élevé ; les valeurs ont été réduites pour éviter la fusion et le collage de copeaux sur l'outil.
+            Source : <em>cncfraises.fr</em>.<br>
+            · Vitesse de coupe et avance par dent : fiches des fraises carbure du fournisseur. Les valeurs ci-dessus ont été comparées aux fraises hélicoïdales plates sans revêtement du catalogue (Ø 1 à 8 mm) et concordent ; le Ø 5 mm, sans fiche, est une valeur intermédiaire.<br>
+            · Profondeur de passe : tableau du fournisseur par famille de matière (bois tendres et mousses ; bois durs et autres ; aluminium, avec le cuivre et le laiton classés comme lui par prudence) et par diamètre ; sous Ø 2 mm, le tableau indique « NC » et l'application reprend le coefficient de Ø 2 mm.<br>
+            · Le bois exotique et le PMMA n'ont pas de fiche chez le fournisseur : leurs valeurs sont prudentes (pour l'acrylique, réduites pour éviter la fusion et le collage des copeaux sur l'outil).
           </p>
         </section>
 
       </div><!-- /panel abaque -->
+
+      <!-- ══════════════ ONGLET À PROPOS ══════════════ -->
+      <div class="help-panel" data-panel="apropos">
+
+        <section class="help-section">
+          <h4>BoxGenerator — CNC Edition${version ? ` · version ${version}` : ''}</h4>
+          <p>Générateur de boîtes et de plateaux paramétriques avec export G-code pour fraiseuse CNC. On choisit un modèle de boîte (plateau, encoches, couvercle à feuillure, empilable), une forme de contour et ses dimensions ; l'application calcule les paramètres de coupe, produit le G-code (Grbl, Mach3, LinuxCNC) et les plans de fabrication (SVG), et rejoue l'usinage en simulation avant de lancer la machine.</p>
+        </section>
+
+        <section class="help-section">
+          <h4>Projet et licence</h4>
+          <dl class="help-dl">
+            <dt>Auteur</dt><dd>zebruo</dd>
+            <dt>Code source</dt><dd><span class="help-mono">github.com/zebruo/boxgenerator</span></dd>
+            <dt>Licence</dt><dd>MIT : libre d'utilisation, de copie et de modification, fourni tel quel, sans garantie.</dd>
+          </dl>
+        </section>
+
+        <section class="help-section">
+          <h4>Sécurité</h4>
+          <p>Le G-code est généré automatiquement : avant de le lancer sur la machine, vérifie-le dans la <strong>simulation</strong>, contrôle l'origine Z0 et le brut, et fais un premier passage à vide. Les paramètres de coupe sont des valeurs indicatives ; ajuste-les à ta machine, à ta fraise et à ton matériau. L'utilisation du G-code se fait sous ta responsabilité.</p>
+        </section>
+
+        <section class="help-section">
+          <h4>Données de coupe</h4>
+          <dl class="help-dl">
+            <dt>Fournisseur</dt><dd>CncFraises, fraises carbure pour la CNC : <span class="help-mono">www.cncfraises.fr</span></dd>
+          </dl>
+          <p>Les vitesses de coupe, les avances par dent et les profondeurs de passe viennent des fiches de paramètres de coupe de ce fournisseur (voir l'onglet <em>Abaque</em>). Le catalogue de fraises de l'application reprend les valeurs de ses fiches.</p>
+        </section>
+
+        <section class="help-section">
+          <h4>Bibliothèques</h4>
+          <dl class="help-dl">
+            <dt>Electron</dt><dd>application de bureau (licence MIT).</dd>
+            <dt>Three.js</dt><dd>aperçu 3D et simulation d'usinage (licence MIT).</dd>
+            <dt>Clipper</dt><dd>décalages et intersections de contours, par Angus Johnson, portage JavaScript (licence Boost).</dd>
+            <dt>i18next</dt><dd>traduction français / anglais (licence MIT).</dd>
+            <dt>Font Awesome Free</dt><dd>icônes (licence CC BY 4.0 pour les icônes, SIL OFL pour les polices, MIT pour le code).</dd>
+          </dl>
+        </section>
+
+      </div><!-- /panel apropos -->
 
     </div><!-- /help-body -->
   `;

@@ -36,29 +36,25 @@ const FZ = {
   '4':     { '150':0.015,'200':0.018,'250':0.020,'350':0.020,'300':0.048,'201.01':0.035,'120':0.018,'120.01':0.013 },
   '5':     { '150':0.016,'200':0.020,'250':0.022,'350':0.024,'300':0.063,'201.01':0.045,'120':0.020,'120.01':0.015 },
   '6':     { '150':0.018,'200':0.022,'250':0.024,'350':0.027,'300':0.078,'201.01':0.055,'120':0.023,'120.01':0.018 },
-  '8':     { '150':0.025,'200':0.031,'250':0.033,'350':0.040,'300':0.088,'201.01':0.065,'120':0.028,'120.01':0.023 },
+  '8':     { '150':0.025,'200':0.035,'250':0.037,'350':0.040,'300':0.088,'201.01':0.065,'120':0.028,'120.01':0.023 },   // bois dur, CTP (et bois tendre) : fiches FC2DH800
 };
 
 // Coefficient k de profondeur de passe (ap = k × diamètre) : tableau du fournisseur, par plage de
 // diamètre (colonnes ⌀ ≥ 2, 3, 4, 5, 6 mm) et famille de matière. Sous 2 mm le tableau indique « NC » :
-// on garde les valeurs d'avant (AP_COEFF_SMALL). Les familles : tendre (bois tendre, contreplaqué,
-// mousses), aluminium, et durs (tout le reste : bois durs, MDF, plastiques, HPL, mélaminé, cuivre…).
+// on reprend le coefficient de la colonne ⌀ ≥ 2 mm. Les familles : tendre (bois tendre, contreplaqué,
+// mousses), aluminium (avec le cuivre et le laiton, classés comme lui par prudence), et durs (tout le
+// reste : bois durs, MDF, plastiques, HPL, mélaminé…).
 const AP_STEPS = [2, 3, 4, 5, 6];
 const AP_K = {
   tendre: [0.5, 0.8, 1, 1, 1],
   durs:   [0.2, 0.4, 0.5, 0.6, 1],
   alu:    [0.1, 0.2, 0.25, 0.35, 0.35],
 };
-const AP_FAMILY = { '250': 'tendre', tendre: 'tendre', mousse: 'tendre', '120': 'alu' };
-const AP_COEFF_SMALL = {
-  '150':0.2, '200':0.2, '250':0.5, '350':0.5, '300':0.5, '201.01':0.5, '120':0.2, '120.01':0.1,
-  tendre:0.5, acetate:0.5, hpl:0.2, melamine:0.5, mousse:0.5,
-};
+const AP_FAMILY = { '250': 'tendre', tendre: 'tendre', mousse: 'tendre', '120': 'alu', '120.01': 'alu' };
 
 /** Coefficient k du tableau du fournisseur pour une matière et un diamètre (sans plafond machine). */
 export function apCoefficient(matId, diameter) {
-  if (!(diameter >= AP_STEPS[0])) return AP_COEFF_SMALL[matId] ?? null;
-  let i = 0;
+  let i = 0;                                  // sous 2 mm : première colonne du tableau
   while (i + 1 < AP_STEPS.length && diameter >= AP_STEPS[i + 1]) i++;
   return AP_K[AP_FAMILY[matId] ?? 'durs'][i];
 }

@@ -21,7 +21,7 @@ Application desktop de génération de boîtes paramétriques avec export G-code
 - **Poche concentrique ou raster**, avec **cloisons** (compartiments)
 - **Dog-bone** aux coins intérieurs pour les finger joints
 - **Origine programme (WCS)** : centre, avant-gauche, avant-droit, arrière-gauche, arrière-droit — dessus ou dessous du brut
-- **Sauvegarde/chargement de session** (JSON) : Ctrl+S enregistre directement dans le fichier ouvert (la version précédente est gardée dans un sous-dossier `sauvegardes`), Ctrl+Maj+S enregistre sous un autre nom, Ctrl+O ouvre ; le nom du fichier s'affiche dans le titre de la fenêtre
+- **Sauvegarde/chargement de session** (JSON) : Ctrl+S enregistre directement dans le fichier ouvert (la version précédente est gardée dans un sous-dossier `sauvegardes`), Ctrl+Maj+S enregistre sous un autre nom, Ctrl+O ouvre ; le nom du fichier s'affiche dans le titre de la fenêtre, avec un « * » quand la session a changé ; la session garde aussi les options d'usinage (entrée, finition, tabs, stratégie de poche)
 - **Interface FR / EN**
 
 ## Interface
