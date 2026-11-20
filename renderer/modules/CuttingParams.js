@@ -3,6 +3,8 @@
  * Logique extraite de ParamCoupe/script/cnc.js — sans dépendance DOM.
  */
 
+import { WARN } from './Thresholds.js';
+
 // Vitesses de coupe (vc) : fiches fraises carbure du fournisseur (bois dur 300, contreplaqué 350,
 // MDF et Valchromat 300, thermoplastiques 200, aluminium et non ferreux 120), identiques pour
 // les diamètres 3,175 et 6 mm, avec ou sans revêtement.
@@ -141,8 +143,8 @@ export function calculate(p) {
   const vfLimited    = (n * fz * p.flutes) > p.maxFeed;
   const zLimited     = vfZTarget > p.maxFeedZ;
   const doubleLimited = nLimited && vfLimited;
-  const rubbingRisk  = vfLimited && (fzEff < fz * 0.6);
-  const heavyCap     = nLimited && vcPct < 65;
+  const rubbingRisk  = vfLimited && (fzEff < fz * WARN.rubbingRatio);
+  const heavyCap     = nLimited && vcPct < WARN.spindleLimitRatio * 100;
 
   const warnings = [];
   if (nLimited)      warnings.push({ level: 'info', text: `Broche plafonnée — n cible : ${nTheo.toFixed(0)} tr/min, effectif : ${n.toFixed(0)} tr/min` });

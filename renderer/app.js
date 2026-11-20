@@ -16,6 +16,7 @@ import { LidBox, lidPartitionThickness } from './modules/boxes/LidBox.js';
 import { StackableBox }   from './modules/boxes/StackableBox.js';
 import { showHelpModal }         from './modules/HelpModal.js';
 import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
+import { WARN } from './modules/Thresholds.js';
 import { initCuttingPanel } from './modules/CuttingPanel.js';
 
 // ─── Tooltip global (réutilisé dans les modales) ────────────────────────────
@@ -539,7 +540,7 @@ function updatePartitionWarning() {
     state.boxParams.partitionSplit ?? '', partThick);
   const across = (partitionDir === 'vertical' ? bb.height : bb.width) - 2 * wallThickness;
   const smallest = Math.min(...sizes, across);
-  const minCell = 3 * td;
+  const minCell = WARN.partitionCellMinTools * td;
   const tooSmall = smallest < minCell
     ? t('warn.partition_small', { cell: smallest.toFixed(0), min: minCell.toFixed(0), td }) : '';
   setWarn(el, tooSmall);
@@ -553,10 +554,6 @@ function updatePartitionWarning() {
   if (note) note.textContent = (state.boxParams.partitionSplit ?? '').trim() ? list : t('param.partition_split_equal', { sizes: list });
 }
 
-/** Matière minimale (mm) à laisser au-dessus du fond du corps sous la feuillure. */
-const MIN_RABBET_FLOOR = 3;
-/** Enfoncement toléré (mm) du dessus du couvercle sous le bord du corps, en feuillure intérieure. */
-const MAX_LID_SINK = 1;
 
 /** Met le champ en orange avec ses messages en info-bulle (aucun message : état normal). */
 function setFieldWarnings(el, msgs) {
@@ -591,12 +588,12 @@ function updateRabbetToolWarning() {
   const lidH = p.lidHeight ?? 0, bFll = p.lidBottomThickness ?? 6;
   const depthMsgs = [];
   const left = H - bFl - rabbetD;
-  if (left < MIN_RABBET_FLOOR)
-    depthMsgs.push(t('warn.rabbet_floor', { left: Math.max(left, 0).toFixed(1), min: MIN_RABBET_FLOOR }));
+  if (left < WARN.rabbetFloorMin)
+    depthMsgs.push(t('warn.rabbet_floor', { left: Math.max(left, 0).toFixed(1), min: WARN.rabbetFloorMin }));
   if (lidH > 0) {
     // Feuillure trop profonde : la lèvre repose au fond de la feuillure, le dessus du couvercle est à H − profondeur + hauteur
     const sink = rabbetD - lidH;
-    if (rabbetSide === 0 && sink > MAX_LID_SINK)
+    if (rabbetSide === 0 && sink > WARN.lidSinkMax)
       depthMsgs.push(t('warn.lid_sunk', { sink: sink.toFixed(1), usable: (H - rabbetD + lidH - bFll - bFl).toFixed(1) }));
     if (rabbetSide === 1 && lidH - rabbetD < bFll - 1e-6)
       depthMsgs.push(t('warn.lid_recess_deep', { depth: rabbetD, left: Math.max(lidH - rabbetD, 0).toFixed(1), top: bFll }));
@@ -629,7 +626,7 @@ function updateFingerJointWarnings() {
       break;
     }
     const tw = L / nb;
-    if (tw <= thick * 1.5) {
+    if (tw <= thick * WARN.fingerWidthMinThick) {
       warnKey = 'warn.finger_too_narrow';
       warnParams = { tw: tw.toFixed(1), t: thick };
       break;
@@ -646,7 +643,7 @@ function updateBeanRatio() {
   const w = state.shape.params.width ?? 1;
   const l = state.shape.params.length ?? 1;
   const ratio = w / l;
-  const warn  = ratio < 0.5 || ratio > 1.5;
+  const warn  = ratio < WARN.beanRatioMin || ratio > WARN.beanRatioMax;
   el.value = ratio.toFixed(2);
   el.title = warn ? t('warn.bean_ratio') : '';
   el.classList.toggle('input-warn', warn);

@@ -1,5 +1,6 @@
 import { MATERIALS, DIAMETERS, calculate } from './CuttingParams.js';
 import { TOOLS, findTool } from './ToolCatalog.js';
+import { WARN } from './Thresholds.js';
 
 /**
  * Réglages de coupe du panneau « Matière & Outil ».
@@ -19,7 +20,6 @@ import { TOOLS, findTool } from './ToolCatalog.js';
  */
 
 const STORAGE_KEY = 'bg-cutting-panel';
-const RUBBING_RATIO = 0.6;                 // fz réel / fz conseillé en dessous duquel on prévient
 const FIELDS = {                       // clé d'état → champ du panneau
   feed:   'param-feedrate',
   plunge: 'param-plunge',
@@ -137,10 +137,10 @@ export function initCuttingPanel({ t, lang, onChange }) {
       div.textContent = text;
       notes.appendChild(div);
     };
-    // Sous 60 % de l'avance par dent conseillée, la fraise frotte au lieu de couper (bois brûlé)
-    if (ratio < RUBBING_RATIO)
+    // Sous le seuil de l'avance par dent conseillée, la fraise frotte au lieu de couper (bois brûlé)
+    if (ratio < WARN.rubbingRatio)
       add(true, t('cut.w_rubbing', { fz: fmt(fzEff, 3), pct: Math.round(ratio * 100), rec: fmt(r.fz, 3) }));
-    else if (st.manual.feed && ratio > 1.5)
+    else if (st.manual.feed && ratio > WARN.heavyFeedRatio)
       add(true, t('cut.w_heavy', { fz: fmt(fzEff, 3), pct: Math.round(ratio * 100) }));
     if (!st.manual.passes && r.apCapped)
       add(false, t('cut.i_ap_cap', { k: fmt(st.machine.apK, 2).replace(/0$/, ''), table: fmt(r.apTable, 1) }));
@@ -148,7 +148,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
       add(false, t('cut.i_feed_cap', { feed: fmt(st.machine.feed) }));
     if (st.spindleFixed && num('param-spindle') > st.machine.spindle)
       add(false, t('cut.i_spindle_cap', { n: fmt(st.machine.spindle) }));
-    if (!st.spindleFixed && r.nTheo > st.machine.spindle && st.machine.spindle / r.nTheo < 0.65)
+    if (!st.spindleFixed && r.nTheo > st.machine.spindle && st.machine.spindle / r.nTheo < WARN.spindleLimitRatio)
       add(true, t('cut.w_spindle', { pct: Math.round(100 * st.machine.spindle / r.nTheo) }));
     if (num(FIELDS.passes) > r.diameter) add(true, t('cut.w_depth'));
   }
