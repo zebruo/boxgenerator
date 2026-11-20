@@ -16,7 +16,7 @@ import { LidBox, lidPartitionThickness } from './modules/boxes/LidBox.js';
 import { StackableBox }   from './modules/boxes/StackableBox.js';
 import { showHelpModal }         from './modules/HelpModal.js';
 import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
-import { WARN } from './modules/Thresholds.js';
+import { WARN, LIMITS } from './modules/Thresholds.js';
 import { initCuttingPanel } from './modules/CuttingPanel.js';
 
 // ─── Tooltip global (réutilisé dans les modales) ────────────────────────────
@@ -540,7 +540,7 @@ function updatePartitionWarning() {
     state.boxParams.partitionSplit ?? '', partThick);
   const across = (partitionDir === 'vertical' ? bb.height : bb.width) - 2 * wallThickness;
   const smallest = Math.min(...sizes, across);
-  const minCell = WARN.partitionCellMinTools * td;
+  const minCell = LIMITS.partitionCellMinTools * td;   // même limite que le calcul des compartiments
   const tooSmall = smallest < minCell
     ? t('warn.partition_small', { cell: smallest.toFixed(0), min: minCell.toFixed(0), td }) : '';
   setWarn(el, tooSmall);

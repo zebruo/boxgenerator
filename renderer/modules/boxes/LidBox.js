@@ -3,25 +3,23 @@ import { pocketConcentric } from '../gcode/PocketConcentric.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { insetPolygon, offsetPolygons, unionPolygons, roundCorners, clipToRegion, signedArea, distToPolygon } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
+import { LIMITS } from '../Thresholds.js';
 
 /**
  * Rayon de coin minimum de la lèvre (partie mâle de la feuillure) : Ø/2 + 0,4 mm. Un coin vif
  * ne s'emboîte pas dans son logement, dont la fraise arrondit forcément les coins.
  */
-export const lipRadius = toolDiameter => toolDiameter / 2 + 0.4;
+export const lipRadius = toolDiameter => toolDiameter / 2 + LIMITS.lipRadiusMargin;
 
 /** Lèvre : contour décalé de d vers l'intérieur, coins arrondis au rayon minimum. */
 export function lipContour(bodyPts, d, toolDiameter) {
   return roundCorners(insetPolygon(bodyPts, d), lipRadius(toolDiameter));
 }
 
-/** Épaisseur minimale d'une cloison (mm) : en dessous, trop fragile à fraiser. */
-export const MIN_PARTITION_THICKNESS = 3;
-
 /**
  * Épaisseur des cloisons de la boîte à couvercle : elles prolongent le profil de la paroi vu depuis
  * la cavité. Feuillure intérieure : la largeur de la feuillure. Feuillure extérieure : ce qui reste
- * de la paroi à pleine hauteur (paroi − feuillure). Au moins MIN_PARTITION_THICKNESS, sans dépasser
+ * de la paroi à pleine hauteur (paroi − feuillure). Au moins LIMITS.partitionThicknessMin, sans dépasser
  * l'épaisseur des parois.
  */
 export function lidPartitionThickness(params) {
@@ -29,7 +27,7 @@ export function lidPartitionThickness(params) {
   if (!(rb > 0)) return wt;
   const exterior = Number(params.rabbetSide) === 1;
   const raw = exterior ? wt - rb : Math.min(rb, wt);
-  return Math.min(Math.max(raw, MIN_PARTITION_THICKNESS), wt);
+  return Math.min(Math.max(raw, LIMITS.partitionThicknessMin), wt);
 }
 
 /** Logement de la lèvre (lèvre + jeu) : même rayon minimum, plus le jeu. */

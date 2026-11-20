@@ -1,4 +1,5 @@
 import { clipToRegion, insetPolygon } from './Offset.js';
+import { LIMITS } from '../Thresholds.js';
 
 /**
  * Lit une répartition saisie en pourcentages (« 60/40 », « 25/50/25 », virgule décimale
@@ -60,7 +61,7 @@ export function buildPartitionContours(W, D, wallThickness, partitions, partitio
   const vertical = partitionDir === 'vertical';
   const { sizes } = partitionSizes(W, D, wt, partitions, partitionDir, split, pt);
   const across = (vertical ? D : W) - 2 * wt;          // dimension non divisée
-  const minCell = 3 * toolDiameter;
+  const minCell = LIMITS.partitionCellMinTools * toolDiameter;
 
   if (Math.min(...sizes) < minCell || across < minCell) return null;
 
