@@ -36,7 +36,7 @@ export function showHelpModal(machine = {}) {
         <h4>Colonne de gauche — Paramètres</h4>
         <dl class="help-dl">
           <dt>Sessions (barre du haut)</dt>
-          <dd>L'icône <em>dossier</em> (Ctrl+O) ouvre une session <span class="help-mono">.json</span>, la <em>disquette</em> (Ctrl+S) l'enregistre <strong>directement dans le fichier ouvert</strong>, sans explorateur. <strong>Maj+clic</strong> sur la disquette, ou Ctrl+Maj+S, enregistre sous un autre nom ou dans un autre dossier. Avant d'écraser, la version précédente est copiée dans un sous-dossier <span class="help-mono">sauvegardes</span> à côté du fichier. Le nom du fichier s'affiche dans le titre de la fenêtre, avec un <strong>*</strong> devant quand la session a changé depuis le dernier enregistrement.</dd>
+          <dd>L'icône <em>dossier</em> (Ctrl+O) ouvre une session <span class="help-mono">.json</span>, la <em>disquette</em> (Ctrl+S) l'enregistre <strong>directement dans le fichier ouvert</strong>, sans explorateur. <strong>Maj+clic</strong> sur la disquette, ou Ctrl+Maj+S, enregistre sous un autre nom ou dans un autre dossier. Avant d'écraser, la version précédente est copiée dans un sous-dossier <span class="help-mono">sauvegardes</span> à côté du fichier. Le nom du fichier s'affiche dans le titre de la fenêtre, avec un <strong>*</strong> devant quand la session a changé depuis le dernier enregistrement. La session garde aussi les options d'usinage : entrée de l'outil, finition, tabs et stratégie de poche.</dd>
           <dt>Modèle de boîte</dt>
           <dd>Choisit le type de construction :
             <strong>Plateau</strong> (fond + parois, sans couvercle),
@@ -196,7 +196,7 @@ export function showHelpModal(machine = {}) {
       <!-- ── Tabs ────────────────────────────────────────── -->
       <section class="help-section">
         <h4>Tabs de maintien</h4>
-        <p>Ponts de matière laissés au fond de la coupe pour maintenir la pièce dans le brut : dès qu'une passe descend sous leur sommet, l'outil remonte automatiquement au-dessus de chaque tab. Ils sont placés au milieu des côtés droits les plus longs, jamais dans un angle ni dans un arrondi ; sur une forme sans côté droit (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre. Par défaut : 4 tabs de 8 mm de long et 2 mm de haut. La largeur saisie est la longueur réelle du pont de matière : l'outil reste au-dessus du tab sur cette largeur plus son diamètre, car il mord de son rayon de chaque côté.</p>
+        <p>Ponts de matière laissés au fond de la coupe pour maintenir la pièce dans le brut : dès qu'une passe descend sous leur sommet, l'outil remonte automatiquement au-dessus de chaque tab. Ils se règlent avec le bouton <strong>Tabs</strong> de la barre <em>Usinage</em> (au-dessus de l'aperçu 3D) et sont enregistrés avec la session. Ils sont placés au milieu des côtés droits les plus longs, jamais dans un angle ni dans un arrondi ; avec plus de tabs que de côtés droits, chaque côté en reçoit au moins un et les autres vont aux côtés les plus longs, espacés régulièrement ; sur une forme sans côté droit (cercle, ovale, haricot), ils sont répartis uniformément sur le périmètre. Par défaut : 4 tabs de 8 mm de long et 2 mm de haut. La largeur saisie est la longueur réelle du pont de matière : l'outil reste au-dessus du tab sur cette largeur plus son diamètre, car il mord de son rayon de chaque côté.</p>
       </section>
 
       <!-- ── Finition des parois ───────────────────────────── -->

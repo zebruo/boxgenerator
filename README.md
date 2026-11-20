@@ -14,7 +14,7 @@ A desktop application for generating parametric boxes and trays with CNC G-code 
 - **3D preview** (Three.js) with Z0 marker and stock ; lid and finger-joint boxes shown *flat* or *assembled*
 - **Technical 2D views** : top, front, side and A-A section, with dimensions
 - **Machining simulation** : replays the exported G-code on the stock (tool, paths, removed material, estimated time), two sides for the stackable box, "finished part only"
-- **Holding tabs** on contour cuts (8 × 2 mm by default ; configurable width, height, count)
+- **Holding tabs** on contour cuts (8 × 2 mm by default ; configurable width, height, count, from the « Tabs » button of the Machining bar), spread per side when there are more tabs than straight sides ; saved with the session, like the entry, finishing and pocket options
 - **Entry strategies** : direct plunge, ramp, helix, tangent lead-in
 - **Wall finishing** : allowance left by the passes, then one full-depth pass on the final size
 - **Cutting parameters calculator** : spindle speed, XY and plunge feed, depth per pass from the material, tool diameter and flutes, capped by your machine limits ; **tool catalogue** with the supplier's datasheet values (helical, straight and compression end mills), tools sorted by diameter

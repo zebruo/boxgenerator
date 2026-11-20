@@ -284,6 +284,11 @@
                 <span class="tb-lab-opt" data-i18n="ui.tb_stock">Brut</span><b id="stock-summary"></b>
                 <svg class="tb-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
               </button>
+              <button class="tb-btn" id="btn-tabs" aria-haspopup="dialog" aria-expanded="false" aria-controls="pop-tabs" data-i18n-title="tip.tabs_btn" title="Tabs de maintien sur les contours">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 15h4v-4h4v4h2v-4h4v4h4"/><path d="M3 19h18"/></svg>
+                <span class="tb-lab-opt" data-i18n="ui.tb_tabs">Tabs</span><b id="tabs-summary"></b>
+                <svg class="tb-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
             </div>
           </div>
         </div>
@@ -309,6 +314,25 @@
               <button class="z0-lvl-btn" aria-pressed="false" data-level="bottom" data-i18n="tip.z0_bottom">Bas de la boîte</button>
             </div>
           </div>
+        </div>
+        <div class="tb-pop" id="pop-tabs" role="dialog" data-i18n-aria="ui.tabs_title" aria-label="Tabs de maintien" hidden>
+          <h3 data-i18n="ui.tabs_title">Tabs de maintien</h3>
+          <label class="pop-check"><input type="checkbox" id="tabs-on"> <span data-i18n="ui.tabs_on">Laisser des tabs sur les contours</span></label>
+          <div class="pop-row" id="tabs-fields">
+            <div class="pop-field">
+              <label for="tab-count" data-i18n="ui.tab_count">Nombre par contour</label>
+              <input type="number" id="tab-count" min="1" max="12" step="1"><span></span>
+            </div>
+            <div class="pop-field">
+              <label for="tab-width" data-i18n="ui.tab_width">Largeur</label>
+              <input type="number" id="tab-width" min="1" max="20" step="0.5" data-i18n-title="modal.tip_tab_width" title="Longueur du pont de matière laissé"><span>mm</span>
+            </div>
+            <div class="pop-field">
+              <label for="tab-height" data-i18n="ui.tab_height">Hauteur</label>
+              <input type="number" id="tab-height" min="0.5" max="10" step="0.5"><span>mm</span>
+            </div>
+          </div>
+          <p class="pop-cap" data-i18n="ui.tabs_note">Enregistrés avec la session. Plus de tabs que de côtés droits : ils sont répartis par côté.</p>
         </div>
         <div class="tb-pop" id="pop-stock" role="dialog" data-i18n-aria="ui.stock_title" aria-label="Surplus de brut" hidden>
           <h3 data-i18n="ui.stock_title">Surplus de brut</h3>

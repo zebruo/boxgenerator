@@ -109,7 +109,7 @@ function setPressed(selector, active) {
   });
 }
 
-const TOOLBAR_POPS = [['btn-z0', 'pop-z0'], ['btn-stock', 'pop-stock']];
+const TOOLBAR_POPS = [['btn-z0', 'pop-z0'], ['btn-stock', 'pop-stock'], ['btn-tabs', 'pop-tabs']];
 
 function closeToolbarPops() {
   for (const [b, p] of TOOLBAR_POPS) {
@@ -159,6 +159,45 @@ function updateToolbarSummaries() {
     const so = stockOffsets(), f = v => +v.toFixed(1);
     ss.textContent = so.two ? `+${f(so.body)} / +${f(so.lid)} mm` : `+${f(so.body)} mm`;
   }
+  const ts = document.getElementById('tabs-summary');
+  if (ts) {
+    const o = state.exportOpts;
+    ts.textContent = o.tabsOn ? `${o.tabCount} × ${String(o.tabWidth).replace('.', ',')} mm` : t('ui.tabs_none');
+  }
+}
+
+/** Fenêtre « Tabs » : champs remplis depuis les options mémorisées (au démarrage, à l'ouverture d'une session). */
+function syncTabsUI() {
+  const o = state.exportOpts;
+  const on = document.getElementById('tabs-on');
+  if (!on) return;
+  on.checked = !!o.tabsOn;
+  document.getElementById('tab-count').value  = o.tabCount;
+  document.getElementById('tab-width').value  = o.tabWidth;
+  document.getElementById('tab-height').value = o.tabHeight;
+  document.getElementById('tabs-fields').classList.toggle('disabled', !o.tabsOn);
+}
+
+/** Tabs réglés dans la fenêtre « Tabs » : mémorisés (session et réglages par défaut). */
+function bindTabsUI() {
+  const read = () => {
+    const fin = (v, def) => (Number.isFinite(v) && v > 0 ? v : def);
+    const o = state.exportOpts;
+    saveExportOpts({
+      ...o,
+      tabsOn:    document.getElementById('tabs-on').checked,
+      tabCount:  Math.round(fin(Number.parseFloat(document.getElementById('tab-count').value), o.tabCount)),
+      tabWidth:  fin(Number.parseFloat(document.getElementById('tab-width').value), o.tabWidth),
+      tabHeight: fin(Number.parseFloat(document.getElementById('tab-height').value), o.tabHeight),
+    });
+    document.getElementById('tabs-fields').classList.toggle('disabled', !state.exportOpts.tabsOn);
+    updateToolbarSummaries();
+  };
+  for (const id of ['tabs-on', 'tab-count', 'tab-width', 'tab-height']) {
+    document.getElementById(id).addEventListener('input', read);
+    document.getElementById(id).addEventListener('change', read);
+  }
+  syncTabsUI();
 }
 
 // ─── i18n — mise à jour des éléments statiques du DOM ──────────────────────
@@ -186,6 +225,7 @@ function init() {
   selectBoxType('open-tray');
   bindEvents();
   initToolbarPopovers();
+  bindTabsUI();
   updateI18n();
   resizeCanvases();
   updatePreview();
@@ -745,6 +785,7 @@ state.exportOpts = loadExportOpts();
 function saveExportOpts(opts) {
   state.exportOpts = opts;
   try { localStorage.setItem('exportOpts', JSON.stringify(opts)); } catch { /* stockage indisponible */ }
+  scheduleDirtyCheck();   // options enregistrées avec la session : « * » du titre
 }
 
 // Valeurs par défaut dépendant du diamètre d'outil (mêmes formules que la fenêtre d'export)
@@ -917,7 +958,7 @@ function resizeCanvases() {
 }
 
 function updatePreview() {
-  clearTimeout(dirtyTimer); dirtyTimer = setTimeout(refreshDirty, 150);   // « * » du titre si la session a changé
+  scheduleDirtyCheck();   // « * » du titre si la session a changé
   if (threePreview) {
     const so = stockOffsets();
     threePreview.stockOffset = so.body; threePreview.stockOffsetLid = so.lid;
@@ -1219,20 +1260,9 @@ function showExportModal(sections, machine = {}) {
       </div>
     </div>
     <div class="tabs-section">
-      <label class="tabs-toggle-row">
-        <input type="checkbox" id="modal-tabs-on"${o.tabsOn ? ' checked' : ''}>
-        <span>${t('modal.tabs_label')}</span>
-      </label>
-      <div class="tabs-fields${o.tabsOn ? '' : ' disabled'}" id="modal-tabs-fields">
-        <span class="tab-f-lbl">${t('modal.tab_count')}</span>
-        <input type="number" id="modal-tab-count"  class="tab-input" value="${o.tabCount}"  min="1"   max="12"  step="1">
-        <span class="tab-f-lbl" data-tip="${t('modal.tip_tab_width')}">${t('modal.tab_width')}</span>
-        <input type="number" id="modal-tab-width"  class="tab-input" value="${o.tabWidth}"  min="1"   max="20"  step="0.5">
-        <span class="tab-f-unit">mm</span>
-        <span class="tab-f-lbl">${t('modal.tab_height')}</span>
-        <input type="number" id="modal-tab-height" class="tab-input" value="${o.tabHeight}" min="0.5" max="10"  step="0.5">
-        <span class="tab-f-unit">mm</span>
-      </div>
+      <p class="modal-sub" style="margin:0">${o.tabsOn
+        ? t('modal.tabs_summary', { n: o.tabCount, w: String(o.tabWidth).replace('.', ','), h: String(o.tabHeight).replace('.', ',') })
+        : t('modal.tabs_off')}</p>
     </div>
     <div class="pocket-section">
       <div class="pocket-title">${t('modal.pocket_strategy')}</div>
@@ -1294,15 +1324,13 @@ function showExportModal(sections, machine = {}) {
   const getCheckboxes = () => list.querySelectorAll('input[type=checkbox]:not(:disabled)');
 
   const modalStatsEl = modal.querySelector('#modal-stats');
-  const tabsOnCbStats   = modal.querySelector('#modal-tabs-on');
   const pocketConcStats = modal.querySelector('#modal-pocket-conc');
+  // Tabs : réglés dans la barre Usinage (bouton « Tabs »), plus dans cette fenêtre
+  const tabOptsNow = () => (state.exportOpts.tabsOn
+    ? { count: state.exportOpts.tabCount, width: state.exportOpts.tabWidth, height: state.exportOpts.tabHeight } : null);
 
   const updateModalStats = () => {
-    const tabOpts = tabsOnCbStats.checked ? {
-      count:  Number.parseInt(modal.querySelector('#modal-tab-count').value),
-      width:  Number.parseFloat(modal.querySelector('#modal-tab-width').value),
-      height: Number.parseFloat(modal.querySelector('#modal-tab-height').value)
-    } : null;
+    const tabOpts = tabOptsNow();
     const entryMode = modal.querySelector('.entry-mode-btn.active')?.dataset.mode ?? 'plunge';
     const entryOpts = {
       entry:      entryMode,
@@ -1334,7 +1362,6 @@ function showExportModal(sections, machine = {}) {
   list.addEventListener('change', updateModalStats);
   modal.querySelector('#modal-sel-all').addEventListener('click',  () => { getCheckboxes().forEach(cb => cb.checked = true);  updateModalStats(); });
   modal.querySelector('#modal-sel-none').addEventListener('click', () => { getCheckboxes().forEach(cb => cb.checked = false); updateModalStats(); });
-  modal.querySelector('#modal-tabs-on').addEventListener('change', updateModalStats);
   modal.querySelector('#modal-pocket-conc').addEventListener('change', updateModalStats);
   modal.querySelectorAll('.entry-mode-btn').forEach(b => b.addEventListener('click', () => setTimeout(updateModalStats, 0)));
 
@@ -1390,19 +1417,6 @@ function showExportModal(sections, machine = {}) {
   });
   modal.querySelector('#modal-finish-allowance').addEventListener('input', updateModalStats);
 
-  const tabsOnCb   = modal.querySelector('#modal-tabs-on');
-  const tabsFields = modal.querySelector('#modal-tabs-fields');
-  tabsOnCb.addEventListener('change', () => {
-    tabsFields.classList.toggle('disabled', !tabsOnCb.checked);
-    list.querySelectorAll('.sec-label').forEach(lbl => {
-      if (!lbl.textContent.toLowerCase().includes('outside')) return;
-      lbl.textContent = tabsOnCb.checked
-        ? lbl.textContent.replace('outside)', 'outside + tabs)')
-                         .replace('outside + tabs + tabs)', 'outside + tabs)')
-        : lbl.textContent.replace('outside + tabs)', 'outside)');
-    });
-  });
-
   const pocketConcCb = modal.querySelector('#modal-pocket-conc');
   // Met à jour les labels de poche dans la liste quand la stratégie change
   pocketConcCb.addEventListener('change', () => {
@@ -1421,6 +1435,7 @@ function showExportModal(sections, machine = {}) {
     const orDefault = (v, def) => (Number.isFinite(v) && Math.abs(v - def) > 1e-9 ? v : null);
     const fin = (v, def) => (Number.isFinite(v) && v > 0 ? v : def);
     return {
+      ...state.exportOpts,   // tabs : réglés dans la barre Usinage
       entry:           selectedEntry,
       rampLen:         orDefault(num('#modal-ramp-len'), defRamp),
       helixR:          orDefault(num('#modal-helix-r'), defHelixR),
@@ -1429,10 +1444,6 @@ function showExportModal(sections, machine = {}) {
       leadInR:         orDefault(num('#modal-leadin-r'), defLeadR),
       finishOn:        finishOnCb.checked,
       finishAllowance: fin(num('#modal-finish-allowance'), 0.2),
-      tabsOn:          tabsOnCb.checked,
-      tabCount:        fin(int('#modal-tab-count'), 4),
-      tabWidth:        fin(num('#modal-tab-width'), 8),
-      tabHeight:       fin(num('#modal-tab-height'), 2),
       pocketConc:      pocketConcCb.checked,
     };
   };
@@ -1465,12 +1476,8 @@ function showExportModal(sections, machine = {}) {
       finishAllowance: finishCb.checked ? Number.parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
     };
 
-    // Paramètres tabs depuis la modale
-    const tabOpts = tabsOnCb.checked ? {
-      count:  Number.parseInt(modal.querySelector('#modal-tab-count').value),
-      width:  Number.parseFloat(modal.querySelector('#modal-tab-width').value),
-      height: Number.parseFloat(modal.querySelector('#modal-tab-height').value)
-    } : null;
+    // Tabs : réglages de la barre Usinage
+    const tabOpts = tabOptsNow();
 
     // Re-génère le G-code avec les options définitives, puis filtre les sections
     const machine = getMachineParams();
@@ -1597,6 +1604,7 @@ function buildSession() {
     machineParams: getMachineParams(),
     cutting:       cuttingPanel.getState(),
     z0:            getZ0Settings(),
+    machining:     { ...state.exportOpts },   // entrée, finition, tabs, stratégie de poche
   };
 }
 
@@ -1607,6 +1615,11 @@ function sessionSnapshot() {
 /** Titre de la fenêtre : « *nom.json — Box Generator… » (le « * » dit que la session a changé depuis l'enregistrement). */
 function refreshTitle() {
   document.title = sessionName ? `${sessionDirty ? '*' : ''}${sessionName} — ${appTitle}` : appTitle;
+}
+
+/** Vérifie le « * » du titre un court instant après une modification (plusieurs modifications : une seule vérification). */
+function scheduleDirtyCheck() {
+  clearTimeout(dirtyTimer); dirtyTimer = setTimeout(refreshDirty, 150);
 }
 
 /** Compare la session courante au dernier enregistrement (appelé, après un court délai, à chaque mise à jour de l'aperçu). */
@@ -1673,6 +1686,12 @@ async function loadSession() {
     cuttingPanel.setState(session.cutting);   // anciennes sessions : valeurs du fichier gardées telles quelles
   }
   if (session.z0) restoreZ0(session.z0);
+  // Options d'usinage de la session (entrée, finition, tabs, poche) ; sessions plus anciennes : réglages courants
+  if (session.machining) {
+    saveExportOpts({ ...EXPORT_OPTS_DEFAULT, ...session.machining });
+    syncTabsUI();
+    updateToolbarSummaries();
+  }
 
   updatePreview();
   updateInfoBar();
