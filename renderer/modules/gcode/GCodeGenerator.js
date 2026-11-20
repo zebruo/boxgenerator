@@ -90,6 +90,40 @@ function spreadTabs(segs, count, perimeter) {
   return centers;
 }
 
+/**
+ * Plus de tabs que de côtés droits (rectangle, polygone) : chaque côté en reçoit au moins un, le
+ * reste va aux côtés les plus longs (au prorata de leur longueur, plus forts restes), puis les tabs
+ * d'un côté y sont espacés régulièrement (au tiers et aux deux tiers pour deux tabs).
+ * Ex. 6 tabs sur un rectangle 180 × 120 : 2 sur chaque grand côté, 1 au milieu de chaque petit côté.
+ * Un côté ne prend pas plus de tabs qu'il n'en peut porter sans approcher ses coins.
+ * Renvoie les abscisses des centres, éventuellement moins que `count` si les côtés sont trop courts.
+ */
+function tabsBySide(segs, count, perimeter, width) {
+  const total = segs.reduce((a, g) => a + g.len, 0);
+  const clear = width / 2 + CORNER_CLEAR;
+  const cap = segs.map(g => Math.max(1, Math.floor(g.len / clear) - 1));   // len / (m + 1) ≥ clear
+  const ideal = segs.map(g => count * g.len / total);
+  const m = ideal.map((v, i) => Math.min(cap[i], Math.max(1, Math.floor(v))));
+  let sum = m.reduce((a, b) => a + b, 0);
+  // Ordre de priorité stable : plus fort reste, puis côté le plus long, puis ordre du contour
+  const order = segs.map((g, i) => i).sort((a, b) =>
+    (ideal[b] - m[b]) - (ideal[a] - m[a]) || segs[b].len - segs[a].len || a - b);
+  for (let pass = 0; sum < count && pass < count; pass++) {
+    let added = false;
+    for (const i of order) {
+      if (sum >= count) break;
+      if (m[i] < cap[i]) { m[i]++; sum++; added = true; }
+    }
+    if (!added) break;
+  }
+  const centers = [];
+  segs.forEach((g, i) => {
+    const start = g.center - g.len / 2;
+    for (let j = 1; j <= m[i]; j++) centers.push(((start + (g.len * j) / (m[i] + 1)) % perimeter + perimeter) % perimeter);
+  });
+  return centers.slice(0, count);
+}
+
 /** Distance curviligne la plus courte entre deux abscisses d'un contour fermé. */
 const loopDist = (a, b, perimeter) => {
   const d = Math.abs(a - b);
@@ -1063,6 +1097,12 @@ export class GCodeGenerator {
   _placeTabs(pts, segLengths, perimeter, count, width) {
     const corners = cornerDistances(pts, segLengths);
     const segs = corners.length ? straightSegments(corners, perimeter, width) : [];
+    // Contour à côtés (rectangle, polygone) et plus de tabs que de côtés : répartition par côté
+    if (segs.length >= 3 && count > segs.length) {
+      const centers = tabsBySide(segs, count, perimeter, width);
+      if (centers.length >= count) return centers;
+      return completeTabs(centers, count, perimeter, cornerDistances(pts, segLengths, SHARP_THR), width);
+    }
     if (segs.length > 0) {
       const centers = spreadTabs(segs, count, perimeter);
       if (centers.length >= count) return centers;
