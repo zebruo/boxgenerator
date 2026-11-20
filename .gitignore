@@ -21,3 +21,6 @@ ParamCoupe/
 
 # Outils personnels (fiches fraises), non suivis pour le moment
 cncFraises/
+
+# Sessions de boîtes personnelles (fichiers .json et leurs sauvegardes)
+boites/

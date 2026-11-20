@@ -393,8 +393,8 @@ function renderShapeParams() {
       if (state.boxParams[d.id] === undefined) state.boxParams[d.id] = currentVal;
       row.innerHTML = `
         <label title="${t(d.label)}">${t(d.label)}</label>
-        <input type="text" data-param="${d.id}" placeholder="${d.placeholder ? t(d.placeholder) : ''}" spellcheck="false" autocomplete="off">
-        <span class="param-unit">${d.unit ?? ''}</span>
+        <input type="text" data-param="${d.id}" placeholder="${d.placeholder ? t(d.placeholder) : ''}" spellcheck="false" autocomplete="off"${d.unit ? '' : ' class="param-text-wide"'}>
+        ${d.unit ? `<span class="param-unit">${d.unit}</span>` : ''}
       `;
       const inp = row.querySelector('input');
       inp.value = currentVal;   // affecté après coup : aucun échappement HTML à gérer

@@ -160,6 +160,8 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   padding: 3px 4px 3px 6px; font-size: 12px; line-height: 18px; width: 100%; text-align: right;
   outline: none;
 }
+/* Champ texte sans unité (répartition « 45/27,5/27,5 ») : prend aussi la colonne de l'unité */
+.param-row input.param-text-wide { grid-column: 2 / 4; padding-right: 9px; }
 .param-row input[type=number]:focus,
 .param-row input[type=text]:focus { border-color: var(--accent); }
 /* Flèches natives : visibles seulement au survol ou à la saisie, à la couleur du thème */
@@ -945,7 +947,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   width: 100%; margin-top: 6px; padding: 6px 0;
   background: none; border: 1px dashed var(--border);
   color: var(--text-muted); border-radius: var(--radius-sm);
-  font-size: 11px; cursor: pointer; transition: all .15s;
+  font-size: 12.5px; cursor: pointer; transition: all .15s;
 }
 .btn-calc-params:hover { border-color: var(--accent3); color: var(--accent3); border-style: solid; }
 
