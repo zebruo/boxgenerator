@@ -21,7 +21,7 @@ A desktop application for generating parametric boxes and trays with CNC G-code 
 - **Concentric or raster pocket** fill, with **partitions** (compartments)
 - **Dog-bone fillets** at inside corners for finger joints
 - **Work origin (WCS)** : center, front-left, front-right, back-left, back-right — top or bottom of stock
-- **Session save/load** (JSON)
+- **Session save/load** (JSON): Ctrl+S saves straight to the open file (the previous version is kept in a `sauvegardes` sub-folder), Ctrl+Shift+S saves under another name, Ctrl+O opens; the file name is shown in the window title
 - **FR / EN** interface
 
 ## Interface

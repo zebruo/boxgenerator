@@ -189,7 +189,7 @@ function init() {
   resizeCanvases();
   updatePreview();
   const v = window.electronAPI?.version;
-  if (v) document.title = `Box Generator - CNC v${v}`;
+  if (v) { appTitle = `Box Generator - CNC v${v}`; showSessionName(sessionName); }
 }
 
 function bindEvents() {
@@ -271,8 +271,15 @@ function bindEvents() {
   });
 
   // Session save / load
-  document.getElementById('btn-save-session').addEventListener('click', saveSession);
+  document.getElementById('btn-save-session').addEventListener('click', e => saveSession(e.shiftKey));   // Maj+clic : Enregistrer sous
   document.getElementById('btn-load-session').addEventListener('click', loadSession);
+  // Raccourcis : Ctrl+S enregistrer, Ctrl+Maj+S enregistrer sous, Ctrl+O ouvrir
+  document.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const k = e.key.toLowerCase();
+    if (k === 's') { e.preventDefault(); saveSession(e.shiftKey); }
+    else if (k === 'o' && !e.shiftKey) { e.preventDefault(); loadSession(); }
+  });
 
   // Export G-code
   document.getElementById('btn-export-gcode').addEventListener('click', exportGCode);
@@ -548,6 +555,8 @@ function updatePartitionWarning() {
 
 /** Matière minimale (mm) à laisser au-dessus du fond du corps sous la feuillure. */
 const MIN_RABBET_FLOOR = 3;
+/** Enfoncement toléré (mm) du dessus du couvercle sous le bord du corps, en feuillure intérieure. */
+const MAX_LID_SINK = 1;
 
 /** Met le champ en orange avec ses messages en info-bulle (aucun message : état normal). */
 function setFieldWarnings(el, msgs) {
@@ -555,7 +564,7 @@ function setFieldWarnings(el, msgs) {
   el.title = msgs.join('\n');
 }
 
-/** Avertissements de la feuillure : fraise, largeur, profondeur et lèvre du couvercle. */
+/** Avertissements de la feuillure : fraise, largeur, profondeur (fond du corps, couvercle enfoncé) et dessus du couvercle. */
 function updateRabbetToolWarning() {
   const widthEl = document.querySelector('[data-param="rabbet"]');
   if (!widthEl) return;
@@ -585,8 +594,10 @@ function updateRabbetToolWarning() {
   if (left < MIN_RABBET_FLOOR)
     depthMsgs.push(t('warn.rabbet_floor', { left: Math.max(left, 0).toFixed(1), min: MIN_RABBET_FLOOR }));
   if (lidH > 0) {
-    if (rabbetSide === 0 && lidH - bFll > rabbetD + 1e-6)
-      depthMsgs.push(t('warn.lip_taller', { lip: (lidH - bFll).toFixed(1), depth: rabbetD, gap: (lidH - bFll - rabbetD).toFixed(1) }));
+    // Feuillure trop profonde : la lèvre repose au fond de la feuillure, le dessus du couvercle est à H − profondeur + hauteur
+    const sink = rabbetD - lidH;
+    if (rabbetSide === 0 && sink > MAX_LID_SINK)
+      depthMsgs.push(t('warn.lid_sunk', { sink: sink.toFixed(1), usable: (H - rabbetD + lidH - bFll - bFl).toFixed(1) }));
     if (rabbetSide === 1 && lidH - rabbetD < bFll - 1e-6)
       depthMsgs.push(t('warn.lid_recess_deep', { depth: rabbetD, left: Math.max(lidH - rabbetD, 0).toFixed(1), top: bFll }));
   }
@@ -902,6 +913,7 @@ function resizeCanvases() {
 }
 
 function updatePreview() {
+  clearTimeout(dirtyTimer); dirtyTimer = setTimeout(refreshDirty, 150);   // « * » du titre si la session a changé
   if (threePreview) {
     const so = stockOffsets();
     threePreview.stockOffset = so.body; threePreview.stockOffsetLid = so.lid;
@@ -1553,10 +1565,15 @@ function showExportModal(sections, machine = {}) {
 }
 
 // ─── Session save / load ────────────────────────────────────────────────────
-async function saveSession() {
-  if (!state.shape || !state.boxType) return;
+let appTitle = 'Box Generator - CNC';   // titre de base (avec la version dans l'application)
+let sessionName = '';                  // fichier de session courant
+let savedSnapshot = null;              // contenu de la session au dernier enregistrement ou à l'ouverture
+let sessionDirty = false;              // modifiée depuis : « * » devant le nom dans le titre
+let dirtyTimer = null;
 
-  const session = {
+/** Session telle qu'elle est enregistrée dans le fichier. */
+function buildSession() {
+  return {
     version:       2,   // 2 : haricot avec longueur sur X
     shapeKey:      state.shapeKey,
     boxTypeKey:    state.boxTypeKey,
@@ -1566,9 +1583,45 @@ async function saveSession() {
     cutting:       cuttingPanel.getState(),
     z0:            getZ0Settings(),
   };
+}
+
+function sessionSnapshot() {
+  try { return JSON.stringify(buildSession()); } catch { return null; }
+}
+
+/** Titre de la fenêtre : « *nom.json — Box Generator… » (le « * » dit que la session a changé depuis l'enregistrement). */
+function refreshTitle() {
+  document.title = sessionName ? `${sessionDirty ? '*' : ''}${sessionName} — ${appTitle}` : appTitle;
+}
+
+/** Compare la session courante au dernier enregistrement (appelé, après un court délai, à chaque mise à jour de l'aperçu). */
+function refreshDirty() {
+  if (!sessionName || savedSnapshot === null || !state.shape || !state.boxType) return;
+  const dirty = sessionSnapshot() !== savedSnapshot;
+  if (dirty !== sessionDirty) { sessionDirty = dirty; refreshTitle(); }
+}
+
+/** Nom du fichier de session dans le titre de la fenêtre (rien tant qu'aucun fichier n'est ouvert ou enregistré). */
+function showSessionName(name) {
+  sessionName = name ?? '';
+  sessionDirty = false;
+  refreshTitle();
+}
+
+async function saveSession(saveAs = false) {
+  if (!state.shape || !state.boxType) return;
+
+  const session = buildSession();
 
   const defaultName = `boxgen_${state.boxTypeKey}_${state.shapeKey}.json`;
-  await window.electronAPI.saveSession({ content: JSON.stringify(session, null, 2), defaultName });
+  const res = await window.electronAPI.saveSession({ content: JSON.stringify(session, null, 2), defaultName, saveAs: saveAs === true });
+  if (res?.success) {
+    savedSnapshot = JSON.stringify(session);
+    showSessionName(res.name);
+    showNotif(t('notif.session_saved', { path: res.path }));
+  } else if (res?.error) {
+    showNotif(t('notif.session_error', { error: res.error }));
+  }
 }
 
 async function loadSession() {
@@ -1577,6 +1630,8 @@ async function loadSession() {
 
   let session;
   try { session = JSON.parse(result.content); } catch { return; }
+  savedSnapshot = null;           // pas de comparaison pendant la restauration
+  showSessionName(result.name);
 
   const { shapeKey, shapeParams } = migrateSessionShape(session);
 
@@ -1606,6 +1661,7 @@ async function loadSession() {
 
   updatePreview();
   updateInfoBar();
+  savedSnapshot = sessionSnapshot();   // état de référence : le titre n'a pas de « * » tant que rien ne change
 }
 
 // Forme et paramètres d'une session, avec compatibilité des anciennes versions

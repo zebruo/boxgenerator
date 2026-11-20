@@ -57,6 +57,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .logo-text { font-size: 16px; font-weight: 700; color: var(--accent); }
 .logo-sub { font-size: 11px; color: var(--text-muted); }
 .header-actions { display: flex; gap: 8px; align-items: center; }
+.header-files { display: flex; gap: 8px; align-items: center; margin-right: auto; margin-left: 24px; }   /* ouvrir, enregistrer : à gauche, près du logo */
 
 /* ── Buttons ── */
 .btn {

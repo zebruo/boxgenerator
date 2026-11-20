@@ -4,6 +4,19 @@ const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
+let sessionPath = null;   // fichier de session ouvert ou enregistré : « Enregistrer » écrit directement dessus
+const BACKUP_DIR = 'sauvegardes';   // sous-dossier (à côté du fichier) des copies .bak de la version précédente
+
+/** Écrit la session ; la version précédente est copiée dans <dossier>/sauvegardes/<nom>.bak (une seule par fichier). */
+function writeSessionFile(filePath, content) {
+  if (fs.existsSync(filePath)) {
+    if (fs.readFileSync(filePath, 'utf8') === content) return;   // rien n'a changé
+    const bakDir = path.join(path.dirname(filePath), BACKUP_DIR);
+    fs.mkdirSync(bakDir, { recursive: true });
+    fs.copyFileSync(filePath, path.join(bakDir, path.basename(filePath) + '.bak'));
+  }
+  fs.writeFileSync(filePath, content, 'utf8');
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -66,17 +79,26 @@ ipcMain.handle('save-gcode', async (event, { content, defaultName }) => {
 });
 
 // IPC: Save session
-ipcMain.handle('save-session', async (event, { content, defaultName }) => {
-  const { filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: 'Sauvegarder la session',
-    defaultPath: defaultName || 'session.json',
-    filters: [{ name: 'Session BoxGenerator', extensions: ['json'] }]
-  });
-  if (filePath) {
-    fs.writeFileSync(filePath, content, 'utf8');
-    return { success: true, path: filePath };
+// « Enregistrer » : directement sur le fichier connu ; « Enregistrer sous » (saveAs), premier enregistrement ou
+// dossier disparu : explorateur. Le chemin reste ici : l'interface ne choisit jamais où écrire.
+ipcMain.handle('save-session', async (event, { content, defaultName, saveAs }) => {
+  let target = !saveAs && sessionPath && fs.existsSync(path.dirname(sessionPath)) ? sessionPath : null;
+  if (!target) {
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Sauvegarder la session',
+      defaultPath: sessionPath || defaultName || 'session.json',
+      filters: [{ name: 'Session BoxGenerator', extensions: ['json'] }]
+    });
+    if (!filePath) return { success: false };
+    target = filePath;
   }
-  return { success: false };
+  try {
+    writeSessionFile(target, content);
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+  sessionPath = target;
+  return { success: true, path: target, name: path.basename(target) };
 });
 
 // IPC: Load session
@@ -88,7 +110,8 @@ ipcMain.handle('load-session', async () => {
   });
   if (filePaths && filePaths[0]) {
     const content = fs.readFileSync(filePaths[0], 'utf8');
-    return { success: true, content };
+    sessionPath = filePaths[0];
+    return { success: true, content, path: sessionPath, name: path.basename(sessionPath) };
   }
   return { success: false };
 });

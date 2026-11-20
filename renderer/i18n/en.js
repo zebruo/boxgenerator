@@ -107,8 +107,8 @@ export const en = {
     stock_below:      'Below',
     gcode_panel:      'G-code',
     btn_generate:     'Generate',
-    btn_save_session: 'Save session',
-    btn_load_session: 'Open session',
+    btn_save_session: 'Save session (Ctrl+S) — Shift+click: Save as… (Ctrl+Shift+S)',
+    btn_load_session: 'Open session (Ctrl+O)',
     btn_export:       'Export G-code',
     btn_export_short: 'G-code',
     btn_svg:          'Export SVG',
@@ -139,7 +139,7 @@ export const en = {
     tool_too_large:    '⚠ Tool Ø{{td}}mm ≥ rabbet+clearance ({{ringW}}mm) — use Ø < {{ringW}}mm',
     rabbet_wider_wall: '⚠ Rabbet width ({{r}} mm) ≥ wall thickness ({{wt}} mm): nothing is left of the wall',
     rabbet_floor:      '⚠ The rabbet leaves only {{left}} mm above the body floor (recommended minimum: {{min}} mm)',
-    lip_taller:        '⚠ Lid lip ({{lip}} mm) is taller than the rabbet ({{depth}} mm): the lid will not sit flat (gap {{gap}} mm)',
+    lid_sunk:          '⚠ The lid sinks {{sink}} mm below the box rim: rabbet too deep or lid too low (usable height: {{usable}} mm)',
     lid_recess_deep:   '⚠ The lid rabbet ({{depth}} mm) leaves only {{left}} mm of top (planned: {{top}} mm)',
     bean_ratio:        '⚠ Ratio outside recommended CNC range (0.5 – 1.5)',
     radius_clamped: 'Radius too large for these dimensions — limited to {{value}} mm (half the smallest dimension).',
@@ -233,6 +233,8 @@ export const en = {
   notif: {
     no_ops:    'No operation selected',
     saved:     'Saved: {{path}}',
+    session_saved: 'Session saved: {{path}}',
+    session_error: 'Could not save: {{error}}',
     svg_saved: 'SVG saved: {{path}}',
   },
 

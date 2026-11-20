@@ -107,8 +107,8 @@ export const fr = {
     stock_below:      'En dessous',
     gcode_panel:      'G-code',
     btn_generate:     'Générer',
-    btn_save_session: 'Sauvegarder la session',
-    btn_load_session: 'Ouvrir une session',
+    btn_save_session: 'Enregistrer la session (Ctrl+S) — Maj+clic : Enregistrer sous… (Ctrl+Maj+S)',
+    btn_load_session: 'Ouvrir une session (Ctrl+O)',
     btn_export:       'Exporter G-code',
     btn_export_short: 'G-code',
     btn_svg:          'Exporter SVG',
@@ -139,7 +139,7 @@ export const fr = {
     tool_too_large:    '⚠ Fraise Ø{{td}}mm ≥ feuillure+jeu ({{ringW}}mm) — utiliser Ø < {{ringW}}mm',
     rabbet_wider_wall: '⚠ Largeur de feuillure ({{r}} mm) ≥ épaisseur de paroi ({{wt}} mm) : il ne reste rien de la paroi',
     rabbet_floor:      '⚠ La feuillure ne laisse que {{left}} mm au-dessus du fond du corps (minimum conseillé : {{min}} mm)',
-    lip_taller:        '⚠ Lèvre du couvercle ({{lip}} mm) plus haute que la feuillure ({{depth}} mm) : le couvercle ne se pose pas à plat (écart {{gap}} mm)',
+    lid_sunk:          '⚠ Le couvercle s’enfonce de {{sink}} mm sous le bord de la boîte : feuillure trop profonde ou couvercle trop bas (hauteur utile : {{usable}} mm)',
     lid_recess_deep:   '⚠ La feuillure du couvercle ({{depth}} mm) ne laisse que {{left}} mm de dessus (prévu : {{top}} mm)',
     bean_ratio:        '⚠ Ratio hors plage CNC recommandée (0.5 – 1.5)',
     radius_clamped: 'Rayon trop grand pour ces dimensions — limité à {{value}} mm (moitié de la plus petite cote).',
@@ -233,6 +233,8 @@ export const fr = {
   notif: {
     no_ops:    'Aucune opération sélectionnée',
     saved:     'Enregistré : {{path}}',
+    session_saved: 'Session enregistrée : {{path}}',
+    session_error: 'Enregistrement impossible : {{error}}',
     svg_saved: 'SVG enregistré : {{path}}',
   },
 
