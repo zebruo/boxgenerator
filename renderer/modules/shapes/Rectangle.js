@@ -16,9 +16,14 @@ export class Rectangle extends ShapeBase {
     ];
   }
 
-  updateParam(id, value) {
+  /**
+   * `live` : saisie en cours dans un champ (chaque chiffre tapé). Le couplage longueur / largeur ne
+   * s'applique qu'à la validation : en tapant « 170 », le « 1 » ne doit pas écraser la largeur.
+   */
+  updateParam(id, value, { live = false } = {}) {
     const v = Number.parseFloat(value);
     this.params[id] = v;
+    if (live) return;
     // Garantir length ≥ width pour éviter la bascule d'orientation
     if (id === 'length' && v < this.params.width) {
       this.params.width = v;

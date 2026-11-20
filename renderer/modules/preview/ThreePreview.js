@@ -262,7 +262,7 @@ export class ThreePreview {
     const innerPts = this._offsetPts(pts, -wt);  // offset négatif = vers l'intérieur (CCW)
     const holes    = cells ?? [innerPts];
     const wallShape = this._shape(pts);
-    wallShape.holes = holes.map(h => this._path(h));
+    wallShape.holes = this._holes(holes);
 
     const wallGeo = new THREE.ExtrudeGeometry(wallShape, { depth: H - bt, bevelEnabled: false });
     const wallMesh = this._mesh(wallGeo, this._mat(BOX_COLOR, { roughness: 0.75 }));
@@ -355,7 +355,7 @@ export class ThreePreview {
     // Feuillure intérieure (rs=0) : le G-code abaisse aussi les cloisons de rD ; feuillure
     // extérieure (rs=1) : les cloisons montent jusqu'en haut (bloc ajouté plus bas).
     const wallShape = this._shape(pts);
-    wallShape.holes = holes.map(h => this._path(h));
+    wallShape.holes = this._holes(holes);
     const wallMesh = this._mesh(
       new THREE.ExtrudeGeometry(wallShape, { depth: Math.max(0.1, H - rD - bFl), bevelEnabled: false }),
       this._mat(BOX_COLOR, { roughness: 0.7 })
@@ -363,7 +363,7 @@ export class ThreePreview {
     wallMesh.position.z = bFl;
     if (cells && rs === 1) {
       const partShape = this._shape(innerPts);
-      partShape.holes = cells.map(h => this._path(h));
+      partShape.holes = this._holes(cells);
       const partTop = this._mesh(
         new THREE.ExtrudeGeometry(partShape, { depth: rD, bevelEnabled: false }),
         this._mat(BOX_COLOR, { roughness: 0.7 })
@@ -426,7 +426,7 @@ export class ThreePreview {
     const ring = (outer, inner, z0, depth) => {
       if (depth <= 0.05) return;
       const s = this._shape(outer);
-      s.holes = [this._path(inner)];
+      s.holes = this._holes([inner]);
       add(new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false }), wood, z0);
     };
 
@@ -533,8 +533,13 @@ export class ThreePreview {
   _path(pts) {
     const p = new THREE.Path();
     pts.forEach((q, i) => i === 0 ? p.moveTo(q.x, q.y) : p.lineTo(q.x, q.y));
-    p.closePath();
+    if (p.curves.length) p.closePath();
     return p;
+  }
+
+  /** Trous d'une forme : les contours vides ou dégénérés (cavité qui disparaît) sont ignorés. */
+  _holes(list) {
+    return list.filter(h => h?.length >= 3).map(h => this._path(h));
   }
 
   /** Compartiments des cloisons (plateau, corps de la boîte à couvercle), ou null. */

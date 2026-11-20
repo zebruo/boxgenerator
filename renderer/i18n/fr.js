@@ -235,6 +235,7 @@ export const fr = {
     saved:     'Enregistré : {{path}}',
     session_saved: 'Session enregistrée : {{path}}',
     session_error: 'Enregistrement impossible : {{error}}',
+    preview_error: 'Aperçu impossible avec ces dimensions (cavité vide ?). Corrige les valeurs en orange.',
     svg_saved: 'SVG enregistré : {{path}}',
   },
 

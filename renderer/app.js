@@ -447,14 +447,18 @@ function renderShapeParams() {
         row.style.pointerEvents = 'none';
       }
       // Cloisons : disponibles pour toutes les formes (compartiments découpés par la cavité)
-      row.querySelector('input').addEventListener('input', e => {
+      const applyNumeric = e => {
         if (d.readonly) return;
         const val = Number.parseFloat(e.target.value);
         // Champ vidé ou saisie en cours (« 8. », « - ») : on attend une valeur valide au lieu
         // d'envoyer NaN aux formes, au G-code et à l'aperçu
         if (!Number.isFinite(val)) return;
+        // Saisie en cours : le « 1 » de « 170 » est sous le minimum, on attend les chiffres suivants
+        // (la validation du champ, évènement « change », applique la valeur telle quelle)
+        const live = e.type === 'input';
+        if (live && d.min !== undefined && val < d.min && state.shape.params.hasOwnProperty(d.id)) return;
         if (state.shape.params.hasOwnProperty(d.id)) {
-          state.shape.updateParam(d.id, val);
+          state.shape.updateParam(d.id, val, { live });
           // Synchronise les inputs liés (ex: longueur/largeur du rectangle)
           for (const [pid, pval] of Object.entries(state.shape.params)) {
             const inp = document.querySelector(`[data-param="${pid}"]`);
@@ -470,7 +474,10 @@ function renderShapeParams() {
         updatePartitionWarning();
         updateFingerJointWarnings();
         updatePreview();
-      });
+      };
+      const numericInput = row.querySelector('input');
+      numericInput.addEventListener('input', applyNumeric);
+      numericInput.addEventListener('change', applyNumeric);   // validation : couplages appliqués (ex. longueur ≥ largeur)
       if (d.note) {
         const noteEl = document.createElement('div');
         noteEl.className = 'param-note';
@@ -930,7 +937,13 @@ function updatePreview() {
     }
     if (state.shape) {
       const bb = state.shape.getBoundingBox();
-      threePreview.build(state.shape.getContourPoints(), bb, state.boxTypeKey, state.boxParams, getMachineParams());
+      try {
+        threePreview.build(state.shape.getContourPoints(), bb, state.boxTypeKey, state.boxParams, getMachineParams());
+      } catch (err) {
+        // Dimensions impossibles (cavité vide…) : l'aperçu ne se construit pas, mais l'état reste utilisable
+        console.error('Aperçu 3D :', err);
+        showNotif(t('notif.preview_error'));
+      }
     }
   } else if (state.view === 'tech') {
     if (!technicalView) {
@@ -940,7 +953,12 @@ function updatePreview() {
       technicalView.resize(area.clientWidth, area.clientHeight);
     }
     if (state.shape) {
-      technicalView.build(state.shape, state.boxTypeKey, state.boxParams, getMachineParams(), state.boxType);
+      try {
+        technicalView.build(state.shape, state.boxTypeKey, state.boxParams, getMachineParams(), state.boxType);
+      } catch (err) {
+        console.error('Vues 2D :', err);
+        showNotif(t('notif.preview_error'));
+      }
     }
   }
   updateInfoBar();
