@@ -48,6 +48,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     toolRef:      findTool(saved.toolRef) ? saved.toolRef : '',      // '' = saisie manuelle
     spindleFixed: saved.spindleFixed ?? false,                 // auto par défaut : n = vc ramenée à la broche max machine
     manual:       { feed: false, plunge: false, passes: false },
+    vc:           null,                // vitesse de coupe cible réglée dans la fenêtre « Détails du calcul » (sinon celle de la matière)
     machine: {                         // TTC450 Pro : 12 000 tr/min, 750 mm/min ($110/$111)
       spindle: saved.machine?.spindle > 0 ? saved.machine.spindle : 12000,
       feed:    saved.machine?.feed    > 0 ? saved.machine.feed    : 750,
@@ -68,7 +69,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     const diameter = num('param-tool-diameter');
     if (!(diameter > 0)) return null;
     const fiche = findTool(st.toolRef)?.cutting[st.matId];          // valeurs de la fiche fournisseur
-    const mat = { ...MATERIALS.find(m => m.id === st.matId), ...(fiche && { vc: fiche.vc }) };
+    const mat = { ...MATERIALS.find(m => m.id === st.matId), ...(fiche && { vc: fiche.vc }), ...(st.vc > 0 && { vc: st.vc }) };
     const spindle = num('param-spindle');
     const r = calculate({
       vc: mat.vc, diameter, flutes: st.flutes, matId: st.matId, manualFz: fiche?.fz,
@@ -207,6 +208,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
   sel.value = st.matId;
   sel.addEventListener('change', () => {
     st.matId = sel.value;
+    st.vc = null;
     st.manual = { feed: false, plunge: false, passes: false };   // nouvelle matière : tout se recalcule
     savePrefs(); update();
   });
@@ -224,6 +226,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
   fillToolList();
   toolSel.addEventListener('change', () => {
     st.toolRef = toolSel.value;
+    st.vc = null;
     st.manual = { feed: false, plunge: false, passes: false };   // nouvelle fraise : tout se recalcule
     syncTool(true); savePrefs(); update();
   });
@@ -285,7 +288,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     },
 
     /** Réglages choisis dans la fenêtre « Détails du calcul » : matière, dents, valeurs de coupe. */
-    applyDetails({ matId, flutes, diameter, vf, vfZ, ap, manual, toolRef, machine }) {
+    applyDetails({ matId, flutes, diameter, vf, vfZ, ap, manual, toolRef, machine, vcManual }) {
       // Limites machine réglées dans la fenêtre : reportées dans le panneau
       for (const [key, el] of Object.entries(mach))
         if (machine?.[key] > 0) { st.machine[key] = machine[key]; el.value = machine[key]; }
@@ -296,6 +299,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
       if (diameter > 0 && nearestKey(num('param-tool-diameter')) !== diameter) $('param-tool-diameter').value = diameter;
       // Seules les valeurs réglées à la main dans la fenêtre (vc, fz, profondeur) sont gardées ;
       // le reste se calcule avec la broche du panneau (la fenêtre suppose la broche calculée)
+      st.vc = vcManual > 0 ? vcManual : null;          // la vitesse de coupe cible saisie dans la fenêtre est gardée
       st.manual = { feed: !!manual?.feed, plunge: !!manual?.feed, passes: !!manual?.passes };
       if (st.manual.feed) { $(FIELDS.feed).value = vf; $(FIELDS.plunge).value = vfZ; }
       if (st.manual.passes) $(FIELDS.passes).value = ap;
@@ -303,7 +307,7 @@ export function initCuttingPanel({ t, lang, onChange }) {
     },
 
     /** Réglages à transmettre à la fenêtre « Détails du calcul ». */
-    modalOptions: () => ({ matId: st.matId, flutes: st.flutes, maxSpindle: st.machine.spindle, maxFeed: st.machine.feed, maxFeedZ: st.machine.feedZ, maxApK: st.machine.apK, tool: findTool(st.toolRef) }),
+    modalOptions: () => ({ matId: st.matId, flutes: st.flutes, maxSpindle: st.machine.spindle, maxFeed: st.machine.feed, maxFeedZ: st.machine.feedZ, maxApK: st.machine.apK, tool: findTool(st.toolRef), vc: st.vc }),
 
     /** Retraduit les libellés dynamiques (changement de langue). */
     refresh() {

@@ -347,7 +347,7 @@ export const fr = {
     w_heavy:         'Avance élevée : fz {{fz}} mm/dent, soit {{pct}} % du conseillé. Risque de flexion de la fraise.',
     i_feed_cap:      'Avance plafonnée à {{feed}} mm/min par les limites machine.',
     i_spindle_cap:   'Broche limitée à {{n}} tr/min par les limites machine.',
-    w_spindle:       'Broche très limitante ({{pct}} % de la vitesse de coupe optimale) : un diamètre plus grand ou une vitesse de coupe plus basse conviendrait mieux.',
+    w_spindle:       'Broche très limitante : la vitesse de coupe réelle n’atteint que {{pct}} % de la valeur conseillée. Un diamètre plus grand ou une broche plus rapide s’en rapprocherait.',
     w_depth:         'La profondeur par passe dépasse le diamètre de la fraise.',
     mat_200:         'Bois massif',
     mat_150:         'Bois exotique',

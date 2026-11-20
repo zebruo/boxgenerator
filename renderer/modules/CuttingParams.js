@@ -146,7 +146,7 @@ export function calculate(p) {
 
   const warnings = [];
   if (nLimited)      warnings.push({ level: 'info', text: `Broche plafonnée — n cible : ${nTheo.toFixed(0)} tr/min, effectif : ${n.toFixed(0)} tr/min` });
-  if (heavyCap)      warnings.push({ level: 'warn', text: `Broche très limitante (${vcPct}% de la vc optimale) — envisagez un diamètre plus grand ou une vc plus basse.` });
+  if (heavyCap)      warnings.push({ level: 'warn', text: `Broche très limitante : la vitesse de coupe réelle n'atteint que ${vcPct} % de la valeur conseillée. Un diamètre plus grand ou une broche plus rapide s'en rapprocherait.` });
   if (vfLimited)     warnings.push({ level: 'info', text: `Avance max machine atteinte — fz effectif : ${fzEff.toFixed(3)} mm/dent au lieu de ${fz} mm/dent` });
   if (doubleLimited) warnings.push({ level: 'warn', text: `Double limitation machine — broche ET avance plafonnées simultanément, conditions de coupe fortement dégradées.` });
   if (rubbingRisk)   warnings.push({ level: 'warn', text: `Risque de frottement : fz ${fzEff.toFixed(3)} mm/dent, soit ${Math.round(fzEff / fz * 100)} % du conseillé (${fz.toFixed(3)}). Le bois peut brûler.` });

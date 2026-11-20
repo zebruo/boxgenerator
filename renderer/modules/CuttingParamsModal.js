@@ -301,7 +301,8 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
 
     lastResult = { diameter: selDiam, matId: selMatId, flutes: selFlutes, toolRef: tool?.ref ?? '',
       machine: { spindle: maxSpindle, feed: maxFeed, feedZ: maxFeedZ, apK: maxApK },   // limites machine réglées dans la fenêtre
-      manual: { feed: vcManual > 0 || manualFz != null, passes: manualAp != null },   // valeurs réglées à la main
+      vcManual: vcManual > 0 ? vcManual : null,                                     // vitesse de coupe cible réglée à la main (gardée par le panneau)
+      manual: { feed: manualFz != null, passes: manualAp != null },                 // avance par dent et profondeur réglées à la main
       ...calculate({
       vc, diameter: selDiam, flutes: selFlutes,
       matId: selMatId, maxSpindle, maxFeed, maxFeedZ, maxApK,
@@ -399,6 +400,7 @@ export function showCuttingParamsModal(toolDiameter = 3.175, onApply, opts = {})
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
   // Initialisation badges + calcul automatique à l'ouverture
+  if (opts.vc > 0) { man.vc = true; modal.querySelector('#cp-vc-manual').value = opts.vc; }   // vitesse de coupe déjà réglée dans le panneau
   updateDefaultBadges();
   calcNow();
 }

@@ -347,7 +347,7 @@ export const en = {
     w_heavy:         'High feed: fz {{fz}} mm/tooth, {{pct}} % of the recommended value. The cutter may deflect.',
     i_feed_cap:      'Feed capped at {{feed}} mm/min by the machine limits.',
     i_spindle_cap:   'Spindle limited to {{n}} rpm by the machine limits.',
-    w_spindle:       'Spindle is very limiting ({{pct}} % of the optimal cutting speed): a larger diameter or a lower cutting speed would suit better.',
+    w_spindle:       'Spindle is very limiting: the actual cutting speed only reaches {{pct}} % of the recommended value. A larger diameter or a faster spindle would get closer.',
     w_depth:         'Depth per pass exceeds the cutter diameter.',
     mat_200:         'Solid wood',
     mat_150:         'Exotic wood',
