@@ -58,8 +58,8 @@ export const fr = {
 
   // ── Options select ──────────────────────────────────────────────────────
   option: {
-    rabbet_interior:       'Rainure intérieure — couvercle ajusté',
-    rabbet_exterior:       'Rainure extérieure — couvercle plein',
+    rabbet_interior:       'Feuillure intérieure — couvercle ajusté',
+    rabbet_exterior:       'Feuillure extérieure — couvercle plein',
     partition_vertical:    'Cloisons | perpendiculaires à X',
     partition_horizontal:  'Cloisons — perpendiculaires à Y',
   },

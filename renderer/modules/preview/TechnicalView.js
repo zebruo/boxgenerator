@@ -115,7 +115,7 @@ export class TechnicalView {
     const rD   = boxParams.rabbetDepth   ?? 4;
     const rim  = boxParams.stackRim      ?? wt;  // stackRim supprimé → fallback wallThickness
     const rimH = boxParams.rimHeight      ?? 0;   // hauteur du guide d'empilement
-    const rs   = boxParams.rabbetSide    ?? 0;  // 0 = rainure intérieure, 1 = rainure extérieure
+    const rs   = boxParams.rabbetSide    ?? 0;  // 0 = feuillure intérieure, 1 = feuillure extérieure
     const jeu  = boxParams.clearance     ?? 0; // jeu d'assemblage
 
     const qW = Math.floor(CW / 2);

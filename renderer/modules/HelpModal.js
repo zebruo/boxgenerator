@@ -276,14 +276,14 @@ export function showHelpModal(machine = {}) {
           <h4>Boîte couvercle (feuillure)</h4>
           <p>Corps + couvercle emboîtables par double feuillure. Deux pièces usinées depuis le dessus, chacune dans son propre brut.</p>
           <dl class="help-dl">
-            <dt>Rainure intérieure — couvercle ajusté</dt>
-            <dd>La feuillure est creusée à l'<strong>intérieur</strong> du bord supérieur du corps. Le couvercle est légèrement plus petit que le corps — sa lèvre s'emboîte dans la rainure. La feuillure corps couvre toute la zone intérieure : la cavité est usinée en repartant du fond de feuillure déjà usiné.</dd>
-            <dt>Rainure extérieure — couvercle plein</dt>
+            <dt>Feuillure intérieure — couvercle ajusté</dt>
+            <dd>La feuillure est creusée à l'<strong>intérieur</strong> du bord supérieur du corps. Le couvercle est légèrement plus petit que le corps — sa lèvre s'emboîte dans la feuillure. La feuillure corps couvre toute la zone intérieure : la cavité est usinée en repartant du fond de feuillure déjà usiné.</dd>
+            <dt>Feuillure extérieure — couvercle plein</dt>
             <dd>La feuillure est creusée sous forme d'<strong>anneau périphérique</strong> en haut du corps. Le couvercle a les mêmes dimensions extérieures que le corps et vient coiffer le sommet. La feuillure couvercle est une poche centrale qui forme la lèvre. La cavité corps repart de Z=0 (l'anneau n'a pas pré-usiné l'intérieur).</dd>
-            <dt>Contrainte fraise / feuillure (rainure extérieure uniquement)</dt>
+            <dt>Contrainte fraise / feuillure (feuillure extérieure uniquement)</dt>
             <dd>L'anneau périphérique est usiné par passes concentriques. Le <strong>diamètre fraise doit être strictement inférieur à (largeur feuillure + jeu)</strong> — un warning s'affiche sur le champ si ce n'est pas le cas. Pour une feuillure de 3 mm + jeu 0,3 mm, utiliser une fraise &lt; 3,3 mm (ex. Ø 3,175 mm).</dd>
-            <dt>Cloisons</dt><dd>Divise la cavité du <strong>corps</strong> en N+1 compartiments. Épaisseur égale à la largeur de la feuillure (comme la lèvre), sans dépasser celle des parois. Direction configurable (perpendiculaires à X ou Y). Le couvercle reste ouvert (cavité non cloisonnée). Disponible uniquement pour la forme Rectangle.</dd>
-            <dt>Jeu</dt><dd>Décalage entre lèvre et rainure pour un assemblage sans forcer. Valeur typique : 0,2 – 0,5 mm selon la précision machine.</dd>
+            <dt>Cloisons</dt><dd>Divise la cavité du <strong>corps</strong> en N+1 compartiments. Les cloisons prolongent le profil de la paroi vu depuis la cavité : feuillure <em>intérieure</em>, leur épaisseur est la largeur de la feuillure ; feuillure <em>extérieure</em>, c'est ce qui reste de la paroi (paroi − feuillure). Minimum 3 mm, sans dépasser l'épaisseur des parois. Direction configurable (perpendiculaires à X ou Y). Le couvercle reste ouvert (cavité non cloisonnée). Disponible uniquement pour la forme Rectangle.</dd>
+            <dt>Jeu</dt><dd>Décalage entre lèvre et feuillure pour un assemblage sans forcer. Valeur typique : 0,2 – 0,5 mm selon la précision machine.</dd>
             <dt>Layout d'export</dt>
             <dd>Corps et couvercle sont placés côte à côte dans le G-code. Le sens est choisi automatiquement pour <strong>minimiser le côté le plus long du brut</strong> : horizontal si W ≤ D, vertical si W &gt; D. Exemple : 140×65 mm → layout vertical, brut 140×150 mm au lieu de 300×65 mm.</dd>
             <dt>Hauteurs différentes</dt>

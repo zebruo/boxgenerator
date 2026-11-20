@@ -351,7 +351,7 @@ export class ThreePreview {
       this._mat(BOX_COLOR, { roughness: 0.85 })
     );
 
-    // Parois (et cloisons) : de bFl à H-rD (s'arrête avant la rainure pour éviter le Z-fighting).
+    // Parois (et cloisons) : de bFl à H-rD (s'arrête avant la feuillure pour éviter le Z-fighting).
     // Feuillure intérieure (rs=0) : le G-code abaisse aussi les cloisons de rD ; feuillure
     // extérieure (rs=1) : les cloisons montent jusqu'en haut (bloc ajouté plus bas).
     const wallShape = this._shape(pts);
@@ -381,13 +381,13 @@ export class ThreePreview {
     }
 
     // Feuillure corps — élargie par le jeu mécanique
-    // Cas 0 : rainure intérieure — anneau entre (wt-r-jeu) et wt, largeur r+jeu, profondeur rD
-    // Cas 1 : rainure extérieure — anneau entre 0 et r+jeu (bord ext), largeur r+jeu, profondeur rD
+    // Cas 0 : feuillure intérieure — anneau entre (wt-r-jeu) et wt, largeur r+jeu, profondeur rD
+    // Cas 1 : feuillure extérieure — anneau entre 0 et r+jeu (bord ext), largeur r+jeu, profondeur rD
     // Lèvre et logement : mêmes coins arrondis que le G-code (rayon minimum de la lèvre)
     const grooveOuter = rs === 0 ? lipSeat(pts, wt - r - jeu, td, jeu) : pts;
     const grooveInner = rs === 0 ? innerPts                            : lipContour(pts, r + jeu, td);
 
-    // Partie solide du mur au niveau de la feuillure (pas creusée par la rainure)
+    // Partie solide du mur au niveau de la feuillure (pas creusée par la feuillure)
     // rs=0 : anneau extérieur (pts → grooveOuter) ; rs=1 : anneau intérieur (grooveInner → innerPts)
     const topWallOuter = rs === 0 ? pts        : grooveInner;
     const topWallInner = rs === 0 ? grooveOuter : innerPts;
@@ -401,7 +401,7 @@ export class ThreePreview {
       this._mat(BOX_COLOR, { roughness: 0.7 })
     );
     topWallMesh.position.z = H - rD;
-    // La rainure de feuillure (grooveOuter → grooveInner) reste vide : vraie marche, comme usinée
+    // Le creux de la feuillure (grooveOuter → grooveInner) reste vide : vraie marche, comme usinée
 
     // ── COUVERCLE — disposé comme à l'usinage (G-code, simulation) ──────────
     // À côté du corps (même règle que LidBox : à droite, ou au-dessus si la forme est

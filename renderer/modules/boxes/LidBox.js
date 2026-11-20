@@ -15,13 +15,21 @@ export function lipContour(bodyPts, d, toolDiameter) {
   return roundCorners(insetPolygon(bodyPts, d), lipRadius(toolDiameter));
 }
 
+/** Épaisseur minimale d'une cloison (mm) : en dessous, trop fragile à fraiser. */
+export const MIN_PARTITION_THICKNESS = 3;
+
 /**
- * Épaisseur des cloisons de la boîte à couvercle : la largeur de la feuillure (comme la lèvre,
- * plutôt que la paroi pleine), sans dépasser l'épaisseur des parois.
+ * Épaisseur des cloisons de la boîte à couvercle : elles prolongent le profil de la paroi vu depuis
+ * la cavité. Feuillure intérieure : la largeur de la feuillure. Feuillure extérieure : ce qui reste
+ * de la paroi à pleine hauteur (paroi − feuillure). Au moins MIN_PARTITION_THICKNESS, sans dépasser
+ * l'épaisseur des parois.
  */
 export function lidPartitionThickness(params) {
   const wt = params.wallThickness ?? 6, rb = params.rabbet ?? 3;
-  return rb > 0 ? Math.min(rb, wt) : wt;
+  if (!(rb > 0)) return wt;
+  const exterior = Number(params.rabbetSide) === 1;
+  const raw = exterior ? wt - rb : Math.min(rb, wt);
+  return Math.min(Math.max(raw, MIN_PARTITION_THICKNESS), wt);
 }
 
 /** Logement de la lèvre (lèvre + jeu) : même rayon minimum, plus le jeu. */
@@ -32,9 +40,9 @@ export function lipSeat(bodyPts, d, toolDiameter, clearance) {
 /**
  * Boîte avec couvercle à double feuillure.
  *
- * Corps  : rainure sur le bord intérieur haut  (largeur=rabbet, profondeur=rabbetDepth)
+ * Corps  : feuillure sur le bord intérieur haut (largeur=rabbet, profondeur=rabbetDepth)
  * Couvercle : poche centrale laissant une lèvre extérieure (largeur=rabbet, hauteur=rabbetDepth)
- * → La lèvre du couvercle s'enfile dans la rainure du corps.
+ * → La lèvre du couvercle s'enfile dans la feuillure du corps.
  */
 export class LidBox {
   static label = 'box.lid_box';
@@ -82,7 +90,7 @@ export class LidBox {
     const bFl  = params.bottomThickness    ?? bt;  // épaisseur fond corps
     const bFll = params.lidBottomThickness ?? bt;  // épaisseur fond couvercle
 
-    const sideLabel = rabbetSide === 0 ? 'rainure intérieure' : 'rainure extérieure';
+    const sideLabel = rabbetSide === 0 ? 'feuillure intérieure' : 'feuillure extérieure';
     gen.header(
       `Boîte couvercle — ${W.toFixed(0)}×${D.toFixed(0)}mm ` +
       `corps ${height}mm + couvercle ${lidHeight}mm`
@@ -237,7 +245,7 @@ export class LidBox {
     }
 
     if (rabbetSide === 0) {
-      // Couvercle réduit : inset nominal (wt-r), lèvre = r s'emboîte dans rainure r+jeu
+      // Couvercle réduit : inset nominal (wt-r), lèvre = r s'emboîte dans feuillure r+jeu
       const inset0 = wallThickness - rabbet;
       gen.comment(`Couvercle réduit: inset ${inset0.toFixed(1)}mm/côté (lèvre nominale ${rabbet}mm)`);
       // Lèvre du couvercle : coins au rayon minimum (s'emboîte dans le logement du corps)
@@ -254,8 +262,8 @@ export class LidBox {
       gen.cutOutline(lidPts, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts,
         arcDef && { ...arcDef, r: arcDef.r - inset0 });
     } else {
-      // Couvercle plein nominal : taille = corps, lèvre r s'emboîte dans rainure r+jeu
-      gen.comment(`Couvercle plein: taille nominale (lèvre ${rabbet}mm, rainure ${rabbet}+${clearance}mm)`);
+      // Couvercle plein nominal : taille = corps, lèvre r s'emboîte dans feuillure r+jeu
+      gen.comment(`Couvercle plein: taille nominale (lèvre ${rabbet}mm, feuillure ${rabbet}+${clearance}mm)`);
       const lidPts1 = mirrorPts(bodyPts);
       // 1. Feuillure (peu profond)
       if (W > 2 * rabbet && D > 2 * rabbet) {
