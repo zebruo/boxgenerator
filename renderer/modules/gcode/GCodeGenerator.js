@@ -1,5 +1,6 @@
 import { compactGCode } from './GCodeCompactor.js';
 import { insetPolygon, offsetPolygons } from './Offset.js';
+import { LIMITS } from '../Thresholds.js';
 
 /**
  * Générateur G-code CNC générique.
@@ -121,8 +122,8 @@ function completeTabs(centers, count, perimeter, sharpDists, width) {
 const SIDE_SIGN = { outside: -1, inside: 1 };
 const sideSign = side => SIDE_SIGN[side] ?? 0;
 
-/** Pente maximale de l'entrée en rampe des poches (10°) : tangente. */
-const POCKET_RAMP_TAN = Math.tan(10 * Math.PI / 180);
+/** Pente maximale de l'entrée en rampe des poches (LIMITS.pocketRampAngle, 10°) : tangente. */
+const POCKET_RAMP_TAN = Math.tan(LIMITS.pocketRampAngle * Math.PI / 180);
 
 /** Suffixe de commentaire « , finition +0.2mm » (vide sans surépaisseur). */
 const finishLabel = fa => (fa > 0 ? `, finition +${fa}mm` : '');
@@ -196,7 +197,7 @@ export class GCodeGenerator {
     const toolDia = this.machine.toolDiameter;
     const effDia  = holeDia ?? toolDia;
 
-    const useHelix = holeDia && (holeDia - toolDia) > 0.5; // hélice seulement si écart > 0.5mm
+    const useHelix = holeDia && (holeDia - toolDia) > LIMITS.helixDrillMinGap; // hélice seulement si l'écart le permet
     const strategy = useHelix ? 'hélice' : 'G83 peck';
     this.comment(`─── ${label} (${strategy}, Ø${(holeDia ?? this.machine.toolDiameter).toFixed(2)}mm, prof. ${depth}mm) ───`);
     this.rapidZ(this.machine.safeZ);
@@ -263,7 +264,7 @@ export class GCodeGenerator {
   pocketEnter(path, z, fromZ, closed = true) {
     const sub = this.pocketRamp && fromZ > z + 1e-6 ? this._pathStart(path, closed, this.pocketRampLen) : null;
     const len = sub ? this._polyLen(sub) : 0;
-    if (len < 0.5) { this.plungeTo(z); return; }
+    if (len < LIMITS.pocketRampMinLength) { this.plungeTo(z); return; }
     const dz    = fromZ - z;
     const legs  = 2 * Math.max(1, Math.ceil(dz / (2 * len * POCKET_RAMP_TAN)));
     const total = legs * len;
@@ -570,7 +571,7 @@ export class GCodeGenerator {
   ringInsets(points, dFrom, dTo) {
     if (dTo <= dFrom + 1e-6) return [dTo];
     const td = this.machine.toolDiameter;
-    let step = 0.6 * td;
+    let step = LIMITS.ringStepTools * td;
     const n = points.length;
     for (let i = 0; i < n; i++) {
       const a = points[(i - 1 + n) % n], b = points[i], c = points[(i + 1) % n];

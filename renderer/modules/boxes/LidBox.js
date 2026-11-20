@@ -167,7 +167,7 @@ export class LidBox {
           .sort((p, q) => Math.abs(signedArea(q)) - Math.abs(signedArea(p)))[0] ?? [];
         const gap = ring => (ring.length < 3 ? 0 : Math.max(...outer.map(v => distToPolygon(v, ring))));
         const es = ds.slice(1).map(d => ringW - d);            // extérieur → lèvre
-        const maxStep = 0.6 * td;
+        const maxStep = LIMITS.ringStepTools * td;
         let eOut = es[0], ringOut = clip(eOut);
         const extra = [];
         for (let k = 0; k < 20 && ringOut.length > 2 && gap(ringOut) > maxStep; k++) {

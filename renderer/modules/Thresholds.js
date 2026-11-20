@@ -10,6 +10,12 @@ export const LIMITS = {
   partitionThicknessMin: 3,   // mm : épaisseur minimale d'une cloison de boîte à couvercle (sans dépasser la paroi)
   lipRadiusMargin: 0.4,       // mm : rayon de coin de la lèvre du couvercle = rayon de la fraise + cette marge
   partitionCellMinTools: 3,   // largeur minimale d'un compartiment, en diamètres de fraise (sinon pas de cloisons)
+
+  // ── Usinage ──
+  helixDrillMinGap: 0.5,      // mm : perçage en hélice si Ø trou − Ø fraise dépasse cette valeur, sinon perçage par passes
+  ringStepTools: 0.6,         // pas maximal des anneaux qui vident une bande (feuillure extérieure, rebord empilable), en diamètres de fraise
+  pocketRampAngle: 10,        // ° : pente maximale de l'entrée en rampe des poches
+  pocketRampMinLength: 0.5,   // mm : rampe plus courte que cela → plongée directe
 };
 
 export const WARN = {
