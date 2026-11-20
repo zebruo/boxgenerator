@@ -4,6 +4,7 @@ import { ThreePreview }   from './modules/preview/ThreePreview.js';
 import { TechnicalView }  from './modules/preview/TechnicalView.js';
 import { buildFabricationSVG } from './modules/export/SvgExport.js';
 import { stockHeaderLines, autoTabFractions } from './modules/gcode/GCodeGenerator.js';
+import { contourLengths } from './modules/gcode/TabPositions.js';
 import { partitionSizes } from './modules/gcode/PartitionedPocket.js';
 import { Rectangle }      from './modules/shapes/Rectangle.js';
 import { Circle }         from './modules/shapes/Circle.js';
@@ -164,7 +165,7 @@ function updateToolbarSummaries() {
     const o = state.exportOpts;
     const n = manualTabsActive() ? o.tabsManual.length : o.tabCount;
     ts.textContent = o.tabsOn
-      ? `${n} × ${String(o.tabWidth).replace('.', ',')} mm${manualTabsActive() ? ' · ' + t('ui.tabs_hand_short') : ''}`
+      ? `${n} × ${String(o.tabWidth).replace('.', ',')} mm`
       : t('ui.tabs_none');
   }
 }
@@ -186,42 +187,76 @@ function syncTabsUI() {
   document.getElementById('tabs-place-status').textContent = fj ? t('ui.tabs_status_fj')
     : manual ? t('ui.tabs_status_manual', { n: o.tabsManual.length }) : t('ui.tabs_status_auto');
   document.getElementById('tabs-place-hand').disabled = fj || !o.tabsOn;
-  document.getElementById('tabs-place-auto').disabled = !manual;
+  // Pastille comme dans le panneau de gauche : « auto » grisé, « ↺ auto » quand les tabs sont placés à la main (clic : retour à l'auto)
+  const pill = document.getElementById('tabs-place-auto');
+  pill.classList.toggle('manual', manual);
+  pill.textContent = t(manual ? 'cut.reset' : 'cut.auto');
+  pill.title = t(manual ? 'ui.tabs_auto_tip_manual' : 'ui.tabs_auto_tip_auto');
 }
 
 // ── Placement des tabs à la main (vue 2D) ─────────────────────────────────────
 let tabEditBar = null;
 
-function startTabEdit() {
-  if (!state.shape || state.boxTypeKey === 'finger-joint') return;
-  closeToolbarPops();
-  const o = state.exportOpts;
-  // Point de départ : les tabs déjà placés, sinon la répartition automatique actuelle
-  if (!manualTabsActive()) {
-    const td = getMachineParams().toolDiameter ?? 3.175;
-    saveExportOpts({ ...o, tabsOn: true, tabsManual: autoTabFractions(state.shape.getContourPoints(), o.tabCount, o.tabWidth + td) });
-  }
-  if (state.view !== 'tech') document.querySelector('.view-btn[data-view="tech"]').click();
-  if (!technicalView) return;
-  technicalView.setTabEdit({
-    fractions: state.exportOpts.tabsManual,
+/** Réglages du mode d'édition de la vue 2D pour des tabs de départ donnés. */
+function tabEditConfig(fractions) {
+  return {
+    fractions,
     tabWidth: state.exportOpts.tabWidth,
-    onChange: fractions => {
-      saveExportOpts({ ...state.exportOpts, tabsManual: fractions });
+    onChange: fr => {
+      // Positions identiques à la répartition automatique : on reste en « auto » (pas de flèche ↺)
+      saveExportOpts({ ...state.exportOpts, tabsManual: sameAsAuto(fr) ? null : fr });
       syncTabsUI();
       updateToolbarSummaries();
       updateTabEditBar();
     },
-  });
+  };
+}
+
+/** Pastille « ↺ auto » du bandeau : les tabs reprennent leur répartition automatique, on reste dans la vue de placement. */
+function resetTabsInEdit() {
+  if (!manualTabsActive()) return;
+  saveExportOpts({ ...state.exportOpts, tabsManual: null });
+  technicalView?.setTabEdit(tabEditConfig(autoTabsFor(state.exportOpts.tabCount)));
+  syncTabsUI();
+  updateToolbarSummaries();
+  updateTabEditBar();
+}
+
+/** Répartition automatique de `n` tabs sur le contour de la forme (fractions du périmètre). */
+function autoTabsFor(n) {
+  const o = state.exportOpts, td = getMachineParams().toolDiameter ?? 3.175;
+  return autoTabFractions(state.shape.getContourPoints(), n, o.tabWidth + td);
+}
+
+/** Les positions données sont celles de la répartition automatique (à 0,5 mm près sur le contour) ? */
+function sameAsAuto(fractions) {
+  const auto = autoTabsFor(fractions.length).sort((a, b) => a - b);
+  const mine = [...fractions].sort((a, b) => a - b);
+  const { P } = contourLengths(state.shape.getContourPoints());
+  const tol = 0.5 / (P || 1);
+  return auto.length === mine.length && auto.every((f, i) => Math.abs(f - mine[i]) < tol);
+}
+
+function startTabEdit() {
+  if (!state.shape || state.boxTypeKey === 'finger-joint') return;
+  closeToolbarPops();
+  const o = state.exportOpts;
+  // Point de départ : les tabs déjà placés, sinon la répartition automatique actuelle (rien n'est
+  // enregistré tant que rien n'est déplacé : la pastille reste sur « auto »)
+  const start = manualTabsActive() ? o.tabsManual : autoTabsFor(o.tabCount);
+  if (!o.tabsOn) saveExportOpts({ ...o, tabsOn: true });
+  if (state.view !== 'tech') document.querySelector('.view-btn[data-view="tech"]').click();
+  if (!technicalView) return;
+  technicalView.setTabEdit(tabEditConfig(start));
   if (!tabEditBar) {
     tabEditBar = document.createElement('div');
     tabEditBar.className = 'tab-edit-bar';
     tabEditBar.innerHTML = '<span id="tab-edit-count"></span>'
-      + '<button class="btn-ghost" id="tab-edit-auto"></button>'
+      + '<button type="button" class="cut-state" id="tab-edit-auto"></button>'
       + '<button class="btn btn-secondary" id="tab-edit-done"></button>';
     document.querySelector('.preview-area').appendChild(tabEditBar);
-    tabEditBar.querySelector('#tab-edit-auto').addEventListener('click', resetTabsAuto);
-    tabEditBar.querySelector('#tab-edit-done').addEventListener('click', stopTabEdit);
+    tabEditBar.querySelector('#tab-edit-auto').addEventListener('click', resetTabsInEdit);
+    tabEditBar.querySelector('#tab-edit-done').addEventListener('click', finishTabEdit);
   }
   tabEditBar.hidden = false;
   updateTabEditBar();
@@ -231,10 +266,19 @@ function startTabEdit() {
 
 function updateTabEditBar() {
   if (!tabEditBar) return;
-  const n = manualTabsActive() ? state.exportOpts.tabsManual.length : 0;
-  tabEditBar.querySelector('#tab-edit-count').textContent = t('ui.tabs_status_manual', { n });
-  tabEditBar.querySelector('#tab-edit-auto').textContent = t('ui.tabs_place_auto');
+  const manual = manualTabsActive();
+  const n = technicalView?.tabEdit?.fractions.length ?? 0;
+  tabEditBar.querySelector('#tab-edit-count').textContent = t(manual ? 'ui.tabs_status_manual' : 'ui.tabs_edit_auto', { n });
+  const pill = tabEditBar.querySelector('#tab-edit-auto');
+  pill.classList.toggle('manual', manual);
+  pill.textContent = t(manual ? 'cut.reset' : 'cut.auto');
+  pill.title = t(manual ? 'ui.tabs_auto_tip_manual' : 'ui.tabs_auto_tip_auto');
   tabEditBar.querySelector('#tab-edit-done').textContent = t('ui.tabs_edit_done');
+}
+
+/** « Terminer » / Échap : sortie du placement et retour à la vue 3D (le bouton de vue arrête l'édition). */
+function finishTabEdit() {
+  document.querySelector('.view-btn[data-view="3d"]').click();
 }
 
 function stopTabEdit() {
@@ -242,8 +286,9 @@ function stopTabEdit() {
   if (tabEditBar) tabEditBar.hidden = true;
 }
 
-/** Répartition automatique : les tabs placés à la main sont oubliés. */
+/** Répartition automatique : les tabs placés à la main sont oubliés (sans effet s'ils sont déjà automatiques). */
 function resetTabsAuto() {
+  if (!manualTabsActive()) return;
   saveExportOpts({ ...state.exportOpts, tabsManual: null });
   stopTabEdit();
   syncTabsUI();
@@ -272,7 +317,7 @@ function bindTabsUI() {
   }
   document.getElementById('tabs-place-hand').addEventListener('click', startTabEdit);
   document.getElementById('tabs-place-auto').addEventListener('click', resetTabsAuto);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && technicalView?.tabEdit) stopTabEdit(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && technicalView?.tabEdit) finishTabEdit(); });
   syncTabsUI();
 }
 

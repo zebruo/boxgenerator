@@ -326,6 +326,12 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .pop-check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
 #tabs-fields.disabled { opacity: .4; pointer-events: none; }
 .pop-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.tabs-status-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.tabs-status-btns { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+/* Crayon « placer à la main » : même pastille que « auto » */
+#tabs-place-hand:disabled { opacity: .4; cursor: default; }
+#tabs-place-hand:disabled:hover { background: none; }
+.tb-pop .cut-state, .tab-edit-bar .cut-state { font-size: 11px; height: 17px; }
 .pop-actions button:disabled { opacity: .4; cursor: default; }
 /* Bandeau du placement des tabs à la main (vue 2D) */
 .tab-edit-bar {

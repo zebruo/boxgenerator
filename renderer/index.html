@@ -333,10 +333,12 @@
             </div>
           </div>
           <div class="pop-row">
-            <span class="pop-cap" id="tabs-place-status"></span>
-            <div class="pop-actions">
-              <button class="btn-ghost" id="tabs-place-hand" data-i18n="ui.tabs_place_hand">Placer à la main dans la vue 2D…</button>
-              <button class="btn-ghost" id="tabs-place-auto" data-i18n="ui.tabs_place_auto">Répartition auto</button>
+            <div class="tabs-status-row">
+              <span class="pop-cap" id="tabs-place-status"></span>
+              <span class="tabs-status-btns">
+                <button type="button" class="cut-state" id="tabs-place-auto">auto</button>
+                <button type="button" class="cut-state togl" id="tabs-place-hand" data-i18n-title="ui.tabs_place_hand" data-i18n-aria="ui.tabs_place_hand" title="Placer à la main dans la vue 2D…" aria-label="Placer à la main dans la vue 2D…"><i class="fa-solid fa-pencil" aria-hidden="true"></i></button>
+              </span>
             </div>
           </div>
           <p class="pop-cap" data-i18n="ui.tabs_note">Enregistrés avec la session. Plus de tabs que de côtés droits : ils sont répartis par côté.</p>
