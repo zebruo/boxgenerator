@@ -311,15 +311,16 @@ function bindEvents() {
     openSimulation().catch(err => { console.error(err); showNotif(`Simulation : ${err.message}`); });
   });
 
-  // Session save / load
-  document.getElementById('btn-save-session').addEventListener('click', e => saveSession(e.shiftKey));   // Maj+clic : Enregistrer sous
-  document.getElementById('btn-load-session').addEventListener('click', loadSession);
+  // Session save / load (une erreur inattendue est affichée au lieu d'être perdue)
+  const sessionError = err => { console.error(err); showNotif(t('notif.session_failed', { error: err.message })); };
+  document.getElementById('btn-save-session').addEventListener('click', e => saveSession(e.shiftKey).catch(sessionError));   // Maj+clic : Enregistrer sous
+  document.getElementById('btn-load-session').addEventListener('click', () => loadSession().catch(sessionError));
   // Raccourcis : Ctrl+S enregistrer, Ctrl+Maj+S enregistrer sous, Ctrl+O ouvrir
   document.addEventListener('keydown', e => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     const k = e.key.toLowerCase();
-    if (k === 's') { e.preventDefault(); saveSession(e.shiftKey); }
-    else if (k === 'o' && !e.shiftKey) { e.preventDefault(); loadSession(); }
+    if (k === 's') { e.preventDefault(); saveSession(e.shiftKey).catch(sessionError); }
+    else if (k === 'o' && !e.shiftKey) { e.preventDefault(); loadSession().catch(sessionError); }
   });
 
   // Export G-code

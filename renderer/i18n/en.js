@@ -245,6 +245,7 @@ export const en = {
     saved:     'Saved: {{path}}',
     session_saved: 'Session saved: {{path}}',
     session_error: 'Could not save: {{error}}',
+    session_failed: 'Session: {{error}}',
     preview_error: 'Preview impossible with these dimensions (empty cavity?). Fix the orange values.',
     svg_saved: 'SVG saved: {{path}}',
   },
