@@ -3,7 +3,7 @@ import { t, setLang, currentLang } from './modules/i18n.js';
 import { ThreePreview }   from './modules/preview/ThreePreview.js';
 import { TechnicalView }  from './modules/preview/TechnicalView.js';
 import { buildFabricationSVG } from './modules/export/SvgExport.js';
-import { stockHeaderLines } from './modules/gcode/GCodeGenerator.js';
+import { stockHeaderLines, autoTabFractions } from './modules/gcode/GCodeGenerator.js';
 import { partitionSizes } from './modules/gcode/PartitionedPocket.js';
 import { Rectangle }      from './modules/shapes/Rectangle.js';
 import { Circle }         from './modules/shapes/Circle.js';
@@ -162,7 +162,10 @@ function updateToolbarSummaries() {
   const ts = document.getElementById('tabs-summary');
   if (ts) {
     const o = state.exportOpts;
-    ts.textContent = o.tabsOn ? `${o.tabCount} × ${String(o.tabWidth).replace('.', ',')} mm` : t('ui.tabs_none');
+    const n = manualTabsActive() ? o.tabsManual.length : o.tabCount;
+    ts.textContent = o.tabsOn
+      ? `${n} × ${String(o.tabWidth).replace('.', ',')} mm${manualTabsActive() ? ' · ' + t('ui.tabs_hand_short') : ''}`
+      : t('ui.tabs_none');
   }
 }
 
@@ -176,6 +179,76 @@ function syncTabsUI() {
   document.getElementById('tab-width').value  = o.tabWidth;
   document.getElementById('tab-height').value = o.tabHeight;
   document.getElementById('tabs-fields').classList.toggle('disabled', !o.tabsOn);
+  // Placement à la main : le nombre vient des tabs placés ; boîte à encoches : automatique seulement
+  const manual = manualTabsActive(), fj = state.boxTypeKey === 'finger-joint';
+  document.getElementById('tab-count').disabled = manual;
+  if (manual) document.getElementById('tab-count').value = o.tabsManual.length;
+  document.getElementById('tabs-place-status').textContent = fj ? t('ui.tabs_status_fj')
+    : manual ? t('ui.tabs_status_manual', { n: o.tabsManual.length }) : t('ui.tabs_status_auto');
+  document.getElementById('tabs-place-hand').disabled = fj || !o.tabsOn;
+  document.getElementById('tabs-place-auto').disabled = !manual;
+}
+
+// ── Placement des tabs à la main (vue 2D) ─────────────────────────────────────
+let tabEditBar = null;
+
+function startTabEdit() {
+  if (!state.shape || state.boxTypeKey === 'finger-joint') return;
+  closeToolbarPops();
+  const o = state.exportOpts;
+  // Point de départ : les tabs déjà placés, sinon la répartition automatique actuelle
+  if (!manualTabsActive()) {
+    const td = getMachineParams().toolDiameter ?? 3.175;
+    saveExportOpts({ ...o, tabsOn: true, tabsManual: autoTabFractions(state.shape.getContourPoints(), o.tabCount, o.tabWidth + td) });
+  }
+  if (state.view !== 'tech') document.querySelector('.view-btn[data-view="tech"]').click();
+  if (!technicalView) return;
+  technicalView.setTabEdit({
+    fractions: state.exportOpts.tabsManual,
+    tabWidth: state.exportOpts.tabWidth,
+    onChange: fractions => {
+      saveExportOpts({ ...state.exportOpts, tabsManual: fractions });
+      syncTabsUI();
+      updateToolbarSummaries();
+      updateTabEditBar();
+    },
+  });
+  if (!tabEditBar) {
+    tabEditBar = document.createElement('div');
+    tabEditBar.className = 'tab-edit-bar';
+    tabEditBar.innerHTML = '<span id="tab-edit-count"></span>'
+      + '<button class="btn-ghost" id="tab-edit-auto"></button>'
+      + '<button class="btn btn-secondary" id="tab-edit-done"></button>';
+    document.querySelector('.preview-area').appendChild(tabEditBar);
+    tabEditBar.querySelector('#tab-edit-auto').addEventListener('click', resetTabsAuto);
+    tabEditBar.querySelector('#tab-edit-done').addEventListener('click', stopTabEdit);
+  }
+  tabEditBar.hidden = false;
+  updateTabEditBar();
+  syncTabsUI();
+  updateToolbarSummaries();
+}
+
+function updateTabEditBar() {
+  if (!tabEditBar) return;
+  const n = manualTabsActive() ? state.exportOpts.tabsManual.length : 0;
+  tabEditBar.querySelector('#tab-edit-count').textContent = t('ui.tabs_status_manual', { n });
+  tabEditBar.querySelector('#tab-edit-auto').textContent = t('ui.tabs_place_auto');
+  tabEditBar.querySelector('#tab-edit-done').textContent = t('ui.tabs_edit_done');
+}
+
+function stopTabEdit() {
+  if (technicalView?.tabEdit) technicalView.setTabEdit(null);
+  if (tabEditBar) tabEditBar.hidden = true;
+}
+
+/** Répartition automatique : les tabs placés à la main sont oubliés. */
+function resetTabsAuto() {
+  saveExportOpts({ ...state.exportOpts, tabsManual: null });
+  stopTabEdit();
+  syncTabsUI();
+  updateToolbarSummaries();
+  updatePreview();
 }
 
 /** Tabs réglés dans la fenêtre « Tabs » : mémorisés (session et réglages par défaut). */
@@ -197,6 +270,9 @@ function bindTabsUI() {
     document.getElementById(id).addEventListener('input', read);
     document.getElementById(id).addEventListener('change', read);
   }
+  document.getElementById('tabs-place-hand').addEventListener('click', startTabEdit);
+  document.getElementById('tabs-place-auto').addEventListener('click', resetTabsAuto);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && technicalView?.tabEdit) stopTabEdit(); });
   syncTabsUI();
 }
 
@@ -249,6 +325,7 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       setPressed('.view-btn', btn);
       state.view = btn.dataset.view;
+      if (state.view !== 'tech') stopTabEdit();
       canvas2d.classList.toggle('hidden', state.view !== '3d');
       canvas3d.classList.toggle('hidden', state.view !== 'tech');
       document.getElementById('toolbar-3d').classList.toggle('hidden', state.view !== '3d');
@@ -702,6 +779,9 @@ function selectBoxType(key) {
   state.boxTypeKey = key;
   document.querySelectorAll('.box-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === key));
   state.boxType = new BOX_TYPES[key]();
+  // Boîte à encoches : pas de placement à la main (panneaux séparés)
+  if (key === 'finger-joint') stopTabEdit();
+  if (document.getElementById('tabs-place-status')) { syncTabsUI(); updateToolbarSummaries(); }
 
   // Forcer rectangle + griser les autres formes pour finger-joint
   const isFingerJoint = key === 'finger-joint';
@@ -774,6 +854,7 @@ const EXPORT_OPTS_DEFAULT = {
   entry: 'plunge', rampLen: null, helixR: null, helixTurns: 1,
   leadInOn: false, leadInR: null, finishOn: false, finishAllowance: 0.2,
   tabsOn: true, tabCount: 4, tabWidth: 8, tabHeight: 2, pocketConc: true,
+  tabsManual: null,   // tabs placés à la main : fractions du périmètre du contour de la forme
 };
 
 function loadExportOpts() {
@@ -798,13 +879,27 @@ function exportToolDefaults(td) {
   };
 }
 
+/** Tabs placés à la main en vigueur (pas pour la boîte à encoches, dont les panneaux ont leurs propres contours). */
+function manualTabsActive() {
+  const m = state.exportOpts.tabsManual;
+  return state.boxTypeKey !== 'finger-joint' && Array.isArray(m) && m.length > 0;
+}
+
+/** Options de tabs pour la génération : nombre, taille et, s'ils sont placés à la main, leurs positions. */
+function currentTabOpts() {
+  const o = state.exportOpts;
+  if (!o.tabsOn) return null;
+  const manual = manualTabsActive() ? o.tabsManual : null;
+  return { count: manual ? manual.length : o.tabCount, width: o.tabWidth, height: o.tabHeight, fractions: manual };
+}
+
 // Options de génération (tabOpts, entryOpts…) correspondant aux options d'export mémorisées
 function exportGenOptions(machine) {
   const o = state.exportOpts;
   const d = exportToolDefaults(machine.toolDiameter ?? 3.175);
   const finishAllowance = o.finishOn ? o.finishAllowance : 0;
   return {
-    tabOpts: o.tabsOn ? { count: o.tabCount, width: o.tabWidth, height: o.tabHeight } : null,
+    tabOpts: currentTabOpts(),
     entryOpts: {
       entry: o.entry, rampLen: o.rampLen ?? d.ramp, helixR: o.helixR ?? d.helixR, helixTurns: o.helixTurns,
       leadIn: o.leadInOn ? (o.leadInR ?? d.leadR) : false, finishAllowance,
@@ -1262,7 +1357,8 @@ function showExportModal(sections, machine = {}) {
     </div>
     <div class="tabs-section">
       <p class="modal-sub" style="margin:0">${o.tabsOn
-        ? t('modal.tabs_summary', { n: o.tabCount, w: String(o.tabWidth).replace('.', ','), h: String(o.tabHeight).replace('.', ',') })
+        ? t(manualTabsActive() ? 'modal.tabs_summary_manual' : 'modal.tabs_summary',
+            { n: manualTabsActive() ? o.tabsManual.length : o.tabCount, w: String(o.tabWidth).replace('.', ','), h: String(o.tabHeight).replace('.', ',') })
         : t('modal.tabs_off')}</p>
     </div>
     <div class="pocket-section">
@@ -1327,8 +1423,7 @@ function showExportModal(sections, machine = {}) {
   const modalStatsEl = modal.querySelector('#modal-stats');
   const pocketConcStats = modal.querySelector('#modal-pocket-conc');
   // Tabs : réglés dans la barre Usinage (bouton « Tabs »), plus dans cette fenêtre
-  const tabOptsNow = () => (state.exportOpts.tabsOn
-    ? { count: state.exportOpts.tabCount, width: state.exportOpts.tabWidth, height: state.exportOpts.tabHeight } : null);
+  const tabOptsNow = currentTabOpts;
 
   const updateModalStats = () => {
     const tabOpts = tabOptsNow();

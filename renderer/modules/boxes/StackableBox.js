@@ -2,6 +2,7 @@ import { GCodeGenerator } from '../gcode/GCodeGenerator.js';
 import { pocketConcentric } from '../gcode/PocketConcentric.js';
 import { insetPolygon } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
+import { withManualTabs } from '../gcode/TabPositions.js';
 
 /**
  * Boite empilable — fond plein + cavite interieure + languette d'empilement.
@@ -116,7 +117,7 @@ export class StackableBox {
     // Épaisseur totale = hauteur corps + hauteur plot (pièce retournée)
     gen.machine.materialThickness = savedT;  // épaisseur stock réelle (inclut offset)
     const arcDef = shape.getArcDef?.() ?? null;   // cercle exact, en miroir comme pts2
-    gen.cutOutline(pts2, 'outside', entryOpts, t('gcode.op_outer_contour'), tabOpts,
+    gen.cutOutline(pts2, 'outside', entryOpts, t('gcode.op_outer_contour'), withManualTabs(tabOpts, pts, p => ({ x: bb.width - p.x, y: p.y })),
       arcDef && { ...arcDef, cx: bb.width - arcDef.cx });
 
     gen.machine.materialThickness = savedT;

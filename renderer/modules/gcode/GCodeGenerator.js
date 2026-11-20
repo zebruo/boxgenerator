@@ -1,6 +1,7 @@
 import { compactGCode } from './GCodeCompactor.js';
 import { insetPolygon, offsetPolygons } from './Offset.js';
 import { LIMITS } from '../Thresholds.js';
+import { nearestOnContour, contourLengths } from './TabPositions.js';
 
 /**
  * Générateur G-code CNC générique.
@@ -150,6 +151,17 @@ function completeTabs(centers, count, perimeter, sharpDists, width) {
     out.push(cands.splice(best, 1)[0]);
   }
   return out;
+}
+
+/**
+ * Positions automatiques des tabs sur un contour, en fractions du périmètre (même règle que le
+ * G-code, appliquée au contour de la forme : sert de point de départ au placement à la main).
+ * `pathWidth` = largeur du tab + Ø de la fraise.
+ */
+export function autoTabFractions(pts, count, pathWidth) {
+  const { seg, P } = contourLengths(pts);
+  if (!(P > 0) || !(count > 0)) return [];
+  return GCodeGenerator.prototype._placeTabs(pts, seg, P, count, pathWidth).map(s => s / P);
 }
 
 /** Signe du décalage d'outil selon le côté : dehors −1, dedans +1, sur le trait 0. */
@@ -675,7 +687,11 @@ export class GCodeGenerator {
     if (tabOpts) {
       tab = this._tabSettings(tabOpts, depth);
       ({ segLengths, perimeter } = this._segLengths(cut));
-      centers = this._placeTabs(cut, segLengths, perimeter, tab.count, tab.path);
+      // Tabs placés à la main : chaque point projeté sur le trajet ; sinon répartition automatique
+      centers = tabOpts.points?.length
+        ? tabOpts.points.map(p => nearestOnContour(cut, p).s % perimeter)
+        : this._placeTabs(cut, segLengths, perimeter, tab.count, tab.path);
+      if (tabOpts.points?.length) tab.count = centers.length;
       tabEv = this._tabEvents(centers, tab.path, perimeter);
       const skipped = tab.count - centers.length;
       const skippedText = skipped ? `, ${skipped} évité(s) sur angles` : '';
@@ -941,7 +957,16 @@ export class GCodeGenerator {
     const startY = cy;
     const oc     = Math.min(this.machine.toolDiameter * 0.5, r_off_work * 0.08);
 
-    const tabLabel  = hasTabs ? `, ${tabCount} tabs ${tabWidth}×${tabHeight}mm` : '';
+    // Angles des centres des tabs : placés à la main (angle du point autour du centre, tenu à
+    // l'écart du départ à 3 h) ou répartis régulièrement (45°, 135°… pour 4 tabs)
+    const manualPts = hasTabs && tabOpts.points?.length ? tabOpts.points : null;
+    const tabAngles = half => manualPts
+      ? manualPts.map(p => {
+          const a = ((Math.atan2(p.y - cy, p.x - cx) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+          return Math.min(2 * Math.PI - half - 1e-3, Math.max(half + 1e-3, a));
+        })
+      : Array.from({ length: tabCount }, (_, t) => (2 * Math.PI / tabCount) * (t + 0.5));
+    const tabLabel  = hasTabs ? `, ${manualPts ? manualPts.length : tabCount} tabs ${tabWidth}×${tabHeight}mm` : '';
     const leadLabel = leadInR ? `, lead-in R${leadInR}mm` : '';
     this.comment(`─── ${label} (${side}, G3 arcs${tabLabel}${leadLabel}${finishLabel(fa)}) ───`);
 
@@ -974,8 +999,7 @@ export class GCodeGenerator {
     const buildTabSegs = rad => {
       const tabHalfAng = tabPath / (2 * rad);
       const boundaries = [];
-      for (let t = 0; t < tabCount; t++) {
-        const center = (2 * Math.PI / tabCount) * (t + 0.5);
+      for (const center of tabAngles(tabHalfAng)) {
         boundaries.push({ start: center - tabHalfAng, end: center + tabHalfAng });
       }
       boundaries.sort((a, b) => a.start - b.start);

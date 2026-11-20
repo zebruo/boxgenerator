@@ -4,6 +4,7 @@ import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { insetPolygon, offsetPolygons, unionPolygons, roundCorners, clipToRegion, signedArea, distToPolygon } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
 import { LIMITS } from '../Thresholds.js';
+import { withManualTabs } from '../gcode/TabPositions.js';
 
 /**
  * Rayon de coin minimum de la lèvre (partie mâle de la feuillure) : Ø/2 + 0,4 mm. Un coin vif
@@ -104,6 +105,7 @@ export class LidBox {
     // Les deux ne sont pas équivalents pour les formes asymétriques (bisectrice différente).
     // Après retournement physique du couvercle, le contour miroir s'aligne exactement avec le corps.
     const mirrorPts = pts => pts.map(p => ({ x: W - p.x, y: p.y })).reverse();
+    const mirrorPt  = p => ({ x: W - p.x, y: p.y });   // tabs placés à la main : même miroir que le couvercle
     const savedT    = gen.machine.materialThickness;
     // Hauteurs de découpe de chaque pièce : sa propre hauteur + le surplus de brut éventuel.
     // Hauteurs différentes → deux bruts (avertissement à l'export) : le contour du couvercle
@@ -218,7 +220,7 @@ export class LidBox {
     }
 
     gen.machine.materialThickness = bodyT;  // hauteur du corps (+ surplus de brut)
-    gen.cutOutline(bodyPts, 'outside', entryOpts, t('gcode.op_body_contour'), tabOpts, arcDef);
+    gen.cutOutline(bodyPts, 'outside', entryOpts, t('gcode.op_body_contour'), withManualTabs(tabOpts, bodyPts), arcDef);
 
     // ═══════════════════════════════════════════════════════════════════════
     // COUVERCLE
@@ -257,7 +259,7 @@ export class LidBox {
       }
       // 2. Contour extérieur (dernière opération)
       gen.machine.materialThickness = lidT;   // hauteur du couvercle (+ surplus de brut)
-      gen.cutOutline(lidPts, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts,
+      gen.cutOutline(lidPts, 'outside', entryOpts, t('gcode.op_lid_contour'), withManualTabs(tabOpts, bodyPts, mirrorPt),
         arcDef && { ...arcDef, r: arcDef.r - inset0 });
     } else {
       // Couvercle plein nominal : taille = corps, lèvre r s'emboîte dans feuillure r+jeu
@@ -278,7 +280,7 @@ export class LidBox {
       }
       // 3. Contour extérieur (dernière opération)
       gen.machine.materialThickness = lidT;   // hauteur du couvercle (+ surplus de brut)
-      gen.cutOutline(lidPts1, 'outside', entryOpts, t('gcode.op_lid_contour'), tabOpts, arcDef);
+      gen.cutOutline(lidPts1, 'outside', entryOpts, t('gcode.op_lid_contour'), withManualTabs(tabOpts, bodyPts, mirrorPt), arcDef);
     }
     gen.machine.originX = savedOriginX;
     gen.machine.originY = savedOriginY;

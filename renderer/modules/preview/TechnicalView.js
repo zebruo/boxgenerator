@@ -2,6 +2,7 @@ import { t } from '../i18n.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { insetPolygon } from '../gcode/Offset.js';
 import { lipContour, lidPartitionThickness } from '../boxes/LidBox.js';
+import { pointAtFraction, nearestOnContour, contourLengths } from '../gcode/TabPositions.js';
 
 // Pièce d'illustration (boîte du dessous de l'empilable) : gris, comme dans l'aperçu 3D
 const GHOST = '#8e8e96';
@@ -28,6 +29,11 @@ export class TechnicalView {
 
     this.canvas.addEventListener('click',     e => this._onClick(e));
     this.canvas.addEventListener('mousemove', e => this._onHover(e));
+    // Placement des tabs à la main (mode activé par setTabEdit)
+    this.tabEdit = null;   // { fractions, tabWidth, onChange } ou null
+    this._drag   = null;
+    this.canvas.addEventListener('mousedown', e => this._tabDown(e));
+    window.addEventListener('mouseup',        e => this._tabUp(e));
 
     this.C = {
       bg:      '#333333',
@@ -90,6 +96,14 @@ export class TechnicalView {
 
   dispose() { this._removeOverlay(); }
 
+  /** Active (cfg = { fractions, tabWidth, onChange }) ou quitte (null) le placement des tabs à la main. */
+  setTabEdit(cfg) {
+    this.tabEdit = cfg ? { ...cfg, fractions: [...cfg.fractions] } : null;
+    this._drag = null;
+    this._removeOverlay();
+    if (this._data) this._draw();
+  }
+
   // ── Dessin principal ─────────────────────────────────────────────────────
   _draw() {
     if (!this._data) return;
@@ -101,6 +115,12 @@ export class TechnicalView {
     this.hitAreas = [];
     ctx.fillStyle = this.C.bg;
     ctx.fillRect(0, 0, CW, CH);
+
+    // Placement des tabs : vue de dessus seule, sur toute la surface
+    if (this.tabEdit && boxTypeKey !== 'finger-joint') {
+      this._viewTabEdit(CW, CH, shape, boxParams);
+      return;
+    }
 
     const bb   = shape.getBoundingBox();
     const W    = bb.width;
@@ -777,13 +797,118 @@ export class TechnicalView {
     return this.hitAreas.find(a => x >= a.x && x <= a.x + a.w && y >= a.y && y <= a.y + a.h);
   }
 
+  // ── Placement des tabs à la main ──────────────────────────────────────────
+  _viewTabEdit(CW, CH, shape, boxParams) {
+    const ctx = this.ctx, pts = shape.getContourPoints(), bb = shape.getBoundingBox();
+    const pad = 70;
+    const sc = Math.min((CW - 2 * pad) / (bb.width || 1), (CH - 2 * pad - 30) / (bb.height || 1));
+    const sx = CW / 2 - (bb.minX + bb.maxX) * sc / 2;
+    const sy = CH / 2 + 15 + (bb.minY + bb.maxY) * sc / 2;
+    this._tabXf = { pts, sx, sy, sc };
+    const toC = p => ({ x: sx + p.x * sc, y: sy - p.y * sc });
+
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = this.C.title;
+    ctx.textAlign = 'left';
+    ctx.fillText(t('view.tabs_edit_title'), 10, 17);
+
+    // Forme et cavité
+    const path = poly => { ctx.beginPath(); poly.forEach((p, i) => { const c = toC(p); i ? ctx.lineTo(c.x, c.y) : ctx.moveTo(c.x, c.y); }); ctx.closePath(); };
+    path(pts);
+    ctx.fillStyle = this.C.wood; ctx.fill();
+    ctx.strokeStyle = this.C.text; ctx.lineWidth = 1.5; ctx.stroke();
+    const cav = insetPolygon(pts, boxParams.wallThickness ?? 6);
+    if (cav.length > 2) { path(cav); ctx.fillStyle = this.C.inner; ctx.fill(); }
+
+    // Tabs : trait épais le long du contour, de la largeur du tab
+    const w = this.tabEdit.tabWidth ?? 8;
+    this.tabEdit.fractions.forEach((f, i) => {
+      const p = pointAtFraction(pts, f);
+      const a = toC({ x: p.x - p.dx * w / 2, y: p.y - p.dy * w / 2 });
+      const b = toC({ x: p.x + p.dx * w / 2, y: p.y + p.dy * w / 2 });
+      ctx.strokeStyle = this.C.dim;
+      ctx.lineWidth = i === this._tabHover ? 11 : 8;
+      ctx.lineCap = 'butt';
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    });
+    ctx.font = '12px monospace';
+    ctx.fillStyle = this.C.text;
+    ctx.textAlign = 'center';
+    ctx.fillText(t('view.tabs_edit_hint', { n: this.tabEdit.fractions.length }), CW / 2, CH - 18);
+  }
+
+  /** Position de la souris en pixels du canvas et en mm de la forme. */
+  _tabMouse(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+    const y = (e.clientY - rect.top)  * (this.canvas.height / rect.height);
+    const { sx, sy, sc } = this._tabXf;
+    return { x, y, p: { x: (x - sx) / sc, y: (sy - y) / sc } };
+  }
+
+  /** Index du tab sous la souris (à 12 px près), ou -1. */
+  _tabAt(m) {
+    const { pts, sx, sy, sc } = this._tabXf;
+    let best = -1, bestD = 12;
+    this.tabEdit.fractions.forEach((f, i) => {
+      const p = pointAtFraction(pts, f);
+      const d = Math.hypot(sx + p.x * sc - m.x, sy - p.y * sc - m.y);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  _tabDown(e) {
+    if (!this.tabEdit || !this._tabXf || e.button !== 0) return;
+    const m = this._tabMouse(e);
+    const i = this._tabAt(m);
+    if (i >= 0) { this._drag = { i, moved: false }; return; }
+    // Clic près du contour : nouveau tab
+    const { pts, sc } = this._tabXf;
+    const near = nearestOnContour(pts, m.p);
+    if (near.dist * sc <= 14) {
+      this.tabEdit.fractions.push(near.s / contourLengths(pts).P);
+      this._tabChanged();
+    }
+  }
+
+  _tabUp() {
+    if (!this._drag || !this.tabEdit) { this._drag = null; return; }
+    // Clic sans déplacement sur un tab : on le retire
+    if (!this._drag.moved) this.tabEdit.fractions.splice(this._drag.i, 1);
+    this._drag = null;
+    this._tabChanged();
+  }
+
+  _tabChanged() {
+    this._draw();
+    this.tabEdit?.onChange?.([...this.tabEdit.fractions]);
+  }
+
   _onClick(e) {
+    if (this.tabEdit) return;   // placement des tabs : géré par mousedown / mouseup
     const ha = this._getHit(e);
     if (ha) this._showInput(ha);
     else    this._removeOverlay();
   }
 
   _onHover(e) {
+    if (this.tabEdit && this._tabXf) {
+      const m = this._tabMouse(e);
+      if (this._drag) {
+        // Glisser : le tab suit le contour
+        const { pts } = this._tabXf;
+        this.tabEdit.fractions[this._drag.i] = nearestOnContour(pts, m.p).s / contourLengths(pts).P;
+        this._drag.moved = true;
+        this._draw();
+        return;
+      }
+      const i = this._tabAt(m);
+      const near = nearestOnContour(this._tabXf.pts, m.p).dist * this._tabXf.sc <= 14;
+      this.canvas.style.cursor = i >= 0 ? 'grab' : near ? 'copy' : 'default';
+      if (i !== this._tabHover) { this._tabHover = i; this._draw(); }
+      return;
+    }
     this.canvas.style.cursor = this._getHit(e) ? 'pointer' : 'default';
   }
 

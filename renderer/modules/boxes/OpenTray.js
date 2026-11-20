@@ -3,6 +3,7 @@ import { pocketConcentric } from '../gcode/PocketConcentric.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { insetPolygon } from '../gcode/Offset.js';
 import { t } from '../i18n.js';
+import { withManualTabs } from '../gcode/TabPositions.js';
 
 /**
  * Plateau ouvert — fraisage du fond + contour des parois.
@@ -53,7 +54,7 @@ export class OpenTray {
     }
 
     // 2. Découpe du contour extérieur (parois)
-    gen.cutOutline(pts, 'outside', entryOpts, t('gcode.op_outer_wall'), tabOpts, shape.getArcDef?.() ?? null);
+    gen.cutOutline(pts, 'outside', entryOpts, t('gcode.op_outer_wall'), withManualTabs(tabOpts, pts), shape.getArcDef?.() ?? null);
 
     gen.footer();
     return gen.getCode();
