@@ -1378,12 +1378,11 @@ function showExportModal(sections, machine = {}) {
   // "Pocket concentrique (N anneaux...)", "Pocket spirale (...)" ou "Pocket (...)" → normalisés
   modal.querySelector('#modal-pocket-conc').checked = o.pocketConc;
   const pocketLabel = t(o.pocketConc ? 'modal.pocket_conc_label' : 'modal.pocket_raster_label');
+  // Un seul remplacement par libellé : enchaînés, « Pocket concentrique (…) » devenait « Pocket raster
+  // zig-zag », puis « Pocket raster » y était remplacé une seconde fois (« zig-zag zig-zag »)
   list.querySelectorAll('.sec-label').forEach(lbl => {
     lbl.textContent = lbl.textContent
-      .replace(/Pocket concentrique \([^)]*\)/, pocketLabel)
-      .replace(/Pocket spirale \([^)]*\)/,      pocketLabel)
-      .replace(/Pocket \([^)]*\)/,              pocketLabel)
-      .replace('Pocket raster',                 pocketLabel);
+      .replace(/Pocket (?:concentrique |spirale )?\([^)]*\)|Pocket raster(?: zig-zag)?/, pocketLabel);
   });
 
   // ── Entry mode buttons ──────────────────────────────────────────────────
