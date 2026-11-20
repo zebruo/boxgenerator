@@ -594,8 +594,11 @@ export class TechnicalView {
       const [a, b] = wall.iv[0];
       this._dimH(map.u(a), map.u(b), map.z(0) + 38,
         t('view.wall_thick', { val: (b - a).toFixed(1) }), null, false, b - a, 1, 9999, map.z(0));
-      // Profondeur de la cavité, contre la paroi intérieure
-      this._dimV(map.u(b) + 14, map.z(H), map.z(bFl), `${(H - bFl).toFixed(1)}`, null, false, H - bFl);
+      // Hauteur utile, contre la paroi intérieure : du dessus du fond jusqu'au haut des parois, ou, pour une
+      // boîte à couvercle, jusqu'au dessous du couvercle posé (lèvre dans la feuillure)
+      const lidOn  = boxTypeKey === 'lid-box' && lidH > 0;
+      const zUsable = lidOn ? H - rD + lidH - bFll : H;
+      this._dimV(map.u(b) + 14, map.z(zUsable), map.z(bFl), `${(zUsable - bFl).toFixed(1)}`, null, false, zUsable - bFl);
     }
 
     // Épaisseur du fond (texte à gauche)
@@ -615,6 +618,7 @@ export class TechnicalView {
 
     // Feuillure et jeu (boîte à couvercle), plot et jeu (boîte empilable) : légende
     const notes = [];
+    if (boxTypeKey === 'lid-box' && lidH > 0) notes.push(t('view.usable_height', { h: (H - rD + lidH - bFll - bFl).toFixed(1) }));
     if (boxTypeKey === 'lid-box' && r > 0) notes.push(t('view.rabbet_note', { r: r.toFixed(1), d: rD.toFixed(1), j: jeu.toFixed(2) }));
     if (boxTypeKey === 'stackable' && rimH > 0) notes.push(t('view.plot_note', { h: rimH.toFixed(1), j: jeu.toFixed(2) }));
     if (notes.length) {

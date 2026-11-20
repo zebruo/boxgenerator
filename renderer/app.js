@@ -546,18 +546,51 @@ function updatePartitionWarning() {
   if (note) note.textContent = (state.boxParams.partitionSplit ?? '').trim() ? list : t('param.partition_split_equal', { sizes: list });
 }
 
+/** Matière minimale (mm) à laisser au-dessus du fond du corps sous la feuillure. */
+const MIN_RABBET_FLOOR = 3;
+
+/** Met le champ en orange avec ses messages en info-bulle (aucun message : état normal). */
+function setFieldWarnings(el, msgs) {
+  el.classList.toggle('input-warn', msgs.length > 0);
+  el.title = msgs.join('\n');
+}
+
+/** Avertissements de la feuillure : fraise, largeur, profondeur et lèvre du couvercle. */
 function updateRabbetToolWarning() {
-  const el = document.querySelector('[data-param="rabbet"]');
-  if (!el) return;
-  const rabbetSide = state.boxParams.rabbetSide ?? 0;
-  if (rabbetSide !== 1) { el.classList.remove('input-warn'); el.title = ''; return; }
-  const rabbet    = Number.parseFloat(el.value) || 0;
-  const clearance = state.boxParams.clearance ?? 0.3;
+  const widthEl = document.querySelector('[data-param="rabbet"]');
+  if (!widthEl) return;
+  const depthEl = document.querySelector('[data-param="rabbetDepth"]');
+  const p         = state.boxParams;
+  const rabbetSide = Number(p.rabbetSide ?? 0);
+  const rabbet    = Number.parseFloat(widthEl.value) || 0;
+  const rabbetD   = Number.parseFloat(depthEl?.value) || 0;
+  const wt        = p.wallThickness ?? 6;
+  const clearance = p.clearance ?? 0.3;
   const td        = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 0;
-  const ringW     = rabbet + clearance;
-  const warn      = td > ringW;
-  el.classList.toggle('input-warn', warn);
-  el.title = warn ? t('warn.tool_too_large', { td, ringW: ringW.toFixed(1) }) : '';
+
+  // Largeur : fraise trop large (feuillure extérieure) ; feuillure aussi large que la paroi
+  const widthMsgs = [];
+  if (rabbetSide === 1 && td > rabbet + clearance)
+    widthMsgs.push(t('warn.tool_too_large', { td, ringW: (rabbet + clearance).toFixed(1) }));
+  if (rabbet >= wt)
+    widthMsgs.push(t('warn.rabbet_wider_wall', { r: rabbet, wt }));
+  setFieldWarnings(widthEl, widthMsgs);
+
+  // Profondeur : fond du corps entamé, et lèvre du couvercle qui ne s'accorde pas à la feuillure
+  if (!depthEl) return;
+  const H = p.height ?? 40, bFl = p.bottomThickness ?? 6;
+  const lidH = p.lidHeight ?? 0, bFll = p.lidBottomThickness ?? 6;
+  const depthMsgs = [];
+  const left = H - bFl - rabbetD;
+  if (left < MIN_RABBET_FLOOR)
+    depthMsgs.push(t('warn.rabbet_floor', { left: Math.max(left, 0).toFixed(1), min: MIN_RABBET_FLOOR }));
+  if (lidH > 0) {
+    if (rabbetSide === 0 && lidH - bFll > rabbetD + 1e-6)
+      depthMsgs.push(t('warn.lip_taller', { lip: (lidH - bFll).toFixed(1), depth: rabbetD, gap: (lidH - bFll - rabbetD).toFixed(1) }));
+    if (rabbetSide === 1 && lidH - rabbetD < bFll - 1e-6)
+      depthMsgs.push(t('warn.lid_recess_deep', { depth: rabbetD, left: Math.max(lidH - rabbetD, 0).toFixed(1), top: bFll }));
+  }
+  setFieldWarnings(depthEl, depthMsgs);
 }
 
 function updateFingerJointWarnings() {
