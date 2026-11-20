@@ -35,6 +35,8 @@ export function showHelpModal(machine = {}) {
       <section class="help-section">
         <h4>Colonne de gauche — Paramètres</h4>
         <dl class="help-dl">
+          <dt>Sessions (barre du haut)</dt>
+          <dd>L'icône <em>dossier</em> (Ctrl+O) ouvre une session <span class="help-mono">.json</span>, la <em>disquette</em> (Ctrl+S) l'enregistre <strong>directement dans le fichier ouvert</strong>, sans explorateur. <strong>Maj+clic</strong> sur la disquette, ou Ctrl+Maj+S, enregistre sous un autre nom ou dans un autre dossier. Avant d'écraser, la version précédente est copiée dans un sous-dossier <span class="help-mono">sauvegardes</span> à côté du fichier. Le nom du fichier s'affiche dans le titre de la fenêtre, avec un <strong>*</strong> devant quand la session a changé depuis le dernier enregistrement.</dd>
           <dt>Modèle de boîte</dt>
           <dd>Choisit le type de construction :
             <strong>Plateau</strong> (fond + parois, sans couvercle),
@@ -100,7 +102,7 @@ export function showHelpModal(machine = {}) {
           <dt>3D</dt>
           <dd>Boîte et brut (cadre jaune) avec le repère <strong>Z0</strong> : tel qu'il sera dans le G-code. Le bouton <em>Z0</em> (groupe <em>Usinage</em>) ouvre une fenêtre : clic sur un point du schéma du brut pour la position dans le plan (centre ou un coin), puis hauteur du zéro (haut ou bas de la boîte). Le bouton <em>Brut</em> ajoute du brut autour de la boîte, au-dessus ou en dessous ; chaque bouton affiche son réglage actuel. <em>X-Ray</em> rend la matière transparente. Boîtes à couvercle et à encoches : <strong>À plat</strong> (pièces disposées comme dans le G-code) ou <strong>Assemblé</strong>. Double-clic : recadrer la vue.</dd>
           <dt>Vues 2D</dt>
-          <dd>Dessus (avec le plan de coupe <strong>A-A</strong>), face, côté et coupe A-A hachurée, avec leurs cotes. La boîte à encoches se présente en panneaux à plat.</dd>
+          <dd>Dessus (avec le plan de coupe <strong>A-A</strong>), face, côté et coupe A-A hachurée, avec leurs cotes. La boîte à encoches se présente en panneaux à plat. Pour la boîte à couvercle, la coupe donne la <strong>hauteur utile</strong> : du dessus du fond jusqu'au dessous du couvercle posé (la lèvre repose sur le fond de la feuillure).
           <dt>Simuler</dt>
           <dd>Rejoue l'usinage sur le brut : fraise, trajets, matière enlevée, temps estimé. Les boutons <strong>Outil</strong>, <strong>Parcours</strong>, <strong>À vide</strong> (déplacements rapides) et <strong>Dessin</strong> (contours théoriques) affichent ou masquent chaque élément ; <strong>Pièce finie seule</strong> masque la chute. La vitesse de lecture se règle à côté de la ligne de temps. Boîte empilable : choix de la face (dessus, dessous retourné). Boîte à couvercle de hauteurs différentes : choix de la pièce, chacune sur son brut.</dd>
         </dl>
@@ -283,6 +285,8 @@ export function showHelpModal(machine = {}) {
             <dt>Contrainte fraise / feuillure (feuillure extérieure uniquement)</dt>
             <dd>L'anneau périphérique est usiné par passes concentriques. Le <strong>diamètre fraise doit être strictement inférieur à (largeur feuillure + jeu)</strong> — un warning s'affiche sur le champ si ce n'est pas le cas. Pour une feuillure de 3 mm + jeu 0,3 mm, utiliser une fraise &lt; 3,3 mm (ex. Ø 3,175 mm).</dd>
             <dt>Cloisons</dt><dd>Divise la cavité du <strong>corps</strong> en N+1 compartiments. Les cloisons prolongent le profil de la paroi vu depuis la cavité : feuillure <em>intérieure</em>, leur épaisseur est la largeur de la feuillure ; feuillure <em>extérieure</em>, c'est ce qui reste de la paroi (paroi − feuillure). Minimum 3 mm, sans dépasser l'épaisseur des parois. Direction configurable (perpendiculaires à X ou Y). Le couvercle reste ouvert (cavité non cloisonnée). Disponible uniquement pour la forme Rectangle.</dd>
+            <dt>Avertissements sur la feuillure</dt>
+            <dd>Le champ passe en orange, avec le détail en info-bulle : <strong>largeur de feuillure ≥ épaisseur de paroi</strong> (il ne reste rien de la paroi) ; <strong>profondeur</strong> qui laisse moins de 3 mm au-dessus du fond du corps ; en feuillure intérieure, <strong>couvercle enfoncé de plus de 1 mm</strong> sous le bord du corps (feuillure trop profonde ou couvercle trop bas : la hauteur utile s'effondre) ; en feuillure extérieure, feuillure de couvercle plus profonde que sa cavité (dessus plus fin que prévu). Les seuils sont réglables dans <span class="help-mono">renderer/modules/Thresholds.js</span>.</dd>
             <dt>Jeu</dt><dd>Décalage entre lèvre et feuillure pour un assemblage sans forcer. Valeur typique : 0,2 – 0,5 mm selon la précision machine.</dd>
             <dt>Layout d'export</dt>
             <dd>Corps et couvercle sont placés côte à côte dans le G-code. Le sens est choisi automatiquement pour <strong>minimiser le côté le plus long du brut</strong> : horizontal si W ≤ D, vertical si W &gt; D. Exemple : 140×65 mm → layout vertical, brut 140×150 mm au lieu de 300×65 mm.</dd>

@@ -110,6 +110,10 @@ BoxGenerator/
     ├── i18n/            — FR / EN translations
     ├── lib/             — Three.js, Clipper (geometry, Boost license)
     └── modules/
+        ├── CuttingParams.js, CuttingPanel.js, CuttingParamsModal.js — cutting parameters (calculation, side panel, detail window)
+        ├── ToolCatalog.js — end mill catalogue (supplier datasheet values)
+        ├── Thresholds.js  — warning thresholds and geometric limits, in one place
+        ├── HelpModal.js   — in-app help
         ├── shapes/      — ShapeBase, Rectangle, Circle, Oval, Polygon, Bean
         ├── boxes/       — OpenTray, FingerJointBox, LidBox, StackableBox
         ├── gcode/       — GCodeGenerator, GCodeCompactor, Offset, PocketConcentric, PartitionedPocket
