@@ -160,7 +160,7 @@ export class TechnicalView {
     // Scale commun = le plus petit des deux pour cohérence visuelle entre vues
     const sc = Math.min(scTop, scElev);
 
-    const nfo = { shape, bb, W, D, H, wt, bt, bFl, bFll, lidH, r, rD, rim, rimH, rs, jeu, sc, totalH, boxTypeKey, boxParams, cells, nParts, partDir, layers, zMin, zMax };
+    const nfo = { shape, bb, W, D, H, wt, bt, bFl, bFll, lidH, r, rD, rim, rimH, rs, jeu, sc, totalH, boxTypeKey, boxParams, cells, nParts, partDir, layers, zMin, zMax, toolD: machineParams.toolDiameter ?? 3.175 };
 
     if (boxTypeKey === 'finger-joint' && boxType) {
       this._viewFingerJoint(CW, CH, boxType, shape, boxParams);
@@ -194,7 +194,7 @@ export class TechnicalView {
 
   // ── VUE 1 : Dessus ───────────────────────────────────────────────────────
   _viewDessus(ox, oy, qW, qH, nfo, title) {
-    const { shape, bb, W, D, wt, sc, boxTypeKey, boxParams, cells } = nfo;
+    const { shape, bb, W, D, wt, sc, boxTypeKey, boxParams, cells, toolD } = nfo;
     this._panelBg(ox, oy, qW, qH, title);
 
     const ctx = this.ctx;
@@ -244,7 +244,7 @@ export class TechnicalView {
 
     // Boîte à couvercle réduit : contour du couvercle (posé dessus), en pointillés
     if (boxTypeKey === 'lid-box' && (boxParams.rabbetSide ?? 0) === 0 && nfo.lidH > 0) {
-      const lid = lipContour(pts, wt - (boxParams.rabbet ?? 0), machineParams.toolDiameter ?? 3.175);
+      const lid = lipContour(pts, wt - (boxParams.rabbet ?? 0), toolD);
       if (lid.length > 2) {
         ctx.beginPath();
         lid.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
