@@ -24,16 +24,20 @@ export function lipContour(bodyPts, d, toolDiameter) {
 /**
  * Épaisseur des cloisons de la boîte à couvercle : elles prolongent le profil de la paroi vu depuis
  * la cavité. Feuillure intérieure : la largeur de la feuillure. Feuillure extérieure : ce qui reste
- * de la paroi à pleine hauteur (paroi − feuillure). Au moins LIMITS.partitionThicknessMin, sans dépasser
+ * de la paroi à pleine hauteur (paroi − feuillure). Sans feuillure : l'épaisseur de la paroi. Au moins LIMITS.partitionThicknessMin, sans dépasser
  * l'épaisseur des parois.
  */
 export function lidPartitionThickness(params) {
   const wt = params.wallThickness ?? 6, rb = params.rabbet ?? 3;
-  if (!(rb > 0)) return wt;
+  if (!(rb > 0) || Number(params.rabbetSide) === RABBET_NONE) return wt;   // sans feuillure : cloisons de l'épaisseur de la paroi
   const exterior = Number(params.rabbetSide) === 1;
   const raw = exterior ? wt - rb : Math.min(rb, wt);
   return Math.min(Math.max(raw, LIMITS.partitionThicknessMin), wt);
 }
+
+/** Valeur de `rabbetSide` : boîte à couvercle sans feuillure (couvercle creux, joint à plat bord à bord). */
+export const RABBET_NONE = 2;
+const noRabbet = p => Number(p.rabbetSide) === RABBET_NONE;
 
 /** Logement de la lèvre (lèvre + jeu) : même rayon minimum, plus le jeu. */
 export function lipSeat(bodyPts, d, toolDiameter, clearance) {
@@ -56,18 +60,19 @@ export class LidBox {
       { id: 'height',        label: 'param.box_height',      min: 10, max: 500, step: 1,   unit: 'mm', value: 40 },
       { id: 'lidHeight',     label: 'param.lid_height',      min: 5,  max: 200, step: 1,   unit: 'mm', value: 20 },
       { id: 'wallThickness', label: 'param.wall_thickness',  min: 2,  max: 30,  step: 0.5, unit: 'mm', value: 6 },
-      { id: 'rabbet',      label: 'param.rabbet',       min: LIMITS.rabbetWidthMin, max: 15, step: 0.5, unit: 'mm', value: 3 },
-      { id: 'rabbetDepth', label: 'param.rabbet_depth', min: 1, max: 15, step: 0.5, unit: 'mm', value: 4 },
+      { id: 'rabbet',      label: 'param.rabbet',       min: LIMITS.rabbetWidthMin, max: 15, step: 0.5, unit: 'mm', value: 3, hiddenWhen: noRabbet },
+      { id: 'rabbetDepth', label: 'param.rabbet_depth', min: 1, max: 15, step: 0.5, unit: 'mm', value: 4, hiddenWhen: noRabbet },
       {
         id: 'rabbetSide', label: 'param.rabbet_side', type: 'select', unit: '',
         options: [
           { value: 0, label: 'option.rabbet_interior' },
-          { value: 1, label: 'option.rabbet_exterior' }
+          { value: 1, label: 'option.rabbet_exterior' },
+          { value: RABBET_NONE, label: 'option.rabbet_none' }
         ]
       },
       { id: 'bottomThickness',    label: 'param.bottom_body', min: 1, max: 30,  step: 0.5, unit: 'mm', value: 6 },
       { id: 'lidBottomThickness', label: 'param.bottom_lid',  min: 1, max: 30,  step: 0.5, unit: 'mm', value: 6 },
-      { id: 'clearance',          label: 'param.clearance',   min: 0, max: 2,   step: 0.1, unit: 'mm', value: 0.4 },
+      { id: 'clearance',          label: 'param.clearance',   min: 0, max: 2,   step: 0.1, unit: 'mm', value: 0.4, hiddenWhen: noRabbet },
       { id: 'partitions',   label: 'param.partitions',    min: 0, max: 5, step: 1, unit: '', value: 0 },
       {
         id: 'partitionDir', label: 'param.partition_dir', type: 'select', unit: '',
@@ -93,12 +98,14 @@ export class LidBox {
     const bFl  = params.bottomThickness    ?? bt;  // épaisseur fond corps
     const bFll = params.lidBottomThickness ?? bt;  // épaisseur fond couvercle
 
+    const none = rabbetSide === RABBET_NONE;
     const sideLabel = rabbetSide === 0 ? 'feuillure intérieure' : 'feuillure extérieure';
     gen.header(
       `Boîte couvercle — ${W.toFixed(0)}×${D.toFixed(0)}mm ` +
       `corps ${height}mm + couvercle ${lidHeight}mm`
     );
-    gen.comment(`Paroi: ${wallThickness}mm | Fond corps: ${bFl}mm | Fond couvercle: ${bFll}mm | Feuillure: larg=${rabbet}mm prof=${rabbetDepth}mm (${sideLabel})`);
+    gen.comment(`Paroi: ${wallThickness}mm | Fond corps: ${bFl}mm | Fond couvercle: ${bFll}mm | ` +
+      (none ? 'Sans feuillure (joint à plat)' : `Feuillure: larg=${rabbet}mm prof=${rabbetDepth}mm (${sideLabel})`));
     gen.emit('');
 
     const tabOpts   = machineParams.tabOpts;
@@ -138,7 +145,9 @@ export class LidBox {
 
     // 1. Feuillure corps (peu profond — doit précéder la cavité)
     gen.machine.materialThickness = rabbetDepth;
-    if (rabbetSide === 0) {
+    if (none) {
+      // Sans feuillure : rien à usiner avant la cavité
+    } else if (rabbetSide === 0) {
       // Logement de la lèvre du couvercle : coins au rayon de la lèvre + jeu
       doPocket(lipSeat(bodyPts, wallThickness - rabbet - clearance, gen.machine.toolDiameter, clearance), t('gcode.op_body_rabbet'));
     } else {
@@ -219,6 +228,7 @@ export class LidBox {
     // 2. Cavité corps
     // rabbetSide=0 : la feuillure a usiné tout l'intérieur → on repart du fond (depthStart=rabbetDepth)
     // rabbetSide=1 : la feuillure n'a usiné que l'anneau extérieur → intérieur vierge, depthStart=0
+    // sans feuillure : intérieur vierge, depthStart=0
     const cavDepthStart = rabbetSide === 0 ? rabbetDepth : 0;
     const cavW = W - 2 * wallThickness, cavH = D - 2 * wallThickness;
     if (cavW > 0 && cavH > 0) {
@@ -262,7 +272,19 @@ export class LidBox {
       }
     }
 
-    if (rabbetSide === 0) {
+    if (none) {
+      // Sans feuillure : couvercle de la taille du corps, cavité aux mêmes parois (joint à plat)
+      gen.comment('Couvercle sans feuillure: taille du corps, joint à plat');
+      const lidPts2 = mirrorPts(bodyPts);
+      const lidCavDepth2 = lidHeight - bFll;
+      if (lidCavDepth2 > 0 && W > 2 * wallThickness) {
+        gen.machine.materialThickness = lidCavDepth2;
+        const lidInnerPts2 = mirrorPts(gen.insetContour(bodyPts, wallThickness));
+        if (lidInnerPts2.length > 2) doPocket(lidInnerPts2, t('gcode.op_lid_cavity'));
+      }
+      gen.machine.materialThickness = lidT;   // hauteur du couvercle (+ surplus de brut)
+      gen.cutOutline(lidPts2, 'outside', entryOpts, t('gcode.op_lid_contour'), withManualTabs(tabOpts, bodyPts, mirrorPt), arcDef);
+    } else if (rabbetSide === 0) {
       // Couvercle réduit : inset nominal (wt-r), lèvre = r s'emboîte dans feuillure r+jeu
       const inset0 = wallThickness - rabbet;
       gen.comment(`Couvercle réduit: inset ${inset0.toFixed(1)}mm/côté (lèvre nominale ${rabbet}mm)`);

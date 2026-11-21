@@ -60,6 +60,7 @@ export const en = {
   option: {
     rabbet_interior:       'Interior rabbet — fitted lid',
     rabbet_exterior:       'Exterior rabbet — full lid',
+    rabbet_none:           'No rabbet — flat joint',
     partition_vertical:    'Walls | perpendicular to X',
     partition_horizontal:  'Walls — perpendicular to Y',
   },

@@ -13,7 +13,7 @@ import { Polygon }        from './modules/shapes/Polygon.js';
 import { Bean }           from './modules/shapes/Bean.js';
 import { OpenTray }       from './modules/boxes/OpenTray.js';
 import { FingerJointBox } from './modules/boxes/FingerJointBox.js';
-import { LidBox, lidPartitionThickness, lidGapOf } from './modules/boxes/LidBox.js';
+import { LidBox, lidPartitionThickness, lidGapOf, RABBET_NONE } from './modules/boxes/LidBox.js';
 import { StackableBox }   from './modules/boxes/StackableBox.js';
 import { showHelpModal }         from './modules/HelpModal.js';
 import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
@@ -678,6 +678,7 @@ function renderShapeParams() {
   for (const d of all) {
     const row = document.createElement('div');
     row.className = 'param-row';
+    if (d.hiddenWhen) row.dataset.hiddenWhen = d.id;   // ligne masquée selon d'autres paramètres (voir updateParamVisibility)
 
     if (d.type === 'ratio') {
       // ── Ratio calculé (lecture seule) ─────────────────────────────────────
@@ -733,6 +734,7 @@ function renderShapeParams() {
       row.querySelector('select').addEventListener('change', e => {
         const raw = e.target.value;
         state.boxParams[d.id] = Number.isNaN(Number(raw)) || raw === '' ? raw : Number.parseInt(raw);
+        updateParamVisibility();
         updateRabbetToolWarning();
         updatePartitionWarning();
         updatePreview();
@@ -801,12 +803,22 @@ function renderShapeParams() {
 
     paramsContainer.appendChild(row);
   }
+  updateParamVisibility();
   updateShapeInputWarnings();
   updateBeanRatio();
   updatePinDepthWarning();
   updateRabbetToolWarning();
   updatePartitionWarning();
   updateFingerJointWarnings();
+}
+
+/** Lignes de paramètres de boîte masquées selon d'autres réglages (ex. feuillure : rien à régler sans feuillure). */
+function updateParamVisibility() {
+  const defs = state.boxType ? state.boxType.getBoxParams() : [];
+  for (const row of paramsContainer.querySelectorAll('[data-hidden-when]')) {
+    const d = defs.find(x => x.id === row.dataset.hiddenWhen);
+    row.hidden = !!d?.hiddenWhen?.(state.boxParams);
+  }
 }
 
 function updatePinDepthWarning() {
@@ -888,6 +900,11 @@ function updateRabbetToolWarning() {
   const depthEl = document.querySelector('[data-param="rabbetDepth"]');
   const p         = state.boxParams;
   const rabbetSide = Number(p.rabbetSide ?? 0);
+  if (rabbetSide === RABBET_NONE) {   // sans feuillure : champs masqués, rien à signaler
+    setFieldWarnings(widthEl, []);
+    if (depthEl) setFieldWarnings(depthEl, []);
+    return;
+  }
   const rabbet    = Number.parseFloat(widthEl.value) || 0;
   const rabbetD   = Number.parseFloat(depthEl?.value) || 0;
   const wt        = p.wallThickness ?? 6;

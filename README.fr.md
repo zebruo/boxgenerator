@@ -6,7 +6,7 @@ Application desktop de génération de boîtes paramétriques avec export G-code
 
 ## Fonctionnalités
 
-- **4 types de boîtes** : Plateau ouvert, Boîte finger joint, Boîte à couvercle (feuillure), Boîte empilable
+- **4 types de boîtes** : Plateau ouvert, Boîte finger joint, Boîte à couvercle (feuillure ou joint à plat), Boîte empilable
 - **6 profils de forme** : Rectangle, Cercle, Ovale, Polygone (dont hexagone), Bean, et toutes variantes arrondies
 - **Export G-code** compatible Grbl, Mach3 et LinuxCNC
 - **G-code compact** : petits segments regroupés en arcs G2/G3 (option), fichiers beaucoup plus courts
@@ -36,7 +36,7 @@ Application desktop de génération de boîtes paramétriques avec export G-code
 |------|-------------|
 | Plateau ouvert | Plateau simple — cavité + contour extérieur |
 | Finger Joint Box | Boîte fermée avec encoches sur tous les panneaux |
-| Boîte à couvercle | Corps + couvercle à feuillure (intérieure ou extérieure) |
+| Boîte à couvercle | Corps + couvercle : feuillure intérieure ou extérieure, ou sans feuillure (joint à plat) |
 | Boîte empilable | Boîte avec jonc d'emboîtement pour empilage |
 
 ## Formes

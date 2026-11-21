@@ -60,6 +60,7 @@ export const fr = {
   option: {
     rabbet_interior:       'Feuillure intérieure — couvercle ajusté',
     rabbet_exterior:       'Feuillure extérieure — couvercle plein',
+    rabbet_none:           'Sans feuillure — joint à plat',
     partition_vertical:    'Cloisons | perpendiculaires à X',
     partition_horizontal:  'Cloisons — perpendiculaires à Y',
   },

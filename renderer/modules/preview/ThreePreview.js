@@ -2,7 +2,7 @@ import * as THREE from '../../lib/three.module.js';
 import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { FingerJointBox } from '../boxes/FingerJointBox.js';
-import { lipContour, lipSeat, lidPartitionThickness, lidGapOf } from '../boxes/LidBox.js';
+import { lipContour, lipSeat, lidPartitionThickness, lidGapOf, RABBET_NONE } from '../boxes/LidBox.js';
 import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 
 // Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
@@ -336,6 +336,9 @@ export class ThreePreview {
   }
 
   _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6, cells = null, td = 3.175, lidGap = 20) {
+    // Sans feuillure : parois pleine hauteur, couvercle de la taille du corps, joint à plat
+    const none = rs === RABBET_NONE;
+    if (none) rD = 0;
     // Emprise de la forme (même boîte englobante que le G-code pour la disposition du couvercle)
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys);
@@ -384,24 +387,26 @@ export class ThreePreview {
     // Cas 0 : feuillure intérieure — anneau entre (wt-r-jeu) et wt, largeur r+jeu, profondeur rD
     // Cas 1 : feuillure extérieure — anneau entre 0 et r+jeu (bord ext), largeur r+jeu, profondeur rD
     // Lèvre et logement : mêmes coins arrondis que le G-code (rayon minimum de la lèvre)
-    const grooveOuter = rs === 0 ? lipSeat(pts, wt - r - jeu, td, jeu) : pts;
-    const grooveInner = rs === 0 ? innerPts                            : lipContour(pts, r + jeu, td);
+    if (!none) {
+      const grooveOuter = rs === 0 ? lipSeat(pts, wt - r - jeu, td, jeu) : pts;
+      const grooveInner = rs === 0 ? innerPts                            : lipContour(pts, r + jeu, td);
 
-    // Partie solide du mur au niveau de la feuillure (pas creusée par la feuillure)
-    // rs=0 : anneau extérieur (pts → grooveOuter) ; rs=1 : anneau intérieur (grooveInner → innerPts)
-    const topWallOuter = rs === 0 ? pts        : grooveInner;
-    const topWallInner = rs === 0 ? grooveOuter : innerPts;
-    const topWallShape = this._shape(topWallOuter);
-    const topWallHole  = new THREE.Path();
-    topWallInner.forEach((p, i) => i === 0 ? topWallHole.moveTo(p.x, p.y) : topWallHole.lineTo(p.x, p.y));
-    topWallHole.closePath();
-    topWallShape.holes = [topWallHole];
-    const topWallMesh = this._mesh(
-      new THREE.ExtrudeGeometry(topWallShape, { depth: rD, bevelEnabled: false }),
-      this._mat(BOX_COLOR, { roughness: 0.7 })
-    );
-    topWallMesh.position.z = H - rD;
-    // Le creux de la feuillure (grooveOuter → grooveInner) reste vide : vraie marche, comme usinée
+      // Partie solide du mur au niveau de la feuillure (pas creusée par la feuillure)
+      // rs=0 : anneau extérieur (pts → grooveOuter) ; rs=1 : anneau intérieur (grooveInner → innerPts)
+      const topWallOuter = rs === 0 ? pts        : grooveInner;
+      const topWallInner = rs === 0 ? grooveOuter : innerPts;
+      const topWallShape = this._shape(topWallOuter);
+      const topWallHole  = new THREE.Path();
+      topWallInner.forEach((p, i) => i === 0 ? topWallHole.moveTo(p.x, p.y) : topWallHole.lineTo(p.x, p.y));
+      topWallHole.closePath();
+      topWallShape.holes = [topWallHole];
+      const topWallMesh = this._mesh(
+        new THREE.ExtrudeGeometry(topWallShape, { depth: rD, bevelEnabled: false }),
+        this._mat(BOX_COLOR, { roughness: 0.7 })
+      );
+      topWallMesh.position.z = H - rD;
+      // Le creux de la feuillure (grooveOuter → grooveInner) reste vide : vraie marche, comme usinée
+    }
 
     // ── COUVERCLE — disposé comme à l'usinage (G-code, simulation) ──────────
     // À côté du corps (même règle que LidBox : à droite, ou au-dessus si la forme est
@@ -431,7 +436,7 @@ export class ThreePreview {
 
     add(new THREE.ExtrudeGeometry(this._shape(lidOuter), { depth: bFll, bevelEnabled: false }),
       this._mat(BOX_COLOR, { roughness: 0.85 }));                               // fond du couvercle
-    if (rs === 0) {
+    if (rs === 0 || none) {
       ring(lidOuter, lidCav, bFll, lidH - bFll);
     } else {
       const lidRab = mirror(lipSeat(pts, r, td, jeu));

@@ -1,7 +1,7 @@
 import { t } from '../i18n.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { insetPolygon } from '../gcode/Offset.js';
-import { lipContour, lidPartitionThickness } from '../boxes/LidBox.js';
+import { lipContour, lidPartitionThickness, RABBET_NONE } from '../boxes/LidBox.js';
 import { pointAtFraction, nearestOnContour, contourLengths } from '../gcode/TabPositions.js';
 
 // Pièce d'illustration (boîte du dessous de l'empilable) : gris, comme dans l'aperçu 3D
@@ -131,12 +131,14 @@ export class TechnicalView {
     const bFl  = boxParams.bottomThickness    ?? bt;  // épaisseur fond corps
     const bFll = boxParams.lidBottomThickness ?? bFl;  // épaisseur fond couvercle
     const lidH = boxParams.lidHeight     ?? 0;
-    const r    = boxParams.rabbet        ?? 0;
-    const rD   = boxParams.rabbetDepth   ?? 4;
+    // Boîte à couvercle sans feuillure : ni feuillure ni jeu, couvercle posé à plat sur le corps
+    const noRabbet = boxTypeKey === 'lid-box' && Number(boxParams.rabbetSide) === RABBET_NONE;
+    const r    = noRabbet ? 0 : boxParams.rabbet ?? 0;
+    const rD   = noRabbet ? 0 : boxParams.rabbetDepth ?? 4;
     const rim  = boxParams.stackRim      ?? wt;  // stackRim supprimé → fallback wallThickness
     const rimH = boxParams.rimHeight      ?? 0;   // hauteur du guide d'empilement
     const rs   = boxParams.rabbetSide    ?? 0;  // 0 = feuillure intérieure, 1 = feuillure extérieure
-    const jeu  = boxParams.clearance     ?? 0; // jeu d'assemblage
+    const jeu  = noRabbet ? 0 : boxParams.clearance ?? 0; // jeu d'assemblage
 
     const qW = Math.floor(CW / 2);
     const qH = Math.floor(CH / 2);

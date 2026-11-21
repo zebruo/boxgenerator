@@ -6,7 +6,7 @@ A desktop application for generating parametric boxes and trays with CNC G-code 
 
 ## Features
 
-- **4 box types** : Open Tray, Finger Joint Box, Lid Box (rabbet lid), Stackable Box
+- **4 box types** : Open Tray, Finger Joint Box, Lid Box (rabbet or flat joint), Stackable Box
 - **6 shape profiles** : Rectangle, Circle, Oval, Polygon (including hexagon), Bean, and any rounded variant
 - **G-code export** compatible with Grbl, Mach3 and LinuxCNC
 - **Compact G-code** : short segments merged into G2/G3 arcs (option), much shorter files
@@ -36,7 +36,7 @@ A desktop application for generating parametric boxes and trays with CNC G-code 
 |------|-------------|
 | Open Tray | Simple open tray — cavity + outer contour |
 | Finger Joint Box | Closed box with finger joints on all panels |
-| Lid Box | Body + rabbet lid (interior or exterior rabbet) |
+| Lid Box | Body + lid: interior or exterior rabbet, or no rabbet (flat joint) |
 | Stackable Box | Box with interlocking rim for stacking |
 
 ## Shapes
