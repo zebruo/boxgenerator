@@ -139,7 +139,9 @@ export const fr = {
     stock_below:      'En dessous',
     gcode_panel:      'G-code',
     btn_generate:     'Générer',
-    btn_save_session: 'Enregistrer la session (Ctrl+S) — Maj+clic : Enregistrer sous… (Ctrl+Maj+S)',
+    btn_save_session: 'Enregistrer la session (Ctrl+S)',
+    btn_save_as_session: 'Enregistrer la session sous… (Ctrl+Maj+S) : autre nom ou autre dossier',
+    btn_new_session:  'Nouvelle session (Ctrl+N) : boîte, Z0, brut, stratégie et tabs par défaut ; matière et limites machine gardées',
     btn_load_session: 'Ouvrir une session (Ctrl+O)',
     btn_export:       'Exporter G-code',
     btn_export_short: 'G-code',
@@ -249,6 +251,8 @@ export const fr = {
 
   // ── Dialogues de confirmation ───────────────────────────────────────────
   dialog: {
+    new_session_title: 'Nouvelle session',
+    new_session_body:  'Les modifications non enregistrées de la session en cours seront perdues.',
     btn_cancel:   'Annuler',
     btn_continue: 'Continuer',
     machining_order_title: "Ordre d'usinage incorrect",

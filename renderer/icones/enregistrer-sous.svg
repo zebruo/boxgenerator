@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <!-- Crayon en diagonale : pointe en bas à gauche, bout arrondi en haut à droite -->
+    <path id="crayon" d="M10.5 21l1.41-3.53 7.78-7.78a1.5 1.5 0 0 1 2.12 2.12l-7.78 7.78z"/>
+    <!-- Espace vide autour du crayon : la disquette s'arrête avant lui -->
+    <mask id="hors-crayon" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+      <rect width="24" height="24" fill="#fff"/>
+      <use href="#crayon" fill="#000" stroke="#000" stroke-width="4.4" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <!-- Disquette : corps à coin coupé, volet avec sa fente, étiquette -->
+  <g mask="url(#hors-crayon)" fill="none" stroke="#000" stroke-width="1.8" stroke-linejoin="round">
+    <path d="M3.5 2.5h12.6l4.4 4.4v13.1a1 1 0 0 1-1 1h-16a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1z"/>
+    <path d="M6 2.5v6.6h9.4V2.5M12.7 4.8v2"/>
+    <path d="M5.6 21v-8.4h12.8"/>
+  </g>
+  <!-- Crayon : contour, pointe pleine -->
+  <use href="#crayon" fill="none" stroke="#000" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M10.5 21l.8-2.01 1.21 1.21z" fill="#000"/>
+</svg>

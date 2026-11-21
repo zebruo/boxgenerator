@@ -287,6 +287,20 @@ export function initCuttingPanel({ t, lang, onChange }) {
       syncTool(false); savePrefs(); render();    // le diamètre du fichier est gardé tel quel
     },
 
+    /**
+     * Nouvelle session : fraise en saisie manuelle (⌀ et dents donnés), broche et valeurs de coupe
+     * recalculées (auto). La matière et les limites machine sont gardées.
+     */
+    reset({ diameter, flutes }) {
+      st.toolRef = '';
+      st.flutes = flutes;
+      st.spindleFixed = false;
+      st.vc = null;
+      st.manual = { feed: false, plunge: false, passes: false };
+      $('param-tool-diameter').value = diameter;
+      syncTool(false); savePrefs(); update();
+    },
+
     /** Réglages choisis dans la fenêtre « Détails du calcul » : matière, dents, valeurs de coupe. */
     applyDetails({ matId, flutes, diameter, vf, vfZ, ap, manual, toolRef, machine, vcManual }) {
       // Limites machine réglées dans la fenêtre : reportées dans le panneau

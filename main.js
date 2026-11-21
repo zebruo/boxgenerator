@@ -101,6 +101,9 @@ ipcMain.handle('save-session', async (event, { content, defaultName, saveAs }) =
   return { success: true, path: target, name: path.basename(target) };
 });
 
+// IPC: Nouvelle session : plus de fichier courant (« Enregistrer » ouvrira l'explorateur)
+ipcMain.on('new-session', () => { sessionPath = null; });
+
 // IPC: Load session
 ipcMain.handle('load-session', async () => {
   const { filePaths } = await dialog.showOpenDialog(mainWindow, {

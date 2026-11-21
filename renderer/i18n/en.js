@@ -139,7 +139,9 @@ export const en = {
     stock_below:      'Below',
     gcode_panel:      'G-code',
     btn_generate:     'Generate',
-    btn_save_session: 'Save session (Ctrl+S) — Shift+click: Save as… (Ctrl+Shift+S)',
+    btn_save_session: 'Save session (Ctrl+S)',
+    btn_save_as_session: 'Save session as… (Ctrl+Shift+S): another name or folder',
+    btn_new_session:  'New session (Ctrl+N): default box, Z0, stock, strategy and tabs; material and machine limits kept',
     btn_load_session: 'Open session (Ctrl+O)',
     btn_export:       'Export G-code',
     btn_export_short: 'G-code',
@@ -249,6 +251,8 @@ export const en = {
 
   // ── Confirm dialogs ─────────────────────────────────────────────────────
   dialog: {
+    new_session_title: 'New session',
+    new_session_body:  'Unsaved changes to the current session will be lost.',
     btn_cancel:   'Cancel',
     btn_continue: 'Continue',
     machining_order_title: 'Incorrect machining order',

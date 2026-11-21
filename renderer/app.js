@@ -487,6 +487,7 @@ function init() {
   updatePreview();
   const v = window.electronAPI?.version;
   if (v) { appTitle = `Box Generator - CNC v${v}`; showSessionName(sessionName); }
+  blankSnapshot = sessionSnapshot();   // session sans fichier : sert à savoir si elle a été modifiée
 }
 
 function bindEvents() {
@@ -580,12 +581,15 @@ function bindEvents() {
   const sessionError = err => { console.error(err); showNotif(t('notif.session_failed', { error: err.message })); };
   document.getElementById('btn-save-session').addEventListener('click', e => saveSession(e.shiftKey).catch(sessionError));   // Maj+clic : Enregistrer sous
   document.getElementById('btn-load-session').addEventListener('click', () => loadSession().catch(sessionError));
-  // Raccourcis : Ctrl+S enregistrer, Ctrl+Maj+S enregistrer sous, Ctrl+O ouvrir
+  document.getElementById('btn-new-session').addEventListener('click', () => newSession().catch(sessionError));
+  document.getElementById('btn-save-as-session').addEventListener('click', () => saveSession(true).catch(sessionError));
+  // Raccourcis : Ctrl+S enregistrer, Ctrl+Maj+S enregistrer sous, Ctrl+O ouvrir, Ctrl+N nouvelle session
   document.addEventListener('keydown', e => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     const k = e.key.toLowerCase();
     if (k === 's') { e.preventDefault(); saveSession(e.shiftKey).catch(sessionError); }
     else if (k === 'o' && !e.shiftKey) { e.preventDefault(); loadSession().catch(sessionError); }
+    else if (k === 'n' && !e.shiftKey) { e.preventDefault(); newSession().catch(sessionError); }
   });
 
   // Export G-code
@@ -1865,6 +1869,50 @@ async function loadSession() {
   updateInfoBar();
   showPanelTab('cut');   // session ouverte : onglet des avertissements de coupe
   savedSnapshot = sessionSnapshot();   // état de référence : le titre n'a pas de « * » tant que rien ne change
+}
+
+// ─── Nouvelle session ───────────────────────────────────────────────────────
+/** Réglages d'une nouvelle session (le reste vient des valeurs par défaut des boîtes et du panneau). */
+const NEW_SESSION = { box: 'open-tray', shape: 'rectangle', toolDiameter: 6, flutes: 2,
+  z0: { pos: 'center', level: 'top' }, safeZ: 5, arcs: true, lidGap: 20 };
+let blankSnapshot = null;   // session sans fichier, au démarrage ou à la dernière « nouvelle session »
+
+/** La session en cours a des modifications qui seraient perdues (fichier modifié, ou travail jamais enregistré). */
+function hasUnsavedWork() {
+  if (sessionName) return sessionDirty;
+  return blankSnapshot !== null && sessionSnapshot() !== blankSnapshot;
+}
+
+/**
+ * Nouvelle session : boîte, forme, dimensions, Z0, brut, onglet « Stratégie » et tabs par défaut ; fraise
+ * en saisie manuelle (⌀ 6, 2 dents). Gardés : matière, limites machine, langue, thème, vue.
+ */
+async function newSession() {
+  if (hasUnsavedWork() && !(await showWarnConfirm(t('dialog.new_session_title'), escHtml(t('dialog.new_session_body'))))) return;
+  const d = NEW_SESSION;
+  savedSnapshot = null;   // pas de comparaison pendant la remise à zéro
+  stopTabEdit();
+  closeToolbarPops();
+  selectBoxType(d.box);
+  selectShape(d.shape);
+  restoreZ0(d.z0);
+  for (const id of ['stock-offset', 'stock-offset-lid']) document.getElementById(id).value = 0;
+  setPressed('.stock-side-btn', document.querySelector('.stock-side-btn[data-side="top"]'));
+  if (threePreview) threePreview.stockSide = 'top';
+  document.getElementById('lid-gap').value = d.lidGap;
+  document.getElementById('param-safe-z').value = d.safeZ;
+  document.getElementById('param-arcs').checked = d.arcs;
+  saveExportOpts({ ...EXPORT_OPTS_DEFAULT });
+  syncTabsUI();
+  cuttingPanel.reset({ diameter: d.toolDiameter, flutes: d.flutes });   // recalcule avances et passes, puis l'aperçu
+  gcodeOutput.innerHTML = `<span class="gcode-placeholder" data-i18n="ui.gcode_placeholder">${escHtml(t('ui.gcode_placeholder'))}</span>`;
+  window.electronAPI?.newSession?.();   // « Enregistrer » demandera où écrire
+  showSessionName('');
+  updateToolbarSummaries();
+  updatePreview();
+  updateInfoBar();
+  showPanelTab('cut');
+  blankSnapshot = sessionSnapshot();
 }
 
 // Forme et paramètres d'une session, avec compatibilité des anciennes versions

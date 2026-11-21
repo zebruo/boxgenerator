@@ -525,6 +525,14 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 }
 .btn-icon-header:hover { border-color: var(--accent3); color: var(--accent3); background: color-mix(in srgb, var(--accent3) 8%, transparent); }
 .header-sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+/* ── Icônes de l'application (dossier icones/, voir son README) : SVG affiché en masque,
+   à la taille et dans la couleur du texte ── */
+.ico {
+  display: inline-block; width: 1.15em; height: 1.15em; flex: none;
+  background-color: currentColor;
+  -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
+}
+.ico-enregistrer-sous { --ico: url(icones/enregistrer-sous.svg); }
 
 /* ── Bouton aide ? (header) ── */
 .btn-icon-header.btn-help { font-size: 17px; }

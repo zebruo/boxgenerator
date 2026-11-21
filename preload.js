@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSVG:       (data) => ipcRenderer.invoke('save-svg', data),
   saveSession:   (data) => ipcRenderer.invoke('save-session', data),
   loadSession:   ()     => ipcRenderer.invoke('load-session'),
+  newSession:    ()     => ipcRenderer.send('new-session'),
   version:       ipcRenderer.sendSync('get-version'),
 });
