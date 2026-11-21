@@ -713,7 +713,9 @@ export class GCodeGenerator {
       fromZ = Math.min(fromZ, entryZ);
       // Sous le sommet des tabs : remontée à tab.z au passage de chaque tab. Si la boucle
       // finit dans un tab, l'outil est à tab.z et le dépassement final passe au-dessus.
-      if (tabsOn) this._cutLoopWithTabs(cut, segLengths, tabEv.events, z, tab.z);
+      // Rampe en sortie de tab (entrée en rampe ou en hélice) : depuis le fond de la passe précédente
+      const tabRamp = e.entry === 'plunge' ? null : { len: e.rampLen, fromZ: z + stepZ, startInTab: tabEv?.startInTab };
+      if (tabsOn) this._cutLoopWithTabs(cut, segLengths, tabEv.events, z, tab.z, tabRamp);
       else        this._loop(cut);
       this._emitOvercut(cut);
     }
@@ -1018,28 +1020,34 @@ export class GCodeGenerator {
       if (angle < 2 * Math.PI - 1e-6) segs.push({ type: 'cut', from: angle, to: 2 * Math.PI });
       return segs;
     };
-    // Un tour complet à la profondeur z, remontée à tabZ sur les tabs
-    const emitTabbedTurn = (segs, z, rad) => {
-      for (const seg of segs) {
-        if (seg.type === 'cut') {
-          emitArc(seg.from, seg.to, rad);
-        } else {
-          this.rapidZ(tabZ);
-          emitArc(seg.from, seg.to, rad);
-          this.plungeTo(z);
-        }
-      }
+    // Arc du cercle de rayon rad, de l'angle a0 sur une longueur L (sens G3), en segments de 5°
+    const arcFrom = (a0, L, rad = r_off_work) => {
+      const da = Math.min(L / rad, 1.8 * Math.PI), n = Math.max(1, Math.ceil(da / (Math.PI / 36)));
+      return Array.from({ length: n + 1 }, (_, i) => ({
+        x: cx + rad * Math.cos(a0 + da * i / n), y: cy + rad * Math.sin(a0 + da * i / n) }));
+    };
+
+    // Un tour complet à la profondeur z, remontée à tabZ sur les tabs. Sortie de tab : rampe
+    // le long du cercle jusqu'au tab suivant si `rampFrom` (fond de la passe précédente), sinon plongée
+    const emitTabbedTurn = (segs, z, rad, rampFrom = null) => {
+      const tabs = segs.filter(s => s.type === 'tab');
+      segs.forEach(seg => {
+        if (seg.type === 'cut') { emitArc(seg.from, seg.to, rad); return; }
+        this.rapidZ(tabZ);
+        emitArc(seg.from, seg.to, rad);
+        const ti = tabs.indexOf(seg);
+        const nextFrom = ti + 1 < tabs.length ? tabs[ti + 1].from : tabs[0].from + 2 * Math.PI;
+        const sub = rampFrom === null ? null : arcFrom(seg.to, Math.min(e.rampLen, (nextFrom - seg.to) * rad), rad);
+        if (sub && this._polyLen(sub) >= LIMITS.rampMinLength) this._rampAlong(sub, z, Math.min(tabZ, rampFrom));
+        else this.plungeTo(z);
+      });
     };
     const tabSegs = hasTabs ? buildTabSegs(r_off_work) : null;
 
     // Entrée en rampe (le long du cercle, sens G3) ou en hélice (côté chute) : place libre avant
     // le premier tab et après le dernier, en longueur d'arc
     const start = { x: startX, y: startY };
-    const arcStart = L => {
-      const a1 = Math.min(L / r_off_work, 1.8 * Math.PI), n = Math.max(1, Math.ceil(a1 / (Math.PI / 36)));
-      return Array.from({ length: n + 1 }, (_, i) => ({
-        x: cx + r_off_work * Math.cos(a1 * i / n), y: cy + r_off_work * Math.sin(a1 * i / n) }));
-    };
+    const arcStart = L => arcFrom(0, L);
     const waste = { outside: { x: 1, y: 0 }, inside: { x: -1, y: 0 } }[side] ?? null;
     const tabTs = tabSegs ? tabSegs.filter(s => s.type === 'tab') : [];
     const tabRoom = tabTs.length
@@ -1069,7 +1077,7 @@ export class GCodeGenerator {
       }
 
       if (tabsOn) {
-        emitTabbedTurn(tabSegs, z, r_off_work);
+        emitTabbedTurn(tabSegs, z, r_off_work, e.entry === 'plunge' ? null : z + stepZ);
       } else {
         this.emit(`G3 X${(cx - r_off_work + ox).toFixed(3)} Y${(cy + oy).toFixed(3)} I${(-r_off_work).toFixed(3)} J0.000 F${f}`);
         this.emit(`G3 X${(startX + ox).toFixed(3)} Y${(startY + oy).toFixed(3)} I${(r_off_work).toFixed(3)} J0.000 F${f}`);
@@ -1198,8 +1206,9 @@ export class GCodeGenerator {
    * Parcourt le contour fermé pts à la profondeur z, en remontant à tabZ entre les
    * événements 'up' et 'down' (voir _tabEvents). Revient au point de départ.
    */
-  _cutLoopWithTabs(pts, segLengths, events, z, tabZ) {
+  _cutLoopWithTabs(pts, segLengths, events, z, tabZ, ramp = null) {
     const n = pts.length;
+    const P = segLengths.reduce((s, l) => s + l, 0);
     let cum = 0, k = 0;
     for (let i = 0; i < n; i++) {
       const a = pts[i], b = pts[(i + 1) % n], len = segLengths[i];
@@ -1208,13 +1217,26 @@ export class GCodeGenerator {
       while (k < events.length && events[k].dist < segEnd) {
         const ev = events[k++];
         const t  = (ev.dist - cum) / len;
-        this.lineTo(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
-        if (ev.action === 'up') this.rapidZ(tabZ);
+        const p  = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        this.lineTo(p.x, p.y);
+        if (ev.action === 'up') { this.rapidZ(tabZ); continue; }
+        // Sortie de tab : rampe sur le trajet qui suit (jusqu'au tab suivant), sinon plongée
+        const sub = ramp ? this._pathStart([p, ...pts.slice(i + 1), ...pts.slice(0, i + 1)], true,
+          Math.min(ramp.len, this._nextTabRoom(events, ev.dist, P, ramp.startInTab))) : null;
+        if (sub && this._polyLen(sub) >= LIMITS.rampMinLength) this._rampAlong(sub, z, Math.min(tabZ, ramp.fromZ));
         else this.plungeTo(z);
       }
       this.lineTo(b.x, b.y);
       cum += len;
     }
+  }
+
+  /** Trajet libre devant l'abscisse `dist` jusqu'au début du tab suivant (en repassant par le départ). */
+  _nextTabRoom(events, dist, P, startInTab) {
+    const ups = events.filter(ev => ev.action === 'up').map(ev => ev.dist);
+    const next = ups.find(u => u > dist + 1e-9);
+    if (next !== undefined) return next - dist;
+    return P - dist + (startInTab || !ups.length ? 0 : ups[0]);
   }
 
   /**
