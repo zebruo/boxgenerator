@@ -34,7 +34,8 @@ function createWindow() {
     backgroundColor: '#1e1e1e'
   });
 
-  mainWindow.loadFile('renderer/index.html');
+  mainWindow.loadFile('renderer/index.html')
+    .catch(err => console.error('Chargement de la page :', err));
 
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools();
@@ -52,7 +53,7 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-});
+}).catch(err => console.error('Démarrage :', err));
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -81,11 +82,11 @@ ipcMain.handle('save-gcode', async (event, { content, defaultName }) => {
 // IPC: Save session
 // « Enregistrer » : directement sur le fichier connu ; « Enregistrer sous » (saveAs), premier enregistrement ou
 // dossier disparu : explorateur. Le chemin reste ici : l'interface ne choisit jamais où écrire.
-ipcMain.handle('save-session', async (event, { content, defaultName, saveAs }) => {
+ipcMain.handle('save-session', async (event, { content, defaultName, saveAs, dialogTitle }) => {
   let target = !saveAs && sessionPath && fs.existsSync(path.dirname(sessionPath)) ? sessionPath : null;
   if (!target) {
     const { filePath } = await dialog.showSaveDialog(mainWindow, {
-      title: 'Sauvegarder la session',
+      title: dialogTitle || 'Enregistrer la session sous',   // titre traduit fourni par l'interface
       defaultPath: sessionPath || defaultName || 'session.json',
       filters: [{ name: 'Session BoxGenerator', extensions: ['json'] }]
     });

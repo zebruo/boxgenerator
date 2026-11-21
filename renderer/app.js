@@ -1814,7 +1814,10 @@ async function saveSession(saveAs = false) {
   const session = buildSession();
 
   const defaultName = `boxgen_${state.boxTypeKey}_${state.shapeKey}.json`;
-  const res = await window.electronAPI.saveSession({ content: JSON.stringify(session, null, 2), defaultName, saveAs: saveAs === true });
+  const res = await window.electronAPI.saveSession({
+    content: JSON.stringify(session, null, 2), defaultName, saveAs: saveAs === true,
+    dialogTitle: t('ui.save_as_dialog'),   // titre de l'explorateur Windows (Enregistrer sous, ou premier enregistrement)
+  });
   if (res?.success) {
     savedSnapshot = JSON.stringify(session);
     showSessionName(res.name);

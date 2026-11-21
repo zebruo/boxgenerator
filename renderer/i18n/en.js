@@ -140,6 +140,7 @@ export const en = {
     gcode_panel:      'G-code',
     btn_generate:     'Generate',
     btn_save_session: 'Save session (Ctrl+S)',
+    save_as_dialog:   'Save session as',
     btn_save_as_session: 'Save session as… (Ctrl+Shift+S): another name or folder',
     btn_new_session:  'New session (Ctrl+N): default box, Z0, stock, strategy and tabs; material and machine limits kept',
     btn_load_session: 'Open session (Ctrl+O)',
