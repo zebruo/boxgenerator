@@ -19,7 +19,7 @@ import { showHelpModal }         from './modules/HelpModal.js';
 import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
 import { WARN, LIMITS } from './modules/Thresholds.js';
 import { initCuttingPanel } from './modules/CuttingPanel.js';
-import { rampAngleFor } from './modules/CuttingParams.js';
+import { rampAngleFor, entryModeFor } from './modules/CuttingParams.js';
 
 // ─── Tooltip global (réutilisé dans les modales) ────────────────────────────
 let _tipEl  = null;
@@ -348,7 +348,20 @@ function syncMachiningUI() {
   const d = exportToolDefaults(getMachineParams().toolDiameter || 3.175);
   const $ = id => document.getElementById(id);
   const val = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
-  setSeg('mach-entry', o.entry);
+  // Pastilles « auto / ↺ auto » : mode selon la matière, longueurs et rayons selon le ⌀ de la fraise
+  const pill = (id, manual, tipKey) => {
+    const b = $(id);
+    b.classList.toggle('manual', manual);
+    b.textContent = t(manual ? 'cut.reset' : 'cut.auto');
+    b.title = t(`${tipKey}_${manual ? 'manual' : 'auto'}`);
+    b.disabled = !manual;
+  };
+  pill('mach-state-entry', !o.entryAuto, 'ui.mach_entry');
+  pill('mach-state-ramp', o.rampLen != null, 'ui.mach_size');
+  pill('mach-state-helix', o.helixR != null, 'ui.mach_size');
+  pill('mach-state-leadin', o.leadInR != null, 'ui.mach_size');
+  const entry = currentEntryMode();
+  setSeg('mach-entry', entry);
   setSeg('mach-pocket', o.pocketConc ? 'conc' : 'raster');
   val('mach-ramp-len', o.rampLen ?? d.ramp);
   val('mach-helix-r', o.helixR ?? d.helixR);
@@ -357,8 +370,8 @@ function syncMachiningUI() {
   val('mach-finish', o.finishAllowance);
   $('mach-leadin-on').checked = !!o.leadInOn;
   $('mach-finish-on').checked = !!o.finishOn;
-  $('mach-row-ramp').hidden = o.entry !== 'ramp';
-  $('mach-row-helix-r').hidden = $('mach-row-helix-t').hidden = o.entry !== 'helix';
+  $('mach-row-ramp').hidden = entry !== 'ramp';
+  $('mach-row-helix-r').hidden = $('mach-row-helix-t').hidden = entry !== 'helix';
   $('mach-leadin-r').disabled = !o.leadInOn;
   $('mach-finish').disabled = !o.finishOn;
   $('mach-tabs-note').textContent = tabsSummaryText();
@@ -389,7 +402,16 @@ function bindMachiningUI() {
     $(id).addEventListener('input', read);
     $(id).addEventListener('change', read);
   }
-  document.querySelectorAll('#mach-entry > button').forEach(b => b.addEventListener('click', () => save({ entry: b.dataset.v })));
+  // Un mode cliqué devient un choix à la main ; la pastille revient au mode proposé selon la matière
+  // (cliquer le mode proposé reste en auto, comme une valeur saisie égale au calcul)
+  document.querySelectorAll('#mach-entry > button').forEach(b => b.addEventListener('click', () => save({
+    entry: b.dataset.v, entryAuto: b.dataset.v === entryModeFor(document.getElementById('param-material').value),
+  })));
+  const reset = (id, patch) => $(id).addEventListener('click', e => { save(patch); e.currentTarget.blur(); });
+  reset('mach-state-entry', { entryAuto: true });
+  reset('mach-state-ramp', { rampLen: null });
+  reset('mach-state-helix', { helixR: null });
+  reset('mach-state-leadin', { leadInR: null });
   document.querySelectorAll('#mach-pocket > button').forEach(b => b.addEventListener('click', () => save({ pocketConc: b.dataset.v === 'conc' })));
   // Infobulles : les valeurs par défaut citées suivent le ⌀ de la fraise
   const tipVal = { 'modal.tip_ramp_len': td => (td * 2).toFixed(1), 'modal.tip_helix_r': td => (td * 0.6).toFixed(2),
@@ -1007,15 +1029,30 @@ function stockExtras() {
 // simulation (qui joue ainsi exactement le fichier exporté). Les valeurs qui dépendent
 // du diamètre d'outil restent null tant qu'elles valent le défaut calculé.
 const EXPORT_OPTS_DEFAULT = {
+  entryAuto: true,    // mode d'entrée proposé selon la matière (entryModeFor) ; false : `entry` choisi à la main
   entry: 'plunge', rampLen: null, helixR: null, helixTurns: 1,
   leadInOn: false, leadInR: null, finishOn: false, finishAllowance: 0.2,
   tabsOn: true, tabCount: 4, tabWidth: 8, tabHeight: 2, pocketConc: true,
   tabsManual: null,   // tabs placés à la main : fractions du périmètre du contour de la forme
 };
 
+/** Options enregistrées complétées par les valeurs par défaut. Enregistrées avant le mode « auto »
+ *  (un `entry` sans `entryAuto`) : le mode enregistré est gardé tel quel, le G-code ne change pas. */
+function withExportDefaults(saved) {
+  const o = { ...EXPORT_OPTS_DEFAULT, ...saved };
+  if (saved && 'entry' in saved && !('entryAuto' in saved)) o.entryAuto = false;
+  return o;
+}
+
 function loadExportOpts() {
-  try { return { ...EXPORT_OPTS_DEFAULT, ...JSON.parse(localStorage.getItem('exportOpts') || '{}') }; }
+  try { return withExportDefaults(JSON.parse(localStorage.getItem('exportOpts') || '{}')); }
   catch { return { ...EXPORT_OPTS_DEFAULT }; }
+}
+
+/** Mode d'entrée en vigueur : proposé selon la matière (auto) ou choisi à la main. */
+function currentEntryMode() {
+  const o = state.exportOpts;
+  return o.entryAuto ? entryModeFor(document.getElementById('param-material')?.value) : o.entry;
 }
 
 state.exportOpts = loadExportOpts();
@@ -1057,7 +1094,7 @@ function exportGenOptions(machine) {
   return {
     tabOpts: currentTabOpts(),
     entryOpts: {
-      entry: o.entry, rampLen: o.rampLen ?? d.ramp, helixR: o.helixR ?? d.helixR, helixTurns: o.helixTurns,
+      entry: currentEntryMode(), rampLen: o.rampLen ?? d.ramp, helixR: o.helixR ?? d.helixR, helixTurns: o.helixTurns,
       leadIn: o.leadInOn ? (o.leadInR ?? d.leadR) : false, finishAllowance,
     },
     pocketConc: o.pocketConc,
@@ -1808,7 +1845,7 @@ async function loadSession() {
   if (session.z0) restoreZ0(session.z0);
   // Options d'usinage de la session (entrée, finition, tabs, poche) ; sessions plus anciennes : réglages courants
   if (session.machining) {
-    saveExportOpts({ ...EXPORT_OPTS_DEFAULT, ...session.machining });
+    saveExportOpts(withExportDefaults(session.machining));
     syncTabsUI();
     updateToolbarSummaries();
   }

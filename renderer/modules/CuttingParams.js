@@ -62,6 +62,12 @@ export function rampAngleFor(matId) {
   return LIMITS.rampAngle[RAMP_FAMILY[matId] ?? 'dur'];
 }
 
+/** Mode d'entrée proposé pour une matière : hélice pour l'aluminium, le cuivre et le laiton
+ *  (copeaux mieux dégagés, pointe soulagée), rampe pour le bois et les plastiques. */
+export function entryModeFor(matId) {
+  return RAMP_FAMILY[matId] === 'alu' ? 'helix' : 'ramp';
+}
+
 /** Coefficient k du tableau du fournisseur pour une matière et un diamètre (sans plafond machine). */
 export function apCoefficient(matId, diameter) {
   let i = 0;                                  // sous 2 mm : première colonne du tableau

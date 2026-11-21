@@ -148,7 +148,7 @@
           <div class="panel-pane" id="ppane-mach" role="tabpanel" aria-labelledby="ptab-mach" hidden>
             <div class="params-list">
               <div class="param-row stacked">
-                <span class="param-label" id="mach-entry-label" data-i18n="modal.entry_tool">Entrée outil</span>
+                <span class="param-lab"><span class="param-label" id="mach-entry-label" data-i18n="modal.entry_tool">Entrée outil</span><button type="button" class="cut-state" id="mach-state-entry"></button></span>
                 <div class="tb-seg mach-seg" id="mach-entry" role="group" aria-labelledby="mach-entry-label">
                   <button type="button" data-v="plunge" data-mtip="modal.tip_plunge" data-i18n="modal.plunge">Plongée</button>
                   <button type="button" data-v="ramp" data-mtip="modal.tip_ramp" data-i18n="modal.ramp">Rampe</button>
@@ -156,12 +156,12 @@
                 </div>
               </div>
               <div class="param-row" id="mach-row-ramp" data-mtip="modal.tip_ramp_len">
-                <label for="mach-ramp-len" data-i18n="modal.ramp_length">Longueur rampe</label>
+                <span class="param-lab"><label for="mach-ramp-len" data-i18n="modal.ramp_length">Longueur rampe</label><button type="button" class="cut-state" id="mach-state-ramp"></button></span>
                 <input type="number" id="mach-ramp-len" min="1" max="50" step="0.5">
                 <span class="param-unit">mm</span>
               </div>
               <div class="param-row" id="mach-row-helix-r" data-mtip="modal.tip_helix_r">
-                <label for="mach-helix-r" data-i18n="ui.helix_radius">Rayon hélice</label>
+                <span class="param-lab"><label for="mach-helix-r" data-i18n="ui.helix_radius">Rayon hélice</label><button type="button" class="cut-state" id="mach-state-helix"></button></span>
                 <input type="number" id="mach-helix-r" min="0.5" max="20" step="0.5">
                 <span class="param-unit">mm</span>
               </div>
@@ -174,7 +174,7 @@
                 <input type="checkbox" id="mach-leadin-on">
               </div>
               <div class="param-row" id="mach-row-leadin-r" data-mtip="modal.tip_leadin_r">
-                <label for="mach-leadin-r" data-i18n="ui.leadin_radius">Rayon arc</label>
+                <span class="param-lab"><label for="mach-leadin-r" data-i18n="ui.leadin_radius">Rayon arc</label><button type="button" class="cut-state" id="mach-state-leadin"></button></span>
                 <input type="number" id="mach-leadin-r" min="0.5" max="20" step="0.5">
                 <span class="param-unit">mm</span>
               </div>

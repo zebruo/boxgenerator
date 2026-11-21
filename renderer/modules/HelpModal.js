@@ -103,7 +103,7 @@ export function showHelpModal(machine = {}) {
             <strong>Arcs G2/G3</strong> — regroupe les petits segments en vrais arcs et ne répète pas les mots inchangés : le fichier est beaucoup plus court et la machine plus fluide.
           </dd>
           <dt>Stratégie</dt>
-          <dd>Second onglet de la même section : <strong>entrée de l'outil</strong> (plongée, rampe avec sa longueur, hélice avec son rayon et son nombre minimal de tours), <strong>lead-in / out</strong> et son rayon, <strong>finition des parois</strong> et sa surépaisseur, <strong>stratégie de poche</strong> (concentrique ou zig-zag), plus un rappel des tabs (bouton <em>Tabs</em> de la barre Usinage). Tant qu'on ne les modifie pas, la longueur de rampe et les rayons suivent le ⌀ de la fraise. Ces réglages sont enregistrés avec la session et servent au visualiseur, à la simulation et à l'export (voir <em>Entrée outil</em>, <em>Lead-in / Lead-out</em>, <em>Stratégie poche</em> et <em>Finition des parois</em> ci-dessous).</dd>
+          <dd>Second onglet de la même section : <strong>entrée de l'outil</strong> (plongée, rampe avec sa longueur, hélice avec son rayon et son nombre minimal de tours), <strong>lead-in / out</strong> et son rayon, <strong>finition des parois</strong> et sa surépaisseur, <strong>stratégie de poche</strong> (concentrique ou zig-zag), plus un rappel des tabs (bouton <em>Tabs</em> de la barre Usinage). Pastilles <em>auto / ↺ auto</em> comme dans l'onglet Matière &amp; Outil : le <strong>mode d'entrée</strong> est proposé selon la matière (rampe pour le bois et les plastiques, hélice pour l'aluminium, le cuivre et le laiton) tant qu'on n'en choisit pas un autre ; la <strong>longueur de rampe</strong> et les <strong>rayons</strong> suivent le ⌀ de la fraise tant qu'on ne les saisit pas. <em>↺ auto</em> revient à la valeur proposée. Les sessions enregistrées avant ce réglage gardent le mode qu'elles avaient. Ces réglages sont enregistrés avec la session et servent au visualiseur, à la simulation et à l'export (voir <em>Entrée outil</em>, <em>Lead-in / Lead-out</em>, <em>Stratégie poche</em> et <em>Finition des parois</em> ci-dessous).</dd>
         </dl>
       </section>
 
@@ -145,7 +145,7 @@ export function showHelpModal(machine = {}) {
       <!-- ── Entrée outil ────────────────────────────────── -->
       <section class="help-section">
         <h4>Entrée outil</h4>
-        <p>Mode de descente dans la matière à chaque passe en Z, pour les contours comme pour les poches. Rampe et hélice partent du fond de la passe précédente (au-dessus, la matière est déjà enlevée) et avancent à 60 % de l'avance de coupe.</p>
+        <p>Mode de descente dans la matière à chaque passe en Z, pour les contours comme pour les poches. Par défaut (<em>auto</em>), il est proposé selon la matière : rampe pour le bois et les plastiques, hélice pour l'aluminium, le cuivre et le laiton. Rampe et hélice partent du fond de la passe précédente (au-dessus, la matière est déjà enlevée) et avancent à 60 % de l'avance de coupe.</p>
         <dl class="help-dl">
           <dt>Plongée</dt>
           <dd>Descente verticale directe. Simple et rapide, mais sollicite la pointe de la fraise. Convient aux fraises qui coupent au centre (toutes celles du catalogue) avec des passes modestes.</dd>
