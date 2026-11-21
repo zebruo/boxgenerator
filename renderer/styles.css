@@ -124,8 +124,24 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 }
 .panel-tab:hover { color: var(--text); }
 .panel-tab.active { color: var(--text); border-bottom-color: var(--accent2); cursor: default; }
+/* Avertissement dans l'onglet caché « Matière & Outil » : point orange après le titre */
+.panel-tab.has-warn::after {
+  content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 5px; vertical-align: 2px;
+  border-radius: 50%; background: var(--warn);
+}
 .panel-pane[hidden] { display: none; }
-.mach-seg { display: flex; }
+.mach-seg { display: flex; grid-column: 1 / -1; }
+/* Entrée outil : libellé et pastille dans la colonne des libellés (pastille contre le bord des
+   champs, comme les lignes suivantes), boutons sur toute la largeur en dessous */
+.mach-entry-row { row-gap: 4px; }
+/* Rubriques de l'onglet Stratégie (entrée, lead-in, finition, poche) : cadre pointillé et fond léger,
+   marges négatives pour garder la largeur des colonnes (pastilles contre les champs) */
+.mach-group {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 -7px; padding: 7px 6px;
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
 .mach-seg > button { flex: 1; height: 26px; padding: 0; }
 .panel-left .mach-seg > button { font-size: 13px; }
 .param-row[hidden] { display: none; }
@@ -201,6 +217,9 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .param-row.stacked { grid-template-columns: 1fr; gap: 4px; }
 .param-lab { display: flex; align-items: center; justify-content: space-between; gap: 5px; min-width: 0; }   /* pastilles auto/fixe alignées contre les champs */
 .param-lab label { white-space: nowrap; }
+/* Libellé trop long : coupé (…) plutôt que de pousser la pastille sous le champ */
+.param-lab > label, .param-lab > .param-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.param-lab > .cut-state { flex: none; }
 .cut-select {
   width: 100%; height: 26px; padding: 0 6px; font: inherit; font-size: 12px;
   background: var(--bg-dark); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);

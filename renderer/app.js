@@ -423,24 +423,35 @@ function bindMachiningUI() {
   syncMachiningUI();
 }
 
-/** Onglets « Matière & Outil » / « Stratégie » ; l'onglet ouvert est retenu sur ce poste. */
+/** Affiche l'onglet `pane` ('cut' : Matière & Outil, 'mach' : Stratégie). */
+function showPanelTab(pane) {
+  document.querySelectorAll('.panel-tab').forEach(b => {
+    const on = b.dataset.pane === pane;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
+    document.getElementById(`ppane-${b.dataset.pane}`).hidden = !on;
+  });
+  if (pane === 'mach') syncMachiningUI();
+  updatePanelTabWarn();
+}
+
+/** Point orange sur « Matière & Outil » quand un avertissement s'y affiche alors que l'onglet est caché. */
+function updatePanelTabWarn() {
+  const pane = document.getElementById('ppane-cut'), tab = document.getElementById('ptab-cut');
+  if (!pane || !tab) return;
+  const warn = pane.hidden && !!pane.querySelector('.cut-note.warn, .input-warn');
+  tab.classList.toggle('has-warn', warn);
+  tab.title = warn ? t('ui.tab_warn') : '';
+}
+
+/** Onglets « Matière & Outil » / « Stratégie » : ouverture sur « Matière & Outil » (où s'affichent les
+ *  avertissements de coupe), au démarrage comme à l'ouverture d'une session. */
 function bindPanelTabs() {
-  const show = pane => {
-    document.querySelectorAll('.panel-tab').forEach(b => {
-      const on = b.dataset.pane === pane;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-selected', String(on));
-      document.getElementById(`ppane-${b.dataset.pane}`).hidden = !on;
-    });
-    if (pane === 'mach') syncMachiningUI();
-  };
-  document.querySelectorAll('.panel-tab').forEach(b => b.addEventListener('click', () => {
-    show(b.dataset.pane);
-    try { localStorage.setItem('panelTab', b.dataset.pane); } catch { /* stockage indisponible */ }
-  }));
-  let saved = 'cut';
-  try { saved = localStorage.getItem('panelTab') === 'mach' ? 'mach' : 'cut'; } catch { /* stockage indisponible */ }
-  show(saved);
+  document.querySelectorAll('.panel-tab').forEach(b => b.addEventListener('click', () => showPanelTab(b.dataset.pane)));
+  // Avertissements de l'onglet : notes orange et champs en avertissement, quel que soit le code qui les pose
+  const pane = document.getElementById('ppane-cut');
+  new MutationObserver(updatePanelTabWarn).observe(pane, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+  showPanelTab('cut');
 }
 
 // ─── i18n — mise à jour des éléments statiques du DOM ──────────────────────
@@ -1852,6 +1863,7 @@ async function loadSession() {
 
   updatePreview();
   updateInfoBar();
+  showPanelTab('cut');   // session ouverte : onglet des avertissements de coupe
   savedSnapshot = sessionSnapshot();   // état de référence : le titre n'a pas de « * » tant que rien ne change
 }
 

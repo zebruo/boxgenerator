@@ -71,6 +71,8 @@ export const fr = {
     dimensions:    'Dimensions',
     material_tool: 'Matière & Outil',
     strategy_tab:  'Stratégie',
+    tab_warn:      'Un avertissement s’affiche dans cet onglet',
+    ramp_length:   'Longueur',
     helix_radius:  'Rayon hélice',
     helix_turns:   'Tours min.',
     leadin:        'Lead-in / out',

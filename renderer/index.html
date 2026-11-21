@@ -147,7 +147,8 @@
           </div>
           <div class="panel-pane" id="ppane-mach" role="tabpanel" aria-labelledby="ptab-mach" hidden>
             <div class="params-list">
-              <div class="param-row stacked">
+              <div class="mach-group">
+              <div class="param-row mach-entry-row">
                 <span class="param-lab"><span class="param-label" id="mach-entry-label" data-i18n="modal.entry_tool">Entrée outil</span><button type="button" class="cut-state" id="mach-state-entry"></button></span>
                 <div class="tb-seg mach-seg" id="mach-entry" role="group" aria-labelledby="mach-entry-label">
                   <button type="button" data-v="plunge" data-mtip="modal.tip_plunge" data-i18n="modal.plunge">Plongée</button>
@@ -156,7 +157,7 @@
                 </div>
               </div>
               <div class="param-row" id="mach-row-ramp" data-mtip="modal.tip_ramp_len">
-                <span class="param-lab"><label for="mach-ramp-len" data-i18n="modal.ramp_length">Longueur rampe</label><button type="button" class="cut-state" id="mach-state-ramp"></button></span>
+                <span class="param-lab"><label for="mach-ramp-len" data-i18n="ui.ramp_length">Longueur</label><button type="button" class="cut-state" id="mach-state-ramp"></button></span>
                 <input type="number" id="mach-ramp-len" min="1" max="50" step="0.5">
                 <span class="param-unit">mm</span>
               </div>
@@ -169,6 +170,8 @@
                 <label for="mach-helix-turns" data-i18n="ui.helix_turns">Tours min.</label>
                 <input type="number" id="mach-helix-turns" min="1" max="5" step="1">
               </div>
+              </div>
+              <div class="mach-group">
               <div class="param-row" data-mtip="modal.tip_leadin">
                 <label for="mach-leadin-on" data-i18n="ui.leadin">Lead-in / out</label>
                 <input type="checkbox" id="mach-leadin-on">
@@ -178,6 +181,8 @@
                 <input type="number" id="mach-leadin-r" min="0.5" max="20" step="0.5">
                 <span class="param-unit">mm</span>
               </div>
+              </div>
+              <div class="mach-group">
               <div class="param-row" data-mtip="modal.tip_finish">
                 <label for="mach-finish-on" data-i18n="modal.finish_pass">Finition parois</label>
                 <input type="checkbox" id="mach-finish-on">
@@ -187,12 +192,15 @@
                 <input type="number" id="mach-finish" min="0.05" max="1" step="0.05">
                 <span class="param-unit">mm</span>
               </div>
+              </div>
+              <div class="mach-group">
               <div class="param-row stacked">
                 <span class="param-label" id="mach-pocket-label" data-i18n="modal.pocket_strategy">Stratégie poche</span>
                 <div class="tb-seg mach-seg" id="mach-pocket" role="group" aria-labelledby="mach-pocket-label">
                   <button type="button" data-v="conc" data-mtip="modal.tip_concentric" data-i18n="ui.pocket_conc">Concentrique</button>
                   <button type="button" data-v="raster" data-mtip="modal.tip_raster" data-i18n="ui.pocket_raster">Zig-zag</button>
                 </div>
+              </div>
               </div>
             </div>
             <p class="cut-summary" id="mach-tabs-note"></p>
