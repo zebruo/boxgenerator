@@ -10,6 +10,10 @@ import { withManualTabs } from '../gcode/TabPositions.js';
  * Rayon de coin minimum de la lèvre (partie mâle de la feuillure) : Ø/2 + 0,4 mm. Un coin vif
  * ne s'emboîte pas dans son logement, dont la fraise arrondit forcément les coins.
  */
+/** Écart (mm) entre le corps et le couvercle dans le programme : réglable (boxParams.lidGap), 20 par défaut. */
+export const LID_GAP_DEFAULT = 20;
+export const lidGapOf = params => (Number(params?.lidGap) > 0 ? Number(params.lidGap) : LID_GAP_DEFAULT);
+
 export const lipRadius = toolDiameter => toolDiameter / 2 + LIMITS.lipRadiusMargin;
 
 /** Lèvre : contour décalé de d vers l'intérieur, coins arrondis au rayon minimum. */
@@ -230,7 +234,7 @@ export class LidBox {
     gen.machine.zOffset = zOffFor(lidT);   // brut du couvercle (voir ci-dessus)
 
     // Décale le couvercle par rapport au corps
-    const lidGap       = 20;
+    const lidGap       = lidGapOf(params);
     const savedOriginX = gen.machine.originX;
     const savedOriginY = gen.machine.originY ?? 0;
     if (!machineParams.lidAtOrigin) {
@@ -297,7 +301,7 @@ export class LidBox {
   getDrawing(shape, params, machineParams = {}) {
     const { wallThickness = 6, rabbet = 3, rabbetSide = 0 } = params;
     const bb = shape.getBoundingBox();
-    const W = bb.width, D = bb.height, lidGap = 20;
+    const W = bb.width, D = bb.height, lidGap = lidGapOf(params);
     const bodyPts = shape.getContourPoints();
     const mirrorPts = pts => pts.map(p => ({ x: W - p.x, y: p.y })).reverse();
     let dx = 0, dy = 0;
@@ -325,14 +329,14 @@ export class LidBox {
     return items;
   }
 
-  getGCodeBoundingBox(shape, _params, machineParams) {
+  getGCodeBoundingBox(shape, params, machineParams) {
     if (machineParams?.lidAtOrigin) {
       const bb = shape.getBoundingBox();
       return { minX: 0, minY: 0, maxX: bb.width, maxY: bb.height, width: bb.width, height: bb.height };
     }
     const bb  = shape.getBoundingBox();
     const W = bb.width, D = bb.height;
-    const lidGap = 20;
+    const lidGap = lidGapOf(params);
     const useVertical = Math.max(W, 2*D + lidGap) < Math.max(2*W + lidGap, D);
     if (useVertical) {
       return { minX: 0, minY: 0, maxX: W,            maxY: 2*D + lidGap, width: W,            height: 2*D + lidGap };

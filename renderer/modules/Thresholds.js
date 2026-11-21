@@ -22,6 +22,10 @@ export const LIMITS = {
 };
 
 export const WARN = {
+  // ── Boîte à couvercle : deux planches (hauteurs différentes) ──
+  boardClear: 3,              // mm : jeu laissé entre les deux planches (taille de plaque conseillée)
+  boardChuteMin: 4,           // mm : chute minimale au-delà du passage de la fraise, pour retenir les tabs
+
   // ── Boîte à couvercle : feuillure ──
   rabbetFloorMin: 3,          // mm : matière minimale entre le fond de la feuillure et le fond du corps
   lidSinkMax: 1,              // mm : enfoncement toléré du dessus du couvercle sous le bord du corps (feuillure intérieure)

@@ -13,7 +13,7 @@ import { Polygon }        from './modules/shapes/Polygon.js';
 import { Bean }           from './modules/shapes/Bean.js';
 import { OpenTray }       from './modules/boxes/OpenTray.js';
 import { FingerJointBox } from './modules/boxes/FingerJointBox.js';
-import { LidBox, lidPartitionThickness } from './modules/boxes/LidBox.js';
+import { LidBox, lidPartitionThickness, lidGapOf } from './modules/boxes/LidBox.js';
 import { StackableBox }   from './modules/boxes/StackableBox.js';
 import { showHelpModal }         from './modules/HelpModal.js';
 import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
@@ -415,6 +415,14 @@ function bindEvents() {
   // Offset brut
   for (const id of ['stock-offset', 'stock-offset-lid']) document.getElementById(id).addEventListener('input', () => {
     updateToolbarSummaries();
+    updatePreview();
+  });
+
+  // Écart entre corps et couvercle (deux planches)
+  document.getElementById('lid-gap').addEventListener('input', e => {
+    const v = Number.parseFloat(e.target.value);
+    if (!(v >= 5)) return;                     // saisie en cours (« 2 » de « 25 ») ou valeur trop faible
+    state.boxParams.lidGap = v;
     updatePreview();
   });
 
@@ -1205,6 +1213,11 @@ function updateStockRows({ two, h, lidH, body, lid }) {
   document.getElementById('row-stock-body').hidden = !two;
   document.getElementById('row-stock-lid').hidden  = !two;
   document.getElementById('stock-lid-group').hidden = !two;   // second champ « Brut + » (couvercle)
+  // Deux planches : écart entre les pièces réglable (le champ ne change pas pendant la saisie)
+  document.getElementById('lid-gap-group').hidden = !two;
+  document.getElementById('lid-gap-note').hidden = !two;
+  const gapEl = document.getElementById('lid-gap');
+  if (document.activeElement !== gapEl) gapEl.value = lidGapOf(state.boxParams);
   const label = document.getElementById('stock-offset-label');
   label.dataset.i18n = two ? 'ui.stock_offset_body' : 'ui.stock_offset';
   label.textContent = t(label.dataset.i18n);
@@ -1213,6 +1226,20 @@ function updateStockRows({ two, h, lidH, body, lid }) {
     document.getElementById('stock-lid').value  = (lidH + lid).toFixed(1);
   }
   updateToolbarSummaries();
+}
+
+/** Fenêtre « Brut » : écart réel entre les contours, marge des planches et chute au-delà de la fraise. */
+function updateLidGapNote(gap, margin) {
+  const note = document.getElementById('lid-gap-note'), field = document.getElementById('lid-gap');
+  const td = getMachineParams().toolDiameter ?? 3.175;
+  const chute = margin - td;                 // le bord de la fraise passe à un diamètre du contour
+  const fmt = v => (+v.toFixed(1)).toLocaleString('fr-FR');
+  const warn = chute < WARN.boardChuteMin;
+  note.textContent = t(warn ? 'ui.lid_gap_warn' : 'ui.lid_gap_note',
+    { gap: fmt(gap), margin: fmt(margin), chute: fmt(Math.max(chute, 0)), min: WARN.boardChuteMin });
+  note.classList.toggle('warn-text', warn);
+  field.classList.toggle('input-warn', warn);
+  field.title = warn ? note.textContent : t('tip.lid_gap');
 }
 
 // Taille de plaque conseillée : emprise réelle des pièces (mêmes contours que le G-code,
@@ -1238,7 +1265,15 @@ function updateSheetSize() {
   if (state.boxTypeKey === 'lid-box' && hBody !== hLid) {
     // Hauteurs différentes → un brut par pièce (voir l'avertissement à l'export)
     const body = ext(face1.filter(d => d.part === 'body')), lid = ext(face1.filter(d => d.part === 'lid'));
-    if (body && lid) text = sheet(body) === sheet(lid) ? `2× ${sheet(body)}` : `${sheet(body)} + ${sheet(lid)}`;
+    if (body && lid) {
+      // Écart réel entre les contours (le couvercle réduit est plus petit que le corps) ; marge de chaque
+      // planche = moitié de l'écart moins un petit jeu, sans dépasser 20 mm : les planches ne se chevauchent pas
+      const gap = Math.max(lid.minY - body.maxY, lid.minX - body.maxX);
+      const m2 = Math.min(margin, Math.max(0, (gap - WARN.boardClear) / 2));
+      const sheet2 = e => `${Math.ceil(e.maxX - e.minX + 2 * m2)} × ${Math.ceil(e.maxY - e.minY + 2 * m2)}`;
+      text = sheet2(body) === sheet2(lid) ? `2× ${sheet2(body)}` : `${sheet2(body)} + ${sheet2(lid)}`;
+      updateLidGapNote(gap, m2);
+    }
   } else {
     const all = ext([...face1, ...holes]);
     if (all) text = sheet(all);

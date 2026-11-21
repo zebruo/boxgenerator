@@ -2,7 +2,7 @@ import * as THREE from '../../lib/three.module.js';
 import { OrbitControls } from '../../lib/jsm/controls/OrbitControls.js';
 import { buildPartitionContours } from '../gcode/PartitionedPocket.js';
 import { FingerJointBox } from '../boxes/FingerJointBox.js';
-import { lipContour, lipSeat, lidPartitionThickness } from '../boxes/LidBox.js';
+import { lipContour, lipSeat, lidPartitionThickness, lidGapOf } from '../boxes/LidBox.js';
 import { insetPolygon, offsetPolygons } from '../gcode/Offset.js';
 
 // Teinte unique des pièces (potiron) : fonds et parois se distinguent par l'éclairage,
@@ -156,7 +156,7 @@ export class ThreePreview {
         break;
       case 'lid-box': {
         const _r = boxParams.rabbet ?? 3; const _bFll = boxParams.lidBottomThickness ?? bFl;
-        lidLay = this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells, machineParams.toolDiameter ?? 3.175);
+        lidLay = this._buildLidBox(shapePts, H, boxParams.lidHeight ?? 15, boxParams.wallThickness ?? 6, _r, boxParams.rabbetDepth ?? 4, boxParams.rabbetSide ?? 0, boxParams.clearance ?? 0, bFl, _bFll, cells, machineParams.toolDiameter ?? 3.175, lidGapOf(boxParams));
         layW = lidLay.W; layD = lidLay.D;
         break;
       }
@@ -335,7 +335,7 @@ export class ThreePreview {
     return { W, D, assembled: true, height: H };
   }
 
-  _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6, cells = null, td = 3.175) {
+  _buildLidBox(pts, H, lidH, wt, r, rD, rs, jeu = 0, bFl = 6, bFll = 6, cells = null, td = 3.175, lidGap = 20) {
     // Emprise de la forme (même boîte englobante que le G-code pour la disposition du couvercle)
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const W = Math.max(...xs) - Math.min(...xs), D = Math.max(...ys) - Math.min(...ys);
@@ -409,7 +409,6 @@ export class ThreePreview {
     // Cas 0 : couvercle réduit (inset wt−r) : la lèvre (largeur r) est la paroi du bac.
     // Cas 1 : couvercle plein (taille corps) : feuillure intérieure (inset r, profondeur rD)
     //         au-dessus de la cavité.
-    const lidGap = 20;
     const useVertical = Math.max(W, 2 * D + lidGap) < Math.max(2 * W + lidGap, D);
     const dx = useVertical ? 0 : W + lidGap, dy = useVertical ? D + lidGap : 0;
     const assembled = this.lidLayout === 'assembled';
