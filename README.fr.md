@@ -15,7 +15,7 @@ Application desktop de génération de boîtes paramétriques avec export G-code
 - **Vues 2D techniques** : dessus, face, côté et coupe A-A, avec cotes
 - **Simulation d'usinage** : rejoue le G-code exporté sur le brut (fraise, trajets, matière enlevée, temps estimé), deux faces pour la boîte empilable, « pièce finie seule »
 - **Tabs de maintien** sur les coupes de contour (8 × 2 mm par défaut ; largeur, hauteur, nombre réglables avec le bouton « Tabs » de la barre Usinage), répartis par côté quand il y a plus de tabs que de côtés droits, ou **placés à la main** dans la vue 2D (clic pour ajouter ou retirer, glisser pour déplacer) ; enregistrés avec la session, comme l'entrée, la finition et la stratégie de poche
-- **Stratégies d'entrée** : plongée directe, rampe, hélicoïdale, lead-in tangentiel
+- **Stratégies d'entrée** : plongée directe, rampe, hélicoïdale, lead-in tangentiel ; réglées avec la finition et la stratégie de poche dans l'onglet « Stratégie » du panneau de gauche
 - **Finition des parois** : surépaisseur laissée aux passes, puis une passe à pleine profondeur sur la cote
 - **Calculateur de paramètres de coupe** : broche, avances XY et de plongée, profondeur de passe selon la matière, le diamètre et le nombre de dents, plafonnés par les limites de ta machine ; **catalogue de fraises** avec les valeurs de la fiche du fournisseur (hélicoïdales, droites et à compression), classées par diamètre
 - **Poche concentrique ou raster**, avec **cloisons** (compartiments)

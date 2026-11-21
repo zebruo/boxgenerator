@@ -115,6 +115,21 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   display: flex; justify-content: space-between; align-items: center;
 }
 .unit-label { font-weight: 400; color: var(--accent3); text-transform: lowercase; }
+/* Onglets « Matière & Outil » / « Stratégie » : titres de section cliquables */
+.panel-tabs { justify-content: flex-start; gap: 4px; border-bottom: 1px solid var(--border); margin: -2px -12px 10px; padding: 0 8px; }
+.panel-tab {
+  background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  padding: 2px 6px 6px; font: inherit; font-weight: 700; letter-spacing: inherit; text-transform: inherit;
+  color: var(--text-muted); cursor: pointer;
+}
+.panel-tab:hover { color: var(--text); }
+.panel-tab.active { color: var(--text); border-bottom-color: var(--accent2); cursor: default; }
+.panel-pane[hidden] { display: none; }
+.mach-seg { display: flex; }
+.mach-seg > button { flex: 1; height: 26px; padding: 0; }
+.panel-left .mach-seg > button { font-size: 13px; }
+.param-row[hidden] { display: none; }
+.param-row input[type=number]:disabled { opacity: .4; }
 
 /* ── Box type grid ── */
 .box-type-grid {
@@ -166,14 +181,11 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .param-row input[type=text]:focus { border-color: var(--accent); }
 /* Flèches natives : visibles seulement au survol ou à la saisie, à la couleur du thème */
 .param-row input[type=number]::-webkit-inner-spin-button,
-.export-modal .tab-input::-webkit-inner-spin-button,
 .sim-lbl input[type=number]::-webkit-inner-spin-button,
 #stock-offset::-webkit-inner-spin-button,
 #stock-offset-lid::-webkit-inner-spin-button { opacity: 0; margin-left: 2px; cursor: pointer; }
 .param-row input[type=number]:hover::-webkit-inner-spin-button,
 .param-row input[type=number]:focus::-webkit-inner-spin-button,
-.export-modal .tab-input:hover::-webkit-inner-spin-button,
-.export-modal .tab-input:focus::-webkit-inner-spin-button,
 .sim-lbl input[type=number]:hover::-webkit-inner-spin-button,
 .sim-lbl input[type=number]:focus::-webkit-inner-spin-button,
 #stock-offset:hover::-webkit-inner-spin-button,
@@ -477,73 +489,11 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 }
 .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
 
-/* ── Sections options dans la modale d'export ── */
-.export-modal .pocket-section {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;
-}
-.export-modal .pocket-title {
-  font-size: 12px; font-weight: 600; margin-bottom: 8px;
-}
-.export-modal .pocket-strategy-row {
-  display: flex; align-items: center; justify-content: space-between;
-}
-.export-modal .pocket-strategy-row .tabs-toggle-row { margin-bottom: 0; }
-.export-modal .pocket-raster-lbl {
-  color: var(--text-muted); font-size: 12px; cursor: default;
-}
+/* ── Rappel des options d'usinage dans la modale d'export ── */
 .export-modal .tabs-section {
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;
 }
-.export-modal .tabs-toggle-row {
-  display: flex; align-items: center; gap: 8px;
-  cursor: pointer; font-size: 12px; font-weight: 600;
-  margin-bottom: 8px; user-select: none;
-}
-.export-modal .tabs-toggle-row input { accent-color: var(--accent3); cursor: pointer; }
-.export-modal .tabs-fields {
-  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
-  font-size: 11px; padding-left: 22px; transition: opacity .15s;
-}
-.export-modal .tabs-fields.disabled { opacity: .35; pointer-events: none; }
-.export-modal .tab-f-lbl  { color: var(--text-muted); white-space: nowrap; }
-.export-modal .tab-f-unit { color: var(--text-muted); margin-right: 4px; }
-.export-modal .tab-input  {
-  width: 58px; background: var(--bg-dark); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 3px 3px 3px 5px; font-size: 11px; line-height: 18px; text-align: right;
-}
-
-/* ── Section entrée outil dans la modale d'export ── */
-.export-modal .entry-section {
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px;
-}
-.export-modal .entry-row {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 12px; margin-bottom: 6px;
-}
-.export-modal .entry-lbl { color: var(--text-muted); white-space: nowrap; }
-.export-modal .entry-mode-btns { display: flex; gap: 4px; }
-.export-modal .entry-mode-btn {
-  padding: 3px 10px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600;
-  background: var(--bg-dark); border: 1px solid var(--border);
-  color: var(--text-muted); cursor: pointer; transition: all .12s;
-}
-.export-modal .entry-mode-btn:hover { border-color: var(--accent); color: var(--accent); }
-.export-modal .entry-mode-btn.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.export-modal .entry-fields {
-  display: flex; align-items: center; gap: 7px; padding-left: 0;
-  font-size: 11px; min-height: 24px;
-}
-.export-modal .entry-field-group { display: flex; align-items: center; gap: 6px; }
-.export-modal .entry-lead-row {
-  display: flex; align-items: center; gap: 6px; cursor: pointer;
-  font-size: 11px; user-select: none; flex-shrink: 0;
-}
-.export-modal .entry-lead-row input { accent-color: var(--accent3); cursor: pointer; }
-.export-modal .entry-lead-fields { display: flex; align-items: center; gap: 6px; font-size: 11px; transition: opacity .15s; }
 
 /* ── Boutons icône header (save/load session) ── */
 .btn-icon-header {

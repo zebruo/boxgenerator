@@ -153,6 +153,7 @@ function initToolbarPopovers() {
 
 // Résumé de l'état sur les boutons Z0 et Brut (lisible sans ouvrir la fenêtre)
 function updateToolbarSummaries() {
+  syncMachiningUI();   // rappel des tabs de l'onglet « Stratégie »
   const z0 = getZ0Settings();
   const zs = document.getElementById('z0-summary');
   if (zs) zs.textContent = `${t(`tip.z0_${z0.pos.replace('-', '_')}`)} · ${t(z0.level === 'top' ? 'ui.z0_top_short' : 'ui.z0_bottom_short')}`;
@@ -322,6 +323,104 @@ function bindTabsUI() {
   syncTabsUI();
 }
 
+// ── Onglet « Stratégie » du panneau de gauche : entrée outil, lead-in, finition, poche ──
+/** Boutons segmentés : bouton actif selon la valeur. */
+function setSeg(id, v) {
+  document.querySelectorAll(`#${id} > button`).forEach(b => {
+    b.classList.toggle('active', b.dataset.v === v);
+    b.setAttribute('aria-pressed', String(b.dataset.v === v));
+  });
+}
+
+/** Rappel des tabs (réglés dans la barre Usinage), comme dans la fenêtre d'export. */
+function tabsSummaryText() {
+  const o = state.exportOpts;
+  if (!o.tabsOn) return t('modal.tabs_off');
+  const manual = manualTabsActive();
+  return t(manual ? 'modal.tabs_summary_manual' : 'modal.tabs_summary',
+    { n: manual ? o.tabsManual.length : o.tabCount, w: String(o.tabWidth).replace('.', ','), h: String(o.tabHeight).replace('.', ',') });
+}
+
+/** Onglet « Stratégie » rempli depuis les options mémorisées ; les valeurs par défaut suivent le ⌀ de la fraise. */
+function syncMachiningUI() {
+  if (!document.getElementById('mach-entry')) return;
+  const o = state.exportOpts;
+  const d = exportToolDefaults(getMachineParams().toolDiameter || 3.175);
+  const $ = id => document.getElementById(id);
+  const val = (id, v) => { if (document.activeElement !== $(id)) $(id).value = v; };
+  setSeg('mach-entry', o.entry);
+  setSeg('mach-pocket', o.pocketConc ? 'conc' : 'raster');
+  val('mach-ramp-len', o.rampLen ?? d.ramp);
+  val('mach-helix-r', o.helixR ?? d.helixR);
+  val('mach-helix-turns', o.helixTurns);
+  val('mach-leadin-r', o.leadInR ?? d.leadR);
+  val('mach-finish', o.finishAllowance);
+  $('mach-leadin-on').checked = !!o.leadInOn;
+  $('mach-finish-on').checked = !!o.finishOn;
+  $('mach-row-ramp').hidden = o.entry !== 'ramp';
+  $('mach-row-helix-r').hidden = $('mach-row-helix-t').hidden = o.entry !== 'helix';
+  $('mach-leadin-r').disabled = !o.leadInOn;
+  $('mach-finish').disabled = !o.finishOn;
+  $('mach-tabs-note').textContent = tabsSummaryText();
+}
+
+/** Onglet « Stratégie » : chaque réglage est mémorisé (session et réglages par défaut). */
+function bindMachiningUI() {
+  const $ = id => document.getElementById(id);
+  const save = patch => { saveExportOpts({ ...state.exportOpts, ...patch }); syncMachiningUI(); };
+  const read = () => {
+    const d = exportToolDefaults(getMachineParams().toolDiameter || 3.175);
+    const num = id => Number.parseFloat($(id).value);
+    // null = valeur par défaut calculée depuis le diamètre d'outil (suit un changement de fraise)
+    const orDefault = (v, def, cur) => (Number.isFinite(v) && v > 0 ? (Math.abs(v - def) > 1e-9 ? v : null) : cur);
+    const fin = (v, cur) => (Number.isFinite(v) && v > 0 ? v : cur);
+    const o = state.exportOpts;
+    save({
+      rampLen:         orDefault(num('mach-ramp-len'), d.ramp, o.rampLen),
+      helixR:          orDefault(num('mach-helix-r'), d.helixR, o.helixR),
+      helixTurns:      Math.round(fin(num('mach-helix-turns'), o.helixTurns)),
+      leadInOn:        $('mach-leadin-on').checked,
+      leadInR:         orDefault(num('mach-leadin-r'), d.leadR, o.leadInR),
+      finishOn:        $('mach-finish-on').checked,
+      finishAllowance: fin(num('mach-finish'), o.finishAllowance),
+    });
+  };
+  for (const id of ['mach-ramp-len', 'mach-helix-r', 'mach-helix-turns', 'mach-leadin-on', 'mach-leadin-r', 'mach-finish-on', 'mach-finish']) {
+    $(id).addEventListener('input', read);
+    $(id).addEventListener('change', read);
+  }
+  document.querySelectorAll('#mach-entry > button').forEach(b => b.addEventListener('click', () => save({ entry: b.dataset.v })));
+  document.querySelectorAll('#mach-pocket > button').forEach(b => b.addEventListener('click', () => save({ pocketConc: b.dataset.v === 'conc' })));
+  // Infobulles : les valeurs par défaut citées suivent le ⌀ de la fraise
+  const tipVal = { 'modal.tip_ramp_len': td => (td * 2).toFixed(1), 'modal.tip_helix_r': td => (td * 0.6).toFixed(2),
+    'modal.tip_leadin_r': td => (td * 0.4).toFixed(2) };
+  document.querySelectorAll('#ppane-mach [data-mtip]').forEach(el => {
+    const key = el.dataset.mtip;
+    attachTooltip(el, () => t(key, { val: tipVal[key]?.(getMachineParams().toolDiameter || 3.175) }), 600);
+  });
+  syncMachiningUI();
+}
+
+/** Onglets « Matière & Outil » / « Stratégie » ; l'onglet ouvert est retenu sur ce poste. */
+function bindPanelTabs() {
+  const show = pane => {
+    document.querySelectorAll('.panel-tab').forEach(b => {
+      const on = b.dataset.pane === pane;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+      document.getElementById(`ppane-${b.dataset.pane}`).hidden = !on;
+    });
+    if (pane === 'mach') syncMachiningUI();
+  };
+  document.querySelectorAll('.panel-tab').forEach(b => b.addEventListener('click', () => {
+    show(b.dataset.pane);
+    try { localStorage.setItem('panelTab', b.dataset.pane); } catch { /* stockage indisponible */ }
+  }));
+  let saved = 'cut';
+  try { saved = localStorage.getItem('panelTab') === 'mach' ? 'mach' : 'cut'; } catch { /* stockage indisponible */ }
+  show(saved);
+}
+
 // ─── i18n — mise à jour des éléments statiques du DOM ──────────────────────
 function updateI18n() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -348,6 +447,8 @@ function init() {
   bindEvents();
   initToolbarPopovers();
   bindTabsUI();
+  bindMachiningUI();
+  bindPanelTabs();
   updateI18n();
   resizeCanvases();
   updatePreview();
@@ -1153,6 +1254,7 @@ function updatePreview() {
       }
     }
   }
+  syncMachiningUI();   // valeurs par défaut de l'onglet « Stratégie » : suivent le ⌀ de la fraise
   updateInfoBar();
 }
 
@@ -1292,7 +1394,8 @@ function generateGCode() {
   const machine = getMachineParams();
   const z0      = getZ0Settings();
   const origin  = computeOrigin(z0, machine);
-  const code = state.boxType.generateGCode(state.shape, state.boxParams, { ...machine, ...origin, pocketConc: true });
+  // Mêmes options que l'export et la simulation (onglet « Stratégie », tabs)
+  const code = state.boxType.generateGCode(state.shape, state.boxParams, { ...machine, ...origin, ...exportGenOptions(machine) });
   renderGCode(code);
 }
 
@@ -1315,10 +1418,13 @@ function renderGCode(code) {
 // ─── Exports ────────────────────────────────────────────────────────────────
 async function exportGCode() {
   generateGCode();
-  const rawCode = gcodeOutput.textContent.trim();
-  if (!rawCode) return;
-  const sections = parseGCodeSections(rawCode);
-  showExportModal(sections, getMachineParams());
+  if (!gcodeOutput.textContent.trim()) return;
+  // Liste des opérations : libellés courts d'une génération sans options (concentrique), les
+  // options (entrée, tabs…) n'ajoutant ni ne retirant de section
+  const machine = getMachineParams();
+  const plain = state.boxType.generateGCode(state.shape, state.boxParams,
+    { ...machine, ...computeOrigin(getZ0Settings(), machine), pocketConc: true });
+  showExportModal(parseGCodeSections(plain), machine);
 }
 
 // Découpe le G-code en sections identifiées par les marqueurs ; ─── ... ───
@@ -1376,12 +1482,18 @@ function splitFooter(sections) {
 
 function showExportModal(sections, machine = {}) {
   const optional = sections.filter(s => !s.required);
-  // Valeurs par défaut calculées depuis les paramètres machine réels
-  const td      = machine.toolDiameter      ?? 3.175;
-  const { ramp: defRamp, helixR: defHelixR, leadR: defLeadR } = exportToolDefaults(td);
-  // Dernières options utilisées (mémorisées)
+  // Options d'usinage : onglet « Stratégie » et bouton « Tabs » (ici, simple rappel)
   const o = state.exportOpts;
-  const dim = on => on ? '' : 'opacity:.4;pointer-events:none';
+  const gen = exportGenOptions(machine);
+  const eo = gen.entryOpts;
+  const mm = v => `${String(v).replace('.', ',')} mm`;
+  const entryText = { ramp: `${t('modal.ramp')} ${mm(eo.rampLen)}`, helix: `${t('modal.helix')} R ${mm(eo.helixR)}` }[eo.entry]
+    ?? t('modal.plunge');
+  const strategyText = t('modal.strategy_summary', {
+    entry: entryText + (eo.leadIn ? ` + lead-in R ${mm(eo.leadIn)}` : ''),
+    finish: gen.finishAllowance > 0 ? mm(gen.finishAllowance) : t('modal.finish_off'),
+    pocket: t(o.pocketConc ? 'ui.pocket_conc' : 'ui.pocket_raster'),
+  });
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -1391,67 +1503,9 @@ function showExportModal(sections, machine = {}) {
   const opsKey = optional.length === 1 ? 'modal.ops_one' : 'modal.ops_other';
   modal.innerHTML = `
     <h3>${t('modal.export_title')}</h3>
-    <div class="entry-section">
-      <div class="entry-row">
-        <span class="entry-lbl">${t('modal.entry_tool')}</span>
-        <div class="entry-mode-btns">
-          <button class="entry-mode-btn${o.entry === 'plunge' ? ' active' : ''}" data-mode="plunge" data-tip="${t('modal.tip_plunge')}">${t('modal.plunge')}</button>
-          <button class="entry-mode-btn${o.entry === 'ramp'   ? ' active' : ''}" data-mode="ramp" data-tip="${t('modal.tip_ramp')}">${t('modal.ramp')}</button>
-          <button class="entry-mode-btn${o.entry === 'helix'  ? ' active' : ''}" data-mode="helix" data-tip="${t('modal.tip_helix')}">${t('modal.helix')}</button>
-        </div>
-      </div>
-      <div class="entry-fields" id="modal-entry-fields">
-        <span class="entry-field-group" id="entry-ramp-fields" style="display:${o.entry === 'ramp' ? '' : 'none'}">
-          <span class="tab-f-lbl" data-tip="${t('modal.tip_ramp_len', { val: (td*2).toFixed(1) })}">${t('modal.ramp_length')}</span>
-          <input type="number" id="modal-ramp-len" class="tab-input" value="${o.rampLen ?? defRamp}" min="1" max="50" step="0.5">
-          <span class="tab-f-unit">mm</span>
-        </span>
-        <span class="entry-field-group" id="entry-helix-fields" style="display:${o.entry === 'helix' ? '' : 'none'}">
-          <span class="tab-f-lbl" data-tip="${t('modal.tip_helix_r', { val: (td*0.6).toFixed(2) })}">${t('modal.radius')}</span>
-          <input type="number" id="modal-helix-r" class="tab-input" value="${o.helixR ?? defHelixR}" min="0.5" max="20" step="0.5">
-          <span class="tab-f-unit">mm</span>
-          <span class="tab-f-lbl" data-tip="${t('modal.tip_helix_turns')}">${t('modal.turns')}</span>
-          <input type="number" id="modal-helix-turns" class="tab-input" value="${o.helixTurns}" min="1" max="5" step="1">
-        </span>
-      </div>
-      <div class="entry-row" style="margin-top:6px">
-        <label class="entry-lead-row" data-tip="${t('modal.tip_leadin')}">
-          <input type="checkbox" id="modal-leadin-on"${o.leadInOn ? ' checked' : ''}>
-          <span class="tab-f-lbl">${t('modal.leadin')}</span>
-        </label>
-        <span class="entry-lead-fields" id="modal-leadin-fields" style="${dim(o.leadInOn)}">
-          <span class="tab-f-lbl" data-tip="${t('modal.tip_leadin_r', { val: (td*0.4).toFixed(2) })}">${t('modal.radius')}</span>
-          <input type="number" id="modal-leadin-r" class="tab-input" value="${o.leadInR ?? defLeadR}" min="0.5" max="20" step="0.5">
-          <span class="tab-f-unit">mm</span>
-        </span>
-      </div>
-      <div class="entry-row" style="margin-top:6px">
-        <label class="entry-lead-row" data-tip="${t('modal.tip_finish')}">
-          <input type="checkbox" id="modal-finish-on"${o.finishOn ? ' checked' : ''}>
-          <span class="tab-f-lbl">${t('modal.finish_pass')}</span>
-        </label>
-        <span class="entry-lead-fields" id="modal-finish-fields" style="${dim(o.finishOn)}">
-          <span class="tab-f-lbl">${t('modal.skin')}</span>
-          <input type="number" id="modal-finish-allowance" class="tab-input" value="${o.finishAllowance}" min="0.05" max="1" step="0.05">
-          <span class="tab-f-unit">mm</span>
-        </span>
-      </div>
-    </div>
     <div class="tabs-section">
-      <p class="modal-sub" style="margin:0">${o.tabsOn
-        ? t(manualTabsActive() ? 'modal.tabs_summary_manual' : 'modal.tabs_summary',
-            { n: manualTabsActive() ? o.tabsManual.length : o.tabCount, w: String(o.tabWidth).replace('.', ','), h: String(o.tabHeight).replace('.', ',') })
-        : t('modal.tabs_off')}</p>
-    </div>
-    <div class="pocket-section">
-      <div class="pocket-title">${t('modal.pocket_strategy')}</div>
-      <div class="pocket-strategy-row">
-        <label class="tabs-toggle-row" data-tip="${t('modal.tip_concentric')}">
-          <input type="checkbox" id="modal-pocket-conc">
-          <span>${t('modal.concentric')}</span>
-        </label>
-        <span class="entry-lbl pocket-raster-lbl" data-tip="${t('modal.tip_raster')}">${t('modal.raster')}</span>
-      </div>
+      <p class="modal-sub" style="margin:0">${escHtml(strategyText)}</p>
+      <p class="modal-sub" style="margin:4px 0 0">${escHtml(tabsSummaryText())}</p>
     </div>
     <p class="modal-sub">${t(opsKey, { count: optional.length })}</p>
     <div class="modal-toolbar">
@@ -1503,31 +1557,15 @@ function showExportModal(sections, machine = {}) {
   const getCheckboxes = () => list.querySelectorAll('input[type=checkbox]:not(:disabled)');
 
   const modalStatsEl = modal.querySelector('#modal-stats');
-  const pocketConcStats = modal.querySelector('#modal-pocket-conc');
-  // Tabs : réglés dans la barre Usinage (bouton « Tabs »), plus dans cette fenêtre
-  const tabOptsNow = currentTabOpts;
+  // Options de génération : onglet « Stratégie » et tabs (une seule source : state.exportOpts)
+  const { tabOpts, entryOpts, pocketConc } = gen;
+  // `origin` : origine du programme (et lidAtOrigin pour le couvercle exporté seul)
+  const genFor = origin => state.boxType.generateGCode(state.shape, state.boxParams,
+    { ...machine, ...origin, tabOpts, entryOpts, pocketConc, finishAllowance: gen.finishAllowance });
+  const fullSections = parseGCodeSections(genFor(computeOrigin(getZ0Settings(), machine)));
 
   const updateModalStats = () => {
-    const tabOpts = tabOptsNow();
-    const entryMode = modal.querySelector('.entry-mode-btn.active')?.dataset.mode ?? 'plunge';
-    const entryOpts = {
-      entry:      entryMode,
-      rampLen:    Number.parseFloat(modal.querySelector('#modal-ramp-len').value),
-      helixR:     Number.parseFloat(modal.querySelector('#modal-helix-r').value),
-      helixTurns: Number.parseInt(modal.querySelector('#modal-helix-turns').value),
-      leadIn:     modal.querySelector('#modal-leadin-on').checked
-                    ? Number.parseFloat(modal.querySelector('#modal-leadin-r').value) : false,
-      finishAllowance: modal.querySelector('#modal-finish-on').checked
-                    ? Number.parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
-    };
-    const machine = getMachineParams();
-    const z0      = getZ0Settings();
-    const origin  = computeOrigin(z0, machine);
-    const fc = state.boxType.generateGCode(
-      state.shape, state.boxParams,
-      { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcStats.checked, finishAllowance: entryOpts.finishAllowance }
-    );
-    const fSections = parseGCodeSections(fc);
+    const fSections = fullSections;
     const sel = new Set();
     list.querySelectorAll('input[type=checkbox]').forEach(cb => { if (cb.checked) sel.add(Number.parseInt(cb.dataset.idx)); });
     const code = fSections.filter((_, i) => sel.has(i)).map(s => s.lines.join('\n')).join('\n');
@@ -1540,8 +1578,6 @@ function showExportModal(sections, machine = {}) {
   list.addEventListener('change', updateModalStats);
   modal.querySelector('#modal-sel-all').addEventListener('click',  () => { getCheckboxes().forEach(cb => cb.checked = true);  updateModalStats(); });
   modal.querySelector('#modal-sel-none').addEventListener('click', () => { getCheckboxes().forEach(cb => cb.checked = false); updateModalStats(); });
-  modal.querySelector('#modal-pocket-conc').addEventListener('change', updateModalStats);
-  modal.querySelectorAll('.entry-mode-btn').forEach(b => b.addEventListener('click', () => setTimeout(updateModalStats, 0)));
 
   // Applique l'état initial des tabs sur les labels (selon les options mémorisées)
   if (o.tabsOn) {
@@ -1554,7 +1590,6 @@ function showExportModal(sections, machine = {}) {
   // Stratégie de poche mémorisée + mise à jour labels
   // La prévisualisation est générée avec pocketConc:true → labels du type
   // "Pocket concentrique (N anneaux...)", "Pocket spirale (...)" ou "Pocket (...)" → normalisés
-  modal.querySelector('#modal-pocket-conc').checked = o.pocketConc;
   const pocketLabel = t(o.pocketConc ? 'modal.pocket_conc_label' : 'modal.pocket_raster_label');
   // Un seul remplacement par libellé : enchaînés, « Pocket concentrique (…) » devenait « Pocket raster
   // zig-zag », puis « Pocket raster » y était remplacé une seconde fois (« zig-zag zig-zag »)
@@ -1562,72 +1597,6 @@ function showExportModal(sections, machine = {}) {
     lbl.textContent = lbl.textContent
       .replace(/Pocket (?:concentrique |spirale )?\([^)]*\)|Pocket raster(?: zig-zag)?/, pocketLabel);
   });
-
-  // ── Entry mode buttons ──────────────────────────────────────────────────
-  let selectedEntry = o.entry;
-  modal.querySelectorAll('.entry-mode-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      modal.querySelectorAll('.entry-mode-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      selectedEntry = btn.dataset.mode;
-      modal.querySelector('#entry-ramp-fields').style.display  = selectedEntry === 'ramp'  ? '' : 'none';
-      modal.querySelector('#entry-helix-fields').style.display = selectedEntry === 'helix' ? '' : 'none';
-    });
-  });
-
-  // ── Lead-in toggle ───────────────────────────────────────────────────────
-  const leadInCb     = modal.querySelector('#modal-leadin-on');
-  const leadInFields = modal.querySelector('#modal-leadin-fields');
-  leadInCb.addEventListener('change', () => {
-    leadInFields.style.opacity      = leadInCb.checked ? '1'    : '.4';
-    leadInFields.style.pointerEvents = leadInCb.checked ? 'auto' : 'none';
-    updateModalStats();
-  });
-
-  // ── Finish allowance toggle ───────────────────────────────────────────────
-  const finishOnCb     = modal.querySelector('#modal-finish-on');
-  const finishFields   = modal.querySelector('#modal-finish-fields');
-  finishOnCb.addEventListener('change', () => {
-    finishFields.style.opacity      = finishOnCb.checked ? '1'    : '.4';
-    finishFields.style.pointerEvents = finishOnCb.checked ? 'auto' : 'none';
-    updateModalStats();
-  });
-  modal.querySelector('#modal-finish-allowance').addEventListener('input', updateModalStats);
-
-  const pocketConcCb = modal.querySelector('#modal-pocket-conc');
-  // Met à jour les labels de poche dans la liste quand la stratégie change
-  pocketConcCb.addEventListener('change', () => {
-    list.querySelectorAll('.sec-label').forEach(lbl => {
-      lbl.textContent = lbl.textContent
-        .replace(t('modal.pocket_raster_label'), pocketConcCb.checked ? t('modal.pocket_conc_label') : t('modal.pocket_raster_label'))
-        .replace(t('modal.pocket_conc_label'),   pocketConcCb.checked ? t('modal.pocket_conc_label') : t('modal.pocket_raster_label'));
-    });
-  });
-
-  // ── Mémorisation des options (réutilisées à la prochaine ouverture et par la simulation)
-  const readExportOpts = () => {
-    const num = sel => Number.parseFloat(modal.querySelector(sel).value);
-    const int = sel => Number.parseInt(modal.querySelector(sel).value, 10);
-    // null = valeur par défaut calculée depuis le diamètre d'outil (suit un changement d'outil)
-    const orDefault = (v, def) => (Number.isFinite(v) && Math.abs(v - def) > 1e-9 ? v : null);
-    const fin = (v, def) => (Number.isFinite(v) && v > 0 ? v : def);
-    return {
-      ...state.exportOpts,   // tabs : réglés dans la barre Usinage
-      entry:           selectedEntry,
-      rampLen:         orDefault(num('#modal-ramp-len'), defRamp),
-      helixR:          orDefault(num('#modal-helix-r'), defHelixR),
-      helixTurns:      fin(int('#modal-helix-turns'), 1),
-      leadInOn:        leadInCb.checked,
-      leadInR:         orDefault(num('#modal-leadin-r'), defLeadR),
-      finishOn:        finishOnCb.checked,
-      finishAllowance: fin(num('#modal-finish-allowance'), 0.2),
-      pocketConc:      pocketConcCb.checked,
-    };
-  };
-  const rememberOpts = () => saveExportOpts(readExportOpts());
-  modal.addEventListener('input', rememberOpts);
-  modal.addEventListener('change', rememberOpts);
-  modal.querySelectorAll('.entry-mode-btn').forEach(b => b.addEventListener('click', rememberOpts));
 
   updateModalStats();
 
@@ -1642,28 +1611,10 @@ function showExportModal(sections, machine = {}) {
     });
     if (selected.size === 0) { showNotif(t('notif.no_ops')); return; }
 
-    // Paramètres entrée outil
-    const finishCb = modal.querySelector('#modal-finish-on');
-    const entryOpts = {
-      entry:      selectedEntry,
-      rampLen:    Number.parseFloat(modal.querySelector('#modal-ramp-len').value),
-      helixR:     Number.parseFloat(modal.querySelector('#modal-helix-r').value),
-      helixTurns: Number.parseInt(modal.querySelector('#modal-helix-turns').value),
-      leadIn:     leadInCb.checked ? Number.parseFloat(modal.querySelector('#modal-leadin-r').value) : false,
-      finishAllowance: finishCb.checked ? Number.parseFloat(modal.querySelector('#modal-finish-allowance').value) : 0,
-    };
-
-    // Tabs : réglages de la barre Usinage
-    const tabOpts = tabOptsNow();
-
-    // Re-génère le G-code avec les options définitives, puis filtre les sections
+    // G-code définitif (options de l'onglet « Stratégie » et tabs), puis filtrage des sections
     const machine = getMachineParams();
     const z0      = getZ0Settings();
-    const origin  = computeOrigin(z0, machine);
-    const finalCode = state.boxType.generateGCode(
-      state.shape, state.boxParams, { ...machine, ...origin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
-    );
-    const finalSections = parseGCodeSections(finalCode);
+    const finalSections = fullSections;
 
     // Avertissement : couvercle ajusté — cavité corps sans feuillure corps
     const cavCorpsIdx = finalSections.findIndex(s => s.label.toLowerCase().includes('cavit') && s.label.toLowerCase().includes('corps'));
@@ -1727,11 +1678,7 @@ function showExportModal(sections, machine = {}) {
       if (!bodySelected) {
         // Couvercle seul : recentre sur le corps (lidAtOrigin → bbox corps seul)
         const lidOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
-        const lidCode = state.boxType.generateGCode(
-          state.shape, state.boxParams,
-          { ...machine, ...lidOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance, lidAtOrigin: true }
-        );
-        sectionsForExport = parseGCodeSections(lidCode);
+        sectionsForExport = parseGCodeSections(genFor({ ...lidOrigin, lidAtOrigin: true }));
         // Corrige le préambule : ═══ CORPS ═══ → ═══ COUVERCLE ═══
         if (sectionsForExport.length > 0 && sectionsForExport[0].required)
           sectionsForExport[0].lines = sectionsForExport[0].lines
@@ -1740,11 +1687,7 @@ function showExportModal(sections, machine = {}) {
       } else if (!lidSelected) {
         // Corps seul : recentre sur le corps uniquement
         const bodyOrigin = computeOrigin(z0, { ...machine, lidAtOrigin: true });
-        const bodyCode = state.boxType.generateGCode(
-          state.shape, state.boxParams,
-          { ...machine, ...bodyOrigin, tabOpts, entryOpts, pocketConc: pocketConcCb.checked, finishAllowance: entryOpts.finishAllowance }
-        );
-        sectionsForExport = parseGCodeSections(bodyCode);
+        sectionsForExport = parseGCodeSections(genFor(bodyOrigin));
         restateStock(sectionsForExport[0], pieceStock('body', machine), machine.depthPerPass);
       }
     }

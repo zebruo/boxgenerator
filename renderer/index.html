@@ -139,9 +139,65 @@
           <div id="params-container" class="params-list"></div>
         </section>
 
-        <!-- Section: Paramètres matière -->
+        <!-- Section: Matière & Outil / Stratégie (onglets) -->
         <section class="panel-section">
-          <h3 class="section-title" data-i18n="ui.material_tool">Matière & Outil</h3>
+          <div class="section-title panel-tabs" role="tablist">
+            <button type="button" class="panel-tab active" role="tab" id="ptab-cut" aria-controls="ppane-cut" aria-selected="true" data-pane="cut" data-i18n="ui.material_tool">Matière & Outil</button>
+            <button type="button" class="panel-tab" role="tab" id="ptab-mach" aria-controls="ppane-mach" aria-selected="false" data-pane="mach" data-i18n="ui.strategy_tab">Stratégie</button>
+          </div>
+          <div class="panel-pane" id="ppane-mach" role="tabpanel" aria-labelledby="ptab-mach" hidden>
+            <div class="params-list">
+              <div class="param-row stacked">
+                <span class="param-label" id="mach-entry-label" data-i18n="modal.entry_tool">Entrée outil</span>
+                <div class="tb-seg mach-seg" id="mach-entry" role="group" aria-labelledby="mach-entry-label">
+                  <button type="button" data-v="plunge" data-mtip="modal.tip_plunge" data-i18n="modal.plunge">Plongée</button>
+                  <button type="button" data-v="ramp" data-mtip="modal.tip_ramp" data-i18n="modal.ramp">Rampe</button>
+                  <button type="button" data-v="helix" data-mtip="modal.tip_helix" data-i18n="modal.helix">Hélice</button>
+                </div>
+              </div>
+              <div class="param-row" id="mach-row-ramp" data-mtip="modal.tip_ramp_len">
+                <label for="mach-ramp-len" data-i18n="modal.ramp_length">Longueur rampe</label>
+                <input type="number" id="mach-ramp-len" min="1" max="50" step="0.5">
+                <span class="param-unit">mm</span>
+              </div>
+              <div class="param-row" id="mach-row-helix-r" data-mtip="modal.tip_helix_r">
+                <label for="mach-helix-r" data-i18n="ui.helix_radius">Rayon hélice</label>
+                <input type="number" id="mach-helix-r" min="0.5" max="20" step="0.5">
+                <span class="param-unit">mm</span>
+              </div>
+              <div class="param-row" id="mach-row-helix-t" data-mtip="modal.tip_helix_turns">
+                <label for="mach-helix-turns" data-i18n="ui.helix_turns">Tours min.</label>
+                <input type="number" id="mach-helix-turns" min="1" max="5" step="1">
+              </div>
+              <div class="param-row" data-mtip="modal.tip_leadin">
+                <label for="mach-leadin-on" data-i18n="ui.leadin">Lead-in / out</label>
+                <input type="checkbox" id="mach-leadin-on">
+              </div>
+              <div class="param-row" id="mach-row-leadin-r" data-mtip="modal.tip_leadin_r">
+                <label for="mach-leadin-r" data-i18n="ui.leadin_radius">Rayon arc</label>
+                <input type="number" id="mach-leadin-r" min="0.5" max="20" step="0.5">
+                <span class="param-unit">mm</span>
+              </div>
+              <div class="param-row" data-mtip="modal.tip_finish">
+                <label for="mach-finish-on" data-i18n="modal.finish_pass">Finition parois</label>
+                <input type="checkbox" id="mach-finish-on">
+              </div>
+              <div class="param-row" id="mach-row-finish" data-mtip="modal.tip_finish">
+                <label for="mach-finish" data-i18n="modal.skin">Surépaisseur</label>
+                <input type="number" id="mach-finish" min="0.05" max="1" step="0.05">
+                <span class="param-unit">mm</span>
+              </div>
+              <div class="param-row stacked">
+                <span class="param-label" id="mach-pocket-label" data-i18n="modal.pocket_strategy">Stratégie poche</span>
+                <div class="tb-seg mach-seg" id="mach-pocket" role="group" aria-labelledby="mach-pocket-label">
+                  <button type="button" data-v="conc" data-mtip="modal.tip_concentric" data-i18n="ui.pocket_conc">Concentrique</button>
+                  <button type="button" data-v="raster" data-mtip="modal.tip_raster" data-i18n="ui.pocket_raster">Zig-zag</button>
+                </div>
+              </div>
+            </div>
+            <p class="cut-summary" id="mach-tabs-note"></p>
+          </div>
+          <div class="panel-pane" id="ppane-cut" role="tabpanel" aria-labelledby="ptab-cut">
           <div class="params-list">
             <div class="param-row" id="row-stock" data-tip="tip.stock">
               <label for="param-thickness" data-i18n="ui.stock">Brut</label>
@@ -245,6 +301,7 @@
             </div>
           </details>
           <button id="btn-cutting-params" class="btn-calc-params" data-i18n="ui.btn_cutting_params">⚙ Détails du calcul…</button>
+          </div>
         </section>
 
       </aside>

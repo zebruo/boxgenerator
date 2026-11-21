@@ -91,7 +91,7 @@ export function showHelpModal(machine = {}) {
           <dt>Matière &amp; Outil</dt>
           <dd>
             <strong>Brut</strong> — épaisseur totale calculée automatiquement depuis la hauteur de boîte + surplus de brut réglé par le bouton <em>Brut</em> de la barre 3D (lecture seule). Boîte à couvercle de hauteurs différentes : deux lignes, <strong>Brut corps</strong> et <strong>Brut couvercle</strong> (deux bruts), chacun avec son propre surplus : la fenêtre du bouton <em>Brut</em> propose alors deux champs (corps, couvercle) ; saisir par exemple 0,3 pour une planche de 8,6 mm sous un couvercle de 8,3 mm.<br>
-            <strong>Fraise</strong> (catalogue de fraises, classées par diamètre : hélicoïdales, droites, à compression ; choisir une fraise fixe son diamètre et ses dents, limite les matières à celles de sa fiche fournisseur et reprend sa vitesse de coupe et son avance par dent ; « Saisie manuelle » pour une autre), <strong>Matière</strong>, <strong>⌀ fraise</strong> et <strong>Dents</strong> — l'avance XY, la plongée et la profondeur par passe se calculent seules à partir de ces trois réglages et de la broche (mêmes tables que <em>Détails du calcul</em>). Le diamètre sert aussi à l'offset de contour et aux valeurs par défaut de la fenêtre d'export.<br>
+            <strong>Fraise</strong> (catalogue de fraises, classées par diamètre : hélicoïdales, droites, à compression ; choisir une fraise fixe son diamètre et ses dents, limite les matières à celles de sa fiche fournisseur et reprend sa vitesse de coupe et son avance par dent ; « Saisie manuelle » pour une autre), <strong>Matière</strong>, <strong>⌀ fraise</strong> et <strong>Dents</strong> — l'avance XY, la plongée et la profondeur par passe se calculent seules à partir de ces trois réglages et de la broche (mêmes tables que <em>Détails du calcul</em>). Le diamètre sert aussi à l'offset de contour et aux valeurs par défaut de l'onglet <strong>Stratégie</strong>.<br>
             <strong>Prof./passe</strong> — profondeur de coupe par passe Z ; le nombre de passes est déduit automatiquement (⌈brut ÷ prof.⌉).<br>
             <strong>Vitesse XY / Z</strong> — avance en mm/min pour les mouvements de coupe (G1) et de plongée.<br>
             <strong>auto / ↺ auto</strong> — l'étiquette à côté d'un champ dit s'il est calculé (<em>auto</em>) ou saisi à la main (<em>↺ auto</em> : un clic remet la valeur calculée). Changer la matière recalcule tout. Une avance saisie trop basse (fz sous 60 % du conseillé) déclenche un avertissement : la fraise frotte et le bois peut brûler.<br>
@@ -102,6 +102,8 @@ export function showHelpModal(machine = {}) {
             <strong>Survol Z</strong> — hauteur de sécurité entre opérations (commande <span class="help-mono">G0 Z…</span>).<br>
             <strong>Arcs G2/G3</strong> — regroupe les petits segments en vrais arcs et ne répète pas les mots inchangés : le fichier est beaucoup plus court et la machine plus fluide.
           </dd>
+          <dt>Stratégie</dt>
+          <dd>Second onglet de la même section : <strong>entrée de l'outil</strong> (plongée, rampe avec sa longueur, hélice avec son rayon et son nombre minimal de tours), <strong>lead-in / out</strong> et son rayon, <strong>finition des parois</strong> et sa surépaisseur, <strong>stratégie de poche</strong> (concentrique ou zig-zag), plus un rappel des tabs (bouton <em>Tabs</em> de la barre Usinage). Tant qu'on ne les modifie pas, la longueur de rampe et les rayons suivent le ⌀ de la fraise. Ces réglages sont enregistrés avec la session et servent au visualiseur, à la simulation et à l'export (voir <em>Entrée outil</em>, <em>Lead-in / Lead-out</em>, <em>Stratégie poche</em> et <em>Finition des parois</em> ci-dessous).</dd>
         </dl>
       </section>
 
@@ -110,9 +112,9 @@ export function showHelpModal(machine = {}) {
         <h4>Colonne de droite — Panneau G-code</h4>
         <dl class="help-dl">
           <dt>Générer</dt>
-          <dd>Calcule et affiche le G-code complet à partir des paramètres courants (forme, modèle de boîte, matière et outil). Le résultat est mis à jour à chaque clic — il n'est pas recalculé automatiquement.</dd>
+          <dd>Calcule et affiche le G-code complet à partir des paramètres courants (forme, modèle de boîte, matière et outil, options de l'onglet <em>Stratégie</em> et tabs) : c'est le fichier qui sera exporté. Le résultat est mis à jour à chaque clic — il n'est pas recalculé automatiquement.</dd>
           <dt>Simuler</dt>
-          <dd>Joue le G-code tel qu'il serait exporté (avec les dernières options d'export) sur le brut. Voir <em>Aperçus et simulation</em> ci-dessous.</dd>
+          <dd>Joue le G-code tel qu'il serait exporté (options de l'onglet <em>Stratégie</em> et tabs compris) sur le brut. Voir <em>Aperçus et simulation</em> ci-dessous.</dd>
           <dt>Visualiseur</dt>
           <dd>Coloration syntaxique par type de commande :
             <span class="help-chip chip-comment">; commentaire</span>
@@ -121,7 +123,7 @@ export function showHelpModal(machine = {}) {
             <span class="help-chip chip-cmd">M/S machine</span>
           </dd>
           <dt>Export G-code</dt>
-          <dd>Ouvre la fenêtre d'export avec les options d'entrée outil, lead-in/out, finition, stratégie de poche et la sélection des sections à exporter (les tabs se règlent avec le bouton <em>Tabs</em>, la fenêtre en rappelle le réglage). Ces options sont enregistrées avec la session. Le G-code est <strong>re-généré</strong> avec ces options au moment de l'export — le visualiseur affiche toujours la version sans options.</dd>
+          <dd>Ouvre la fenêtre d'export : choix des opérations à exporter, avec un rappel des options d'usinage (onglet <em>Stratégie</em>) et des tabs (bouton <em>Tabs</em>), qui se règlent là. Le fichier exporté est celui du visualiseur, limité aux opérations cochées.</dd>
           <dt>SVG</dt>
           <dd>Exporte les pièces en SVG (mm, mêmes contours que le G-code, cloisons comprises). Trois calques : <strong>Découpe</strong> (rouge, contours traversants), <strong>Usinages</strong> (bleu, poches non traversantes) et <strong>Repères</strong> (noms des pièces, à masquer avant découpe). Pour la découpe laser ou la retouche dans Inkscape / Fusion 360.</dd>
         </dl>
@@ -205,9 +207,9 @@ export function showHelpModal(machine = {}) {
         <h4>Lead-in / Lead-out</h4>
         <p>Arc tangentiel d'entrée <em>et</em> de sortie sur le contour extérieur. S'applique à <strong>toutes les formes</strong> — rectangles, ovales, polygones et <strong>cercles</strong> (arcs G3 natifs).</p>
         <dl class="help-dl">
-          <dt>Case décochée (défaut)</dt>
+          <dt>Lead-in / out décoché (défaut)</dt>
           <dd>Un <strong>overcut automatique</strong> de ½ ⌀outil prolonge le contour légèrement au-delà du point de départ — l'outil ne s'arrête jamais exactement au même endroit, ce qui élimine la marque de jonction. Suffisant pour le bois et le MDF.</dd>
-          <dt>Case cochée</dt>
+          <dt>Lead-in / out coché</dt>
           <dd>L'outil approche le contour par un <strong>arc de 90°</strong> tangentiel (lead-in), puis en repart symétriquement par un arc de sortie (lead-out). Aucune plongée directe sur la paroi, aucun arrêt sur le contour. L'outil se rétracte et se repositionne au point d'approche entre chaque passe Z. Avec une entrée en rampe ou en hélice, les passes d'ébauche s'en passent (elles entrent déjà progressivement) : l'arc ne sert qu'à la passe de finition. Recommandé pour l'aluminium, l'acrylique et les passes de finition sur bois dur.</dd>
           <dt>Rayon</dt>
           <dd>Par défaut 0,4 × ⌀outil (${defLeadR} mm). L'arc doit tenir dans l'espace libre autour de la forme — réduire si la fraise est trop proche d'une paroi.</dd>
@@ -220,7 +222,7 @@ export function showHelpModal(machine = {}) {
         <dl class="help-dl">
           <dt>Concentrique (défaut)</dt>
           <dd>L'outil part du centre et trace des anneaux concentriques vers la paroi. La paroi est atteinte lors du dernier anneau, qui constitue la passe de finition. Résultat propre pour les formes convexes (rectangle, cercle, ovale, polygone). Un overcut de ½ ⌀outil sur le dernier anneau élimine la marque de fermeture sur la paroi.</dd>
-          <dt>Raster (zig-zag)</dt>
+          <dt>Zig-zag</dt>
           <dd>Balayage horizontal ligne par ligne. Universel — fonctionne pour toutes les formes y compris les profils concaves (haricot, C, U). À chaque passe, la fraise fait ensuite le tour du contour pour enlever les marches du balayage le long des parois. À utiliser quand la forme est trop concave pour la stratégie concentrique.</dd>
         </dl>
       </section>
@@ -236,7 +238,7 @@ export function showHelpModal(machine = {}) {
       <!-- ── Finition des parois ───────────────────────────── -->
       <section class="help-section">
         <h4>Finition des parois</h4>
-        <p>Case <strong>Finition parois</strong> et <strong>surépaisseur</strong> (0,2 mm par défaut) : les passes en profondeur s'arrêtent à cette distance de la cote, puis une passe unique à pleine profondeur suit le contour exact. Un seul passage léger donne une paroi plus nette et soulage la fraise. S'applique aux contours, à la poche concentrique et à la poche en balayage.</p>
+        <p>Case <strong>Finition parois</strong> de l'onglet <em>Stratégie</em> et <strong>surépaisseur</strong> (0,2 mm par défaut) : les passes en profondeur s'arrêtent à cette distance de la cote, puis une passe unique à pleine profondeur suit le contour exact. Un seul passage léger donne une paroi plus nette et soulage la fraise. S'applique aux contours, à la poche concentrique et à la poche en balayage.</p>
       </section>
 
       <!-- ── Valeurs par défaut ──────────────────────────── -->
