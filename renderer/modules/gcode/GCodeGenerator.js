@@ -168,8 +168,8 @@ export function autoTabFractions(pts, count, pathWidth) {
 const SIDE_SIGN = { outside: -1, inside: 1 };
 const sideSign = side => SIDE_SIGN[side] ?? 0;
 
-/** Pente maximale de l'entrée en rampe des poches (LIMITS.pocketRampAngle, 10°) : tangente. */
-const POCKET_RAMP_TAN = Math.tan(LIMITS.pocketRampAngle * Math.PI / 180);
+/** Aucun tab près du départ : rampe et hélice d'entrée sans limite de place (voir _entryDescent). */
+const FREE_ROOM = { ahead: Infinity, behind: Infinity };
 
 /** Suffixe de commentaire « , finition +0.2mm » (vide sans surépaisseur). */
 const finishLabel = fa => (fa > 0 ? `, finition +${fa}mm` : '');
@@ -190,8 +190,12 @@ export class GCodeGenerator {
       originY: machine.originY ?? 0,  // décalage Y (mm)
       zOffset: machine.zOffset ?? 0,  // 0 = Z0 en surface, matThickness = Z0 en bas du brut
       arcs:    machine.arcs    ?? true, // regroupe les segments G1 en arcs G2/G3 à la sortie
+      // Pente maximale des rampes et hélices d'entrée (°), selon la matière (rampAngleFor)
+      rampAngle: machine.rampAngle > 0 ? machine.rampAngle : LIMITS.rampAngle.tendre,
       unit: 'mm'
     };
+    this.rampTan   = Math.tan(this.machine.rampAngle * Math.PI / 180);
+    this.entryFeed = Math.round(LIMITS.entryFeedRatio * this.machine.feedrate);
     // Entrée des poches : rampe si l'export demande rampe ou hélice (voir pocketEnter)
     const eo = machine.entryOpts ?? {};
     this.pocketRamp    = eo.entry === 'ramp' || eo.entry === 'helix';
@@ -302,20 +306,28 @@ export class GCodeGenerator {
   /**
    * Descente dans la matière au début d'un trajet de poche, de fromZ (dessus de la matière à
    * cet endroit : fond de la couche précédente) jusqu'à z. L'outil est déjà au-dessus de path[0].
-   * Rampe (export en rampe ou hélice) : allers-retours sur le début du trajet, pente ≤ 10°,
-   * jambes de la longueur de rampe choisie ; finit en path[0] à z. Sinon : plongée droite.
+   * Rampe (export en rampe ou hélice) : allers-retours sur le début du trajet (voir _rampAlong) ;
+   * finit en path[0] à z. Sinon : plongée droite.
    * @param {{x,y}[]} path    trajet qui va être usiné à partir de path[0]
    * @param {boolean} closed  trajet fermé (anneau) : la rampe peut continuer après le dernier point
    */
   pocketEnter(path, z, fromZ, closed = true) {
     const sub = this.pocketRamp && fromZ > z + 1e-6 ? this._pathStart(path, closed, this.pocketRampLen) : null;
-    const len = sub ? this._polyLen(sub) : 0;
-    if (len < LIMITS.pocketRampMinLength) { this.plungeTo(z); return; }
+    if (!sub || this._polyLen(sub) < LIMITS.rampMinLength) { this.plungeTo(z); return; }
+    this._rampAlong(sub, z, fromZ);
+  }
+
+  /**
+   * Rampe aller-retour de fromZ (dessus de la matière à cet endroit) à z, sur la portion de trajet
+   * `sub` (sub[0] = départ) : pente ≤ angle de rampe de la matière, nombre pair de jambes pour
+   * finir en sub[0], avance d'entrée (LIMITS.entryFeedRatio × avance). Descente rapide à fromZ :
+   * au-dessus, la matière est déjà enlevée.
+   */
+  _rampAlong(sub, z, fromZ) {
+    const len   = this._polyLen(sub);
     const dz    = fromZ - z;
-    const legs  = 2 * Math.max(1, Math.ceil(dz / (2 * len * POCKET_RAMP_TAN)));
+    const legs  = 2 * Math.max(1, Math.ceil(dz / (2 * len * this.rampTan)));
     const total = legs * len;
-    const f = Math.round(this.machine.plungeRate
-      + (2 * Math.atan2(total, dz) / Math.PI) * (this.machine.feedrate - this.machine.plungeRate));
     const { originX: ox, originY: oy, zOffset: zo } = this.machine;
     this.emit(`G0 Z${(fromZ + zo).toFixed(3)}`);
     let done = 0;
@@ -324,7 +336,7 @@ export class GCodeGenerator {
       for (let i = 1; i < leg.length; i++) {
         done += Math.hypot(leg[i].x - leg[i - 1].x, leg[i].y - leg[i - 1].y);
         const zz = fromZ - dz * Math.min(1, done / total);
-        this.emit(`G1 X${(leg[i].x + ox).toFixed(3)} Y${(leg[i].y + oy).toFixed(3)} Z${(zz + zo).toFixed(3)} F${f}`);
+        this.emit(`G1 X${(leg[i].x + ox).toFixed(3)} Y${(leg[i].y + oy).toFixed(3)} Z${(zz + zo).toFixed(3)} F${this.entryFeed}`);
       }
     }
   }
@@ -353,67 +365,68 @@ export class GCodeGenerator {
   // ─── Entrées outil ────────────────────────────────────────────────────────
 
   /**
-   * Entrée en rampe linéaire (ramp-in).
-   * L'outil descend progressivement de safeZ jusqu'à targetZ sur une longueur
-   * égale à rampLen mm le long d'un segment aller-retour avant le point de départ.
-   *
-   * L'outil est déjà positionné en XY sur pts[0] à safeZ avant l'appel.
-   * Après l'appel, l'outil est à pts[0] à targetZ, prêt pour le contour.
-   *
-   * @param {{x,y}[]} pts       - contour (pts[0] = point d'entrée)
-   * @param {number}  targetZ   - profondeur de passe cible (négatif)
-   * @param {number}  rampLen   - longueur de rampe en mm (défaut 1× diamètre outil)
+   * Descente en rampe ou en hélice au départ p0 d'un contour, de fromZ (fond de la passe
+   * précédente à cet endroit) à z. L'outil est au-dessus de p0 (au safeZ ou plus bas).
+   * - Hélice : cercle de rayon helixR tangent au trajet en p0, du côté de la chute (`waste` :
+   *   normale unitaire vers la chute) ; il ne touche jamais la pièce et finit en p0.
+   * - Rampe : allers-retours sur le début du trajet, `pathStart(L)` = ses L premiers mm.
+   * Pente ≤ angle de rampe de la matière (l'hélice prend des tours de plus si besoin).
+   * @param {{ahead:number, behind:number}} room  trajet libre avant le premier tab devant et
+   *   derrière le départ : l'hélice demande helixR des deux côtés, la rampe s'arrête avant le tab.
+   * @returns {boolean} false si rien n'a été fait : l'appelant plonge.
    */
-  _rampIn(pts, targetZ, rampLen) {
-    const len = rampLen ?? this.machine.toolDiameter;
-    // Direction du premier segment
-    const dx = pts[1].x - pts[0].x;
-    const dy = pts[1].y - pts[0].y;
-    const segLen = Math.hypot(dx, dy) || 1;
-    const ux = dx / segLen, uy = dy / segLen;
-
-    // Clamp rampLen à la longueur du premier segment
-    const rLen = Math.min(len, segLen * 0.9);
-
-    const x1 = pts[0].x + ux * rLen;
-    const y1 = pts[0].y + uy * rLen;
-
-    // Feedrate blendé pour le mouvement diagonal (formule FreeCAD) :
-    // pitch=0 → descente pure → plungeRate ; pitch=1 → horizontal → feedrate
-    const pitch     = 2 * Math.atan2(rLen, Math.abs(targetZ)) / Math.PI;
-    const blendedF  = Math.round(this.machine.plungeRate + pitch * (this.machine.feedrate - this.machine.plungeRate));
-
-    this.comment('Ramp-in linéaire');
-    this.emit(`G1 X${(x1 + this.machine.originX).toFixed(3)} Y${(y1 + this.machine.originY).toFixed(3)} Z${(targetZ + this.machine.zOffset).toFixed(3)} F${blendedF}`);
-    this.lineTo(pts[0].x, pts[0].y);
+  _entryDescent(p0, pathStart, z, fromZ, e, waste, room) {
+    if (e.entry === 'plunge' || fromZ <= z + 1e-6) return false;
+    const R = e.helixR;
+    if (e.entry === 'helix' && waste && R > 0 && room.ahead >= R && room.behind >= R) {
+      this.rapidTo(p0.x, p0.y);
+      this._helixDown(p0, waste, R, z, fromZ, e.helixTurns);
+      return true;
+    }
+    const sub = pathStart(Math.min(e.rampLen, room.ahead));
+    if (this._polyLen(sub) < LIMITS.rampMinLength) return false;
+    this.comment(`Rampe aller-retour ≤ ${this.machine.rampAngle}°`);
+    this.rapidTo(p0.x, p0.y);
+    this._rampAlong(sub, z, fromZ);
+    return true;
   }
 
   /**
-   * Entrée hélicoïdale (helix-in).
-   * Génère un arc hélicoïdal centré sur (cx, cy), rayon helixR,
-   * descendant de safeZ jusqu'à targetZ sur `turns` tours.
-   * Produit des G2/G3 arc en segments linéaires approchés.
-   *
-   * @param {number}  cx, cy   - centre de l'hélice
-   * @param {number}  helixR   - rayon de l'hélice (mm)
-   * @param {number}  targetZ  - profondeur cible (négatif)
-   * @param {number}  turns    - nombre de tours (défaut 1)
-   * @param {number}  segs     - segments par tour (défaut 36 = 10°)
+   * Hélice d'entrée de fromZ à z, de rayon R, tangente au trajet en p0 côté chute (centre en
+   * p0 + w·R), sens horaire, finissant en p0. Au moins `minTurns` tours, et assez pour que la
+   * pente reste sous l'angle de rampe. Avance d'entrée.
    */
-  _helixIn(cx, cy, helixR, targetZ, turns = 1, segs = 36) {
-    const totalSteps = Math.round(turns * segs);
-    const startZ = this.machine.safeZ;
-    const ox = this.machine.originX, oy = this.machine.originY;
-
-    this.comment(`Helix-in — R=${helixR.toFixed(2)}mm × ${turns} tour${turns > 1 ? 's' : ''}`);
-    for (let i = 1; i <= totalSteps; i++) {
-      const angle = -2 * Math.PI * (i / segs); // sens horaire (G2)
-      const x = cx + helixR * Math.cos(angle);
-      const y = cy + helixR * Math.sin(angle);
-      const z = startZ + (targetZ - startZ) * (i / totalSteps);
-      this.emit(`G1 X${(x + ox).toFixed(3)} Y${(y + oy).toFixed(3)} Z${(z + this.machine.zOffset).toFixed(3)} F${this.machine.plungeRate}`);
+  _helixDown(p0, w, R, z, fromZ, minTurns = 1) {
+    const dz = fromZ - z, segs = 36;
+    const turns = Math.max(1, Math.round(minTurns) || 1, Math.ceil(dz / (2 * Math.PI * R * this.rampTan)));
+    const cx = p0.x + w.x * R, cy = p0.y + w.y * R, a0 = Math.atan2(-w.y, -w.x);
+    const { originX: ox, originY: oy, zOffset: zo } = this.machine;
+    this.comment(`Hélice d'entrée côté chute — R=${R.toFixed(2)}mm × ${turns} tour${turns > 1 ? 's' : ''}, ≤ ${this.machine.rampAngle}°`);
+    this.emit(`G0 Z${(fromZ + zo).toFixed(3)}`);
+    const steps = turns * segs;
+    for (let i = 1; i <= steps; i++) {
+      const a = a0 - 2 * Math.PI * i / segs;
+      const x = i === steps ? p0.x : cx + R * Math.cos(a);
+      const y = i === steps ? p0.y : cy + R * Math.sin(a);
+      const zz = fromZ - dz * i / steps;
+      this.emit(`G1 X${(x + ox).toFixed(3)} Y${(y + oy).toFixed(3)} Z${(zz + zo).toFixed(3)} F${this.entryFeed}`);
     }
-    // Déplacer au point d'entrée du contour (bord de l'hélice)
+  }
+
+  /** Normale unitaire en pts[0] vers la chute : dehors pour 'outside', dedans pour 'inside' ; null sur le trait. */
+  _wasteNormal(pts, side) {
+    const s = sideSign(side);
+    if (!s || pts.length < 3) return null;
+    const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y, l = Math.hypot(dx, dy);
+    if (l < 1e-9) return null;
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      area += a.x * b.y - b.x * a.y;
+    }
+    // À droite du sens de marche (dy, −dx) : dehors pour un trajet anti-horaire
+    const k = (area > 0 ? 1 : -1) * (s < 0 ? 1 : -1) / l;
+    return { x: dy * k, y: -dx * k };
   }
 
   /**
@@ -568,29 +581,13 @@ export class GCodeGenerator {
   }
 
   /**
-   * Descente de l'outil jusqu'à z au début du trajet `cut`, selon le mode d'entrée
-   * (plongée, rampe, hélice centrée sur `rough`) ; lead-in éventuel jusqu'à cut[0].
+   * Descente de l'outil jusqu'à z au début du trajet `cut` (outil au safeZ) : rampe ou hélice
+   * depuis fromZ (voir _entryDescent), sinon plongée, avec lead-in éventuel jusqu'à cut[0].
    */
-  _enterContour(cut, rough, z, e, leadIn) {
-    if (e.entry === 'helix') {
-      const cx = rough.reduce((s, p) => s + p.x, 0) / rough.length;
-      const cy = rough.reduce((s, p) => s + p.y, 0) / rough.length;
-      this.rapidTo(cx + e.helixR, cy);
-      this._helixIn(cx, cy, e.helixR, z, e.helixTurns);
-      if (leadIn) {
-        this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-        this.lineTo(cut[0].x, cut[0].y);
-      } else {
-        this.rapidTo(cut[0].x, cut[0].y);
-      }
-    } else if (e.entry === 'ramp') {
-      this.rapidTo(cut[0].x, cut[0].y);
-      this._rampIn(cut, z, e.rampLen);
-      if (leadIn) {
-        this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
-        this.lineTo(cut[0].x, cut[0].y);
-      }
-    } else if (leadIn) {
+  _enterContour(cut, z, fromZ, e, leadIn, side, room) {
+    if (this._entryDescent(cut[0], L => this._pathStart(cut, true, L), z, fromZ, e,
+      this._wasteNormal(cut, side), room)) return;
+    if (leadIn) {
       this.rapidTo(leadIn.approachPt.x, leadIn.approachPt.y);
       this.plungeTo(z);
       this.lineTo(cut[0].x, cut[0].y);
@@ -680,7 +677,9 @@ export class GCodeGenerator {
     const e = this._entrySettings(entryOpts);
     const { rough, exact, cut, cutFin } = this._contourPaths(points, side, e.fa, e.dogbone);
     const { depth, passes, stepZ } = this._passPlan();
-    const leadIn = e.leadInR ? this._leadArc(rough, e.leadInR, 'in') : null;
+    // Lead-in des passes d'ébauche : avec la plongée seulement (rampe et hélice entrent déjà
+    // progressivement sur le trajet ou dans la chute)
+    const leadIn = e.leadInR && e.entry === 'plunge' ? this._leadArc(rough, e.leadInR, 'in') : null;
 
     // Tabs : centres le long du trajet, événements « relever / redescendre »
     let tab = null, segLengths = null, perimeter = 0, centers = [], tabEv = null;
@@ -700,6 +699,7 @@ export class GCodeGenerator {
       this.comment(`─── ${label} (${side}${e.label}${finishLabel(e.fa)}) ───`);
     }
 
+    let fromZ = 0;   // fond déjà creusé au point de départ (dessus du brut avant la 1re passe)
     for (let pass = 1; pass <= passes; pass++) {
       const z = -(stepZ * pass);
       // Tabs actifs dès que la passe descend sous leur sommet (pas seulement la dernière)
@@ -707,7 +707,10 @@ export class GCodeGenerator {
       this.comment(`Passe ${pass}/${passes} — Z=${z.toFixed(3)}${tabsOn ? ' [tabs actifs]' : ''}`);
       this.rapidZ(this.machine.safeZ);
       // Départ dans un tab : on n'entre qu'au sommet du tab (ne pas le percer)
-      this._enterContour(cut, rough, tabsOn && tabEv.startInTab ? tab.z : z, e, leadIn);
+      const entryZ = tabsOn && tabEv.startInTab ? tab.z : z;
+      const room = tabsOn && !tabEv.startInTab ? this._tabRoom(tabEv.events, perimeter) : FREE_ROOM;
+      this._enterContour(cut, entryZ, fromZ, e, leadIn, side, room);
+      fromZ = Math.min(fromZ, entryZ);
       // Sous le sommet des tabs : remontée à tab.z au passage de chaque tab. Si la boucle
       // finit dans un tab, l'outil est à tab.z et le dépassement final passe au-dessus.
       if (tabsOn) this._cutLoopWithTabs(cut, segLengths, tabEv.events, z, tab.z);
@@ -949,6 +952,7 @@ export class GCodeGenerator {
     const tabPath  = hasTabs ? tab.path : this.machine.toolDiameter;
     const tabZ     = hasTabs ? tab.z : -depth;
 
+    const e        = this._entrySettings(entryOpts);
     const leadInR  = entryOpts.leadIn  ?? false;
     const leadOutR = entryOpts.leadOut ?? false;
 
@@ -982,7 +986,8 @@ export class GCodeGenerator {
       { x: startX, y: startY },
       { x: cx + r_off_work * Math.cos(-0.001), y: cy + r_off_work * Math.sin(-0.001) }
     ];
-    const leadIn  = leadInR  ? this._leadArc(entryPts, leadInR, 'in') : null;
+    // Lead-in des passes d'ébauche : avec la plongée seulement (comme cutContour)
+    const leadIn  = leadInR && e.entry === 'plunge' ? this._leadArc(entryPts, leadInR, 'in') : null;
     const leadOut = leadOutR ? this._leadOutArc(exitPts, leadOutR)    : null;
 
     // Émet un arc G3 sur le cercle de rayon rad
@@ -1027,6 +1032,20 @@ export class GCodeGenerator {
     };
     const tabSegs = hasTabs ? buildTabSegs(r_off_work) : null;
 
+    // Entrée en rampe (le long du cercle, sens G3) ou en hélice (côté chute) : place libre avant
+    // le premier tab et après le dernier, en longueur d'arc
+    const start = { x: startX, y: startY };
+    const arcStart = L => {
+      const a1 = Math.min(L / r_off_work, 1.8 * Math.PI), n = Math.max(1, Math.ceil(a1 / (Math.PI / 36)));
+      return Array.from({ length: n + 1 }, (_, i) => ({
+        x: cx + r_off_work * Math.cos(a1 * i / n), y: cy + r_off_work * Math.sin(a1 * i / n) }));
+    };
+    const waste = { outside: { x: 1, y: 0 }, inside: { x: -1, y: 0 } }[side] ?? null;
+    const tabTs = tabSegs ? tabSegs.filter(s => s.type === 'tab') : [];
+    const tabRoom = tabTs.length
+      ? { ahead: tabTs[0].from * r_off_work, behind: (2 * Math.PI - tabTs.at(-1).to) * r_off_work }
+      : FREE_ROOM;
+
     // Positionnement initial
     this.rapidZ(this.machine.safeZ);
     this.rapidTo(leadIn ? leadIn.approachPt.x : startX, leadIn ? leadIn.approachPt.y : startY);
@@ -1045,7 +1064,7 @@ export class GCodeGenerator {
         }
         this.plungeTo(z);
         for (const p of leadIn.arcPts) this.lineTo(p.x, p.y);
-      } else {
+      } else if (!this._entryDescent(start, arcStart, z, z + stepZ, e, waste, tabsOn ? tabRoom : FREE_ROOM)) {
         this.plungeTo(z);
       }
 
@@ -1160,6 +1179,19 @@ export class GCodeGenerator {
     }
     events.sort((a, b) => a.dist - b.dist);
     return { events, startInTab: intervals.some(([s]) => s <= EPS) };
+  }
+
+  /**
+   * Trajet libre de tabs devant le départ (jusqu'au premier 'up') et derrière (depuis le dernier
+   * 'down'), départ hors tab (voir _tabEvents).
+   */
+  _tabRoom(events, P) {
+    const ups = events.filter(ev => ev.action === 'up').map(ev => ev.dist);
+    const downs = events.filter(ev => ev.action === 'down').map(ev => ev.dist);
+    return {
+      ahead:  ups.length ? Math.min(...ups) : Infinity,
+      behind: downs.length ? P - Math.max(...downs) : Infinity,
+    };
   }
 
   /**

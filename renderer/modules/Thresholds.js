@@ -14,8 +14,11 @@ export const LIMITS = {
   // ── Usinage ──
   helixDrillMinGap: 0.5,      // mm : perçage en hélice si Ø trou − Ø fraise dépasse cette valeur, sinon perçage par passes
   ringStepTools: 0.6,         // pas maximal des anneaux qui vident une bande (feuillure extérieure, rebord empilable), en diamètres de fraise
-  pocketRampAngle: 10,        // ° : pente maximale de l'entrée en rampe des poches
-  pocketRampMinLength: 0.5,   // mm : rampe plus courte que cela → plongée directe
+  rampMinLength: 0.5,         // mm : rampe plus courte que cela → plongée directe
+
+  // ── Entrée de l'outil (rampe aller-retour, hélice), poches comme contours ──
+  rampAngle: { tendre: 10, dur: 5, alu: 3 },   // ° : pente maximale selon la famille de matière (voir rampAngleFor, CuttingParams.js)
+  entryFeedRatio: 0.6,        // avance pendant la rampe ou l'hélice = 60 % de l'avance de coupe
 };
 
 export const WARN = {

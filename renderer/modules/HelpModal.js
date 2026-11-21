@@ -143,14 +143,14 @@ export function showHelpModal(machine = {}) {
       <!-- ── Entrée outil ────────────────────────────────── -->
       <section class="help-section">
         <h4>Entrée outil</h4>
-        <p>Mode de descente dans la matière à chaque passe en Z.</p>
+        <p>Mode de descente dans la matière à chaque passe en Z, pour les contours comme pour les poches. Rampe et hélice partent du fond de la passe précédente (au-dessus, la matière est déjà enlevée) et avancent à 60 % de l'avance de coupe.</p>
         <dl class="help-dl">
           <dt>Plongée</dt>
-          <dd>Descente verticale directe. Simple et rapide, mais sollicite l'arête frontale de la fraise. À éviter pour les fraises sans dent centrale.</dd>
+          <dd>Descente verticale directe. Simple et rapide, mais sollicite la pointe de la fraise. Convient aux fraises qui coupent au centre (toutes celles du catalogue) avec des passes modestes.</dd>
           <dt>Rampe</dt>
-          <dd>L'outil descend progressivement sur un aller-retour le long du premier segment du contour. Réduit la contrainte axiale — recommandé pour le bois dur et le médium.</dd>
+          <dd>L'outil descend en allers-retours sur le début du trajet, sans dépasser la pente de la matière : <strong>10°</strong> pour le bois tendre, le MDF et les mousses, <strong>5°</strong> pour les bois durs et exotiques, le contreplaqué, les plastiques, le HPL et le mélaminé, <strong>3°</strong> pour l'aluminium, le cuivre et le laiton. Plus la passe est profonde, plus il y a d'allers-retours. Sur un contour avec tabs, la rampe s'arrête avant le premier tab.</dd>
           <dt>Hélice</dt>
-          <dd>Spirale descendante autour du centroïde de la forme avant d'attaquer le contour. Idéal pour les fraises sans dent frontale (2T). Le rayon doit tenir dans l'espace intérieur.</dd>
+          <dd>Sur un contour : spirale descendante dans la chute, tangente au trajet au point de départ, qui ne touche jamais la pièce ; elle perce un trou de 2 × rayon + ⌀outil à côté du contour, il faut donc assez de brut autour. Même pente maximale que la rampe (des tours sont ajoutés si besoin). Dans les poches, l'entrée se fait en rampe. Utile surtout pour les fraises qui ne coupent pas au centre et pour le métal ; si un tab est trop près du départ, l'entrée se fait en rampe.</dd>
         </dl>
       </section>
 
@@ -168,35 +168,35 @@ export function showHelpModal(machine = {}) {
           <tbody>
             <tr>
               <td class="help-row-hd">Fraise compatible</td>
-              <td>Toutes (1T, 2T, 3T…)</td>
-              <td>Sans dent frontale — 2T recommandée</td>
+              <td>Toutes</td>
+              <td>Toutes, indispensable pour une fraise qui ne coupe pas au centre</td>
             </tr>
             <tr>
               <td class="help-row-hd">Espace requis</td>
-              <td>${defRamp} mm le long du contour</td>
-              <td>⌀ ${(defHelixR * 2).toFixed(2)} mm à l'intérieur de la forme</td>
+              <td>${defRamp} mm le long du trajet</td>
+              <td>Trou de ⌀ ${(defHelixR * 2 + td).toFixed(1)} mm dans la chute, à côté du contour</td>
             </tr>
             <tr>
               <td class="help-row-hd">Matériaux</td>
-              <td>Bois, MDF, PMMA, plastiques</td>
-              <td>Aluminium, laiton, matériaux durs</td>
+              <td>Bois, MDF, plastiques</td>
+              <td>Aluminium, cuivre, laiton</td>
             </tr>
             <tr>
               <td class="help-row-hd">Avantage</td>
-              <td>Chemin court, descente douce sur le bord</td>
-              <td>Zéro contrainte axiale, descente au centre</td>
+              <td>Rien d'usiné en dehors du trajet</td>
+              <td>Copeaux mieux dégagés, pointe de la fraise soulagée</td>
             </tr>
             <tr>
               <td class="help-row-hd">Limite</td>
-              <td>Le premier segment doit être ≥ longueur rampe</td>
-              <td>Forme trop petite → rayon hélice impossible</td>
+              <td>Trajet plus court que la rampe ou tab proche : rampe raccourcie (plongée sous 0,5 mm)</td>
+              <td>Tab à moins d'un rayon du départ : entrée en rampe</td>
             </tr>
           </tbody>
         </table>
         <p class="help-note help-rec">
           <strong>Recommandation pour les boîtes en bois / MDF :</strong>
-          <strong>Rampe</strong> — rapide, compatible toutes fraises, espace minimal.<br>
-          Passer en <strong>Hélice</strong> uniquement pour l'aluminium ou avec une fraise 2T sans dent frontale.
+          <strong>Rampe</strong>, qui convient à toutes les fraises et n'usine rien en dehors du trajet.<br>
+          Passer en <strong>Hélice</strong> pour l'aluminium ou avec une fraise qui ne coupe pas au centre.
         </p>
       </section>
 
@@ -208,7 +208,7 @@ export function showHelpModal(machine = {}) {
           <dt>Case décochée (défaut)</dt>
           <dd>Un <strong>overcut automatique</strong> de ½ ⌀outil prolonge le contour légèrement au-delà du point de départ — l'outil ne s'arrête jamais exactement au même endroit, ce qui élimine la marque de jonction. Suffisant pour le bois et le MDF.</dd>
           <dt>Case cochée</dt>
-          <dd>L'outil approche le contour par un <strong>arc de 90°</strong> tangentiel (lead-in), puis en repart symétriquement par un arc de sortie (lead-out). Aucune plongée directe sur la paroi, aucun arrêt sur le contour. L'outil se rétracte et se repositionne au point d'approche entre chaque passe Z. Recommandé pour l'aluminium, l'acrylique et les passes de finition sur bois dur.</dd>
+          <dd>L'outil approche le contour par un <strong>arc de 90°</strong> tangentiel (lead-in), puis en repart symétriquement par un arc de sortie (lead-out). Aucune plongée directe sur la paroi, aucun arrêt sur le contour. L'outil se rétracte et se repositionne au point d'approche entre chaque passe Z. Avec une entrée en rampe ou en hélice, les passes d'ébauche s'en passent (elles entrent déjà progressivement) : l'arc ne sert qu'à la passe de finition. Recommandé pour l'aluminium, l'acrylique et les passes de finition sur bois dur.</dd>
           <dt>Rayon</dt>
           <dd>Par défaut 0,4 × ⌀outil (${defLeadR} mm). L'arc doit tenir dans l'espace libre autour de la forme — réduire si la fraise est trop proche d'une paroi.</dd>
         </dl>
@@ -260,13 +260,13 @@ export function showHelpModal(machine = {}) {
               <td>Longueur rampe</td>
               <td class="help-formula">2 × ⌀outil</td>
               <td class="help-val">${defRamp} mm</td>
-              <td>Angle de descente ≈ dpp ÷ (2×⌀) — doux pour la fraise</td>
+              <td>Longueur d'un aller ; le nombre d'allers-retours suit la pente de la matière</td>
             </tr>
             <tr>
               <td>Rayon hélice</td>
               <td class="help-formula">0,6 × ⌀outil</td>
               <td class="help-val">${defHelixR} mm</td>
-              <td>Laisse 40 % de jeu avec la paroi, évite les vibrations</td>
+              <td>Trou de 2,2 × ⌀outil : la fraise travaille de côté, pas en plongée</td>
             </tr>
             <tr>
               <td>Rayon lead-in/out</td>

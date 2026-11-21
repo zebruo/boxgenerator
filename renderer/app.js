@@ -19,6 +19,7 @@ import { showHelpModal }         from './modules/HelpModal.js';
 import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
 import { WARN, LIMITS } from './modules/Thresholds.js';
 import { initCuttingPanel } from './modules/CuttingPanel.js';
+import { rampAngleFor } from './modules/CuttingParams.js';
 
 // ─── Tooltip global (réutilisé dans les modales) ────────────────────────────
 let _tipEl  = null;
@@ -871,6 +872,7 @@ function getMachineParams() {
     safeZ:             Number.parseFloat(document.getElementById('param-safe-z').value),
     arcs:              document.getElementById('param-arcs').checked,
     rapidRate:         Number.parseFloat(document.getElementById('param-rapid').value) || 3000,  // G0 (temps estimé)
+    rampAngle:         rampAngleFor(document.getElementById('param-material').value),  // pente des rampes / hélices d'entrée
     // Boîte à couvercle de hauteurs différentes : surplus de brut de chaque pièce (sinon indéfinis)
     ...stockExtras(),
   };

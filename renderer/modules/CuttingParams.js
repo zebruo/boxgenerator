@@ -3,7 +3,7 @@
  * Logique extraite de ParamCoupe/script/cnc.js — sans dépendance DOM.
  */
 
-import { WARN } from './Thresholds.js';
+import { WARN, LIMITS } from './Thresholds.js';
 
 // Vitesses de coupe (vc) : fiches fraises carbure du fournisseur (bois dur 300, contreplaqué 350,
 // MDF et Valchromat 300, thermoplastiques 200, aluminium et non ferreux 120), identiques pour
@@ -51,6 +51,16 @@ const AP_K = {
   alu:    [0.1, 0.2, 0.25, 0.35, 0.35],
 };
 const AP_FAMILY = { '250': 'tendre', tendre: 'tendre', mousse: 'tendre', '120': 'alu', '120.01': 'alu' };
+
+// Pente des rampes et hélices d'entrée (LIMITS.rampAngle) : tendre 10° (bois tendre, mousses, MDF :
+// 5 à 15° conseillés), alu 3° (aluminium, cuivre, laiton), dur 5° pour tout le reste (bois durs et
+// exotiques, contreplaqué : 3 à 5° conseillés à cause des colles, plastiques, HPL, mélaminé…).
+const RAMP_FAMILY = { tendre: 'tendre', mousse: 'tendre', '350': 'tendre', '120': 'alu', '120.01': 'alu' };
+
+/** Pente maximale (°) des entrées en rampe ou en hélice pour une matière. */
+export function rampAngleFor(matId) {
+  return LIMITS.rampAngle[RAMP_FAMILY[matId] ?? 'dur'];
+}
 
 /** Coefficient k du tableau du fournisseur pour une matière et un diamètre (sans plafond machine). */
 export function apCoefficient(matId, diameter) {
