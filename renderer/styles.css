@@ -323,6 +323,8 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .z0-btn.active::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--on-accent); }
 .pop-field { display: flex; align-items: center; gap: 8px; }
 .pop-field[hidden] { display: none; }
+.pop-field input.input-warn { color: var(--warn); border-color: var(--warn); border-style: dashed; }
+.pop-cap.warn-text { color: var(--warn); }
 .pop-check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
 #tabs-fields.disabled { opacity: .4; pointer-events: none; }
 .pop-actions { display: flex; flex-wrap: wrap; gap: 6px; }
