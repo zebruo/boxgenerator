@@ -54,7 +54,7 @@ Les pièces sont exportées à plat, en millimètres, avec les mêmes contours q
 - G-code CNC standard (G21, G90, G17)
 - Passes en Z multiples avec profondeur par passe configurable
 - Offset brut pour les planches légèrement surdimensionnées (la dernière passe de contour atteint l'épaisseur réelle du brut)
-- Boîte à couvercle : même hauteur, corps et couvercle sur un seul brut ; hauteurs différentes, **deux bruts séparés aux épaisseurs correspondantes**. Chaque pièce peut être exportée seule : recentrée à l'origine, avec son brut dans l'en-tête du fichier
+- Boîte à couvercle : même hauteur, corps et couvercle sur un seul brut ; hauteurs différentes, **deux bruts séparés aux épaisseurs correspondantes**, côte à côte dans le même programme (Z0 en bas) avec un **écart réglable** entre les pièces (fenêtre *Brut*, 25 à 30 mm conseillés avec une fraise de 6 mm). Chaque pièce peut être exportée seule : recentrée à l'origine, avec son brut dans l'en-tête du fichier
 - Formes asymétriques : le couvercle est fraisé en miroir pour s'emboîter correctement après retournement physique
 
 ## Installation

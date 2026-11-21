@@ -54,7 +54,7 @@ Parts are exported flat, in millimetres, with the same outlines as the G-code (p
 - Standard CNC G-code (G21, G90, G17)
 - Multiple Z passes with configurable depth-per-pass
 - Stock offset for oversize blanks (last contour pass reaches full stock thickness)
-- Lid Box: same height, body and lid on one stock ; different heights, **two separate stocks of matching thickness**. Each part can be exported alone: recentered at the origin, with its own stock in the file header
+- Lid Box: same height, body and lid on one stock ; different heights, **two separate stocks of matching thickness**, side by side in the same program (Z0 at the bottom) with an **adjustable gap** between the parts (*Stock* window, 25 to 30 mm advised with a 6 mm cutter). Each part can be exported alone: recentered at the origin, with its own stock in the file header
 - Asymmetric shapes: lid is mirrored so it fits the body after physical flipping
 
 ## Installation
