@@ -56,7 +56,7 @@ export class LidBox {
       { id: 'height',        label: 'param.box_height',      min: 10, max: 500, step: 1,   unit: 'mm', value: 40 },
       { id: 'lidHeight',     label: 'param.lid_height',      min: 5,  max: 200, step: 1,   unit: 'mm', value: 20 },
       { id: 'wallThickness', label: 'param.wall_thickness',  min: 2,  max: 30,  step: 0.5, unit: 'mm', value: 6 },
-      { id: 'rabbet',      label: 'param.rabbet',       min: 1, max: 15, step: 0.5, unit: 'mm', value: 3 },
+      { id: 'rabbet',      label: 'param.rabbet',       min: LIMITS.rabbetWidthMin, max: 15, step: 0.5, unit: 'mm', value: 3 },
       { id: 'rabbetDepth', label: 'param.rabbet_depth', min: 1, max: 15, step: 0.5, unit: 'mm', value: 4 },
       {
         id: 'rabbetSide', label: 'param.rabbet_side', type: 'select', unit: '',
@@ -147,8 +147,9 @@ export class LidBox {
       const ringW = rabbet + clearance;
       const dMin = td / 2;
       const dMax = ringW - td / 2;
-      if (dMin > dMax + 1e-6) {
-        gen.comment(`ATTENTION: fraise Ø${td}mm trop large pour feuillure ${ringW.toFixed(1)}mm — utiliser Ø≤${(ringW).toFixed(1)}mm`);
+      const wideTool = dMin > dMax + 1e-6;   // fraise plus large que la feuillure : elle déborde dans la chute
+      if (wideTool) {
+        gen.comment(`Fraise Ø${td}mm plus large que la feuillure ${ringW.toFixed(1)}mm : elle déborde de ${(td - ringW).toFixed(1)}mm dans la chute`);
       }
       // Lèvre (partie qui reste haute, côté intérieur de la feuillure) : rayon de coin d'au moins
       // Ø/2 + 0,4 mm. Un coin vif ne peut pas s'emboîter dans la poche du couvercle, dont la
@@ -184,8 +185,21 @@ export class LidBox {
         return [outer, ...extra, ...es.map(clip)];
       };
       const faRing = entryOpts.finishAllowance ?? 0;
-      if (dMin > dMax + 1e-6) {
-        // rien à usiner : la fraise est plus large que la feuillure
+      if (wideTool) {
+        // Fraise plus large que la feuillure : le bord de l'outil suit la lèvre (centre à Ø/2 de la
+        // lèvre) et le reste de l'outil mord dans la chute, au-delà du contour (découpé ensuite).
+        // Dans les coins saillants, la lèvre arrondie s'éloigne du coin du contour : des anneaux
+        // plus larges s'ajoutent (pas ≤ 0,6 Ø) tant qu'un coin du contour est hors de portée.
+        const r = td / 2, maxStep = LIMITS.ringStepTools * td;
+        const rings = [];
+        for (let e = r + faRing, k = 0; k < 20; e += maxStep, k++) {
+          const ring = around(e);
+          if (ring.length < 3) break;
+          rings.unshift(ring);   // de l'extérieur vers la lèvre
+          if (Math.max(...bodyPts.map(v => distToPolygon(v, ring))) <= 0.95 * r) break;
+        }
+        const fin = faRing > 0 ? [around(r)].filter(c => c.length > 2) : [];
+        gen.cutBandRings(rings.filter(c => c.length > 2), fin, t('gcode.op_body_rabbet_ext'));
       } else if (faRing > 0) {
         // Ébauche à faRing des deux parois, puis finition sur chacune (bords exacts)
         const lo = dMin + faRing, hi = dMax - faRing;

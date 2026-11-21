@@ -171,7 +171,6 @@ export const en = {
     partition_split_count: '⚠ {{n}} percentages needed (one per compartment), e.g. 60/40 — equal parts meanwhile',
     partition_split_invalid: '⚠ Invalid entry: percentages separated by “/”, e.g. 60/40 — equal parts meanwhile',
     partition_split_sum: '⚠ Total is {{sum}} % instead of 100 % — equal parts meanwhile',
-    tool_too_large:    '⚠ Tool Ø{{td}}mm ≥ rabbet+clearance ({{ringW}}mm) — use Ø < {{ringW}}mm',
     rabbet_wider_wall: '⚠ Rabbet width ({{r}} mm) ≥ wall thickness ({{wt}} mm): nothing is left of the wall',
     rabbet_floor:      '⚠ The rabbet leaves only {{left}} mm above the body floor (recommended minimum: {{min}} mm)',
     lid_sunk:          '⚠ The lid sinks {{sink}} mm below the box rim: rabbet too deep or lid too low (usable height: {{usable}} mm)',

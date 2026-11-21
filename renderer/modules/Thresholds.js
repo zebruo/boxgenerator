@@ -10,6 +10,7 @@ export const LIMITS = {
   partitionThicknessMin: 3,   // mm : épaisseur minimale d'une cloison de boîte à couvercle (sans dépasser la paroi)
   lipRadiusMargin: 0.4,       // mm : rayon de coin de la lèvre du couvercle = rayon de la fraise + cette marge
   partitionCellMinTools: 3,   // largeur minimale d'un compartiment, en diamètres de fraise (sinon pas de cloisons)
+  rabbetWidthMin: 3,          // mm : largeur minimale de la feuillure (boîte à couvercle), valeur plus petite ramenée à ce minimum
 
   // ── Usinage ──
   helixDrillMinGap: 0.5,      // mm : perçage en hélice si Ø trou − Ø fraise dépasse cette valeur, sinon perçage par passes

@@ -766,7 +766,7 @@ function renderShapeParams() {
         // Saisie en cours : le « 1 » de « 170 » est sous le minimum, on attend les chiffres suivants
         // (la validation du champ, évènement « change », applique la valeur telle quelle)
         const live = e.type === 'input';
-        if (live && d.min !== undefined && val < d.min && state.shape.params.hasOwnProperty(d.id)) return;
+        if (live && d.min !== undefined && val < d.min) return;
         if (state.shape.params.hasOwnProperty(d.id)) {
           state.shape.updateParam(d.id, val, { live });
           // Synchronise les inputs liés (ex: longueur/largeur du rectangle)
@@ -776,7 +776,10 @@ function renderShapeParams() {
           }
           updateShapeInputWarnings();
         } else {
-          state.boxParams[d.id] = val;
+          // Paramètre de boîte validé sous son minimum (ex. feuillure < 3 mm) : ramené au minimum
+          const v = d.min !== undefined && val < d.min ? d.min : val;
+          if (v !== val) e.target.value = v;
+          state.boxParams[d.id] = v;
         }
         updateBeanRatio();
         updatePinDepthWarning();
@@ -888,13 +891,10 @@ function updateRabbetToolWarning() {
   const rabbet    = Number.parseFloat(widthEl.value) || 0;
   const rabbetD   = Number.parseFloat(depthEl?.value) || 0;
   const wt        = p.wallThickness ?? 6;
-  const clearance = p.clearance ?? 0.3;
-  const td        = Number.parseFloat(document.getElementById('param-tool-diameter').value) || 0;
 
-  // Largeur : fraise trop large (feuillure extérieure) ; feuillure aussi large que la paroi
+  // Largeur : feuillure aussi large que la paroi (une fraise plus large que la feuillure extérieure
+  // n'est plus un problème : elle déborde dans la chute, voir LidBox)
   const widthMsgs = [];
-  if (rabbetSide === 1 && td > rabbet + clearance)
-    widthMsgs.push(t('warn.tool_too_large', { td, ringW: (rabbet + clearance).toFixed(1) }));
   if (rabbet >= wt)
     widthMsgs.push(t('warn.rabbet_wider_wall', { r: rabbet, wt }));
   setFieldWarnings(widthEl, widthMsgs);

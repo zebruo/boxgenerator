@@ -171,7 +171,6 @@ export const fr = {
     partition_split_count: '⚠ Il faut {{n}} valeurs en % (une par compartiment), ex. 60/40 — parts égales en attendant',
     partition_split_invalid: '⚠ Saisie non valide : pourcentages séparés par « / », ex. 60/40 — parts égales en attendant',
     partition_split_sum: '⚠ La somme fait {{sum}} % au lieu de 100 % — parts égales en attendant',
-    tool_too_large:    '⚠ Fraise Ø{{td}}mm ≥ feuillure+jeu ({{ringW}}mm) — utiliser Ø < {{ringW}}mm',
     rabbet_wider_wall: '⚠ Largeur de feuillure ({{r}} mm) ≥ épaisseur de paroi ({{wt}} mm) : il ne reste rien de la paroi',
     rabbet_floor:      '⚠ La feuillure ne laisse que {{left}} mm au-dessus du fond du corps (minimum conseillé : {{min}} mm)',
     lid_sunk:          '⚠ Le couvercle s’enfonce de {{sink}} mm sous le bord de la boîte : feuillure trop profonde ou couvercle trop bas (hauteur utile : {{usable}} mm)',
