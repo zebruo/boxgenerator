@@ -20,6 +20,7 @@ import { showCuttingParamsModal } from './modules/CuttingParamsModal.js';
 import { WARN, LIMITS } from './modules/Thresholds.js';
 import { initCuttingPanel } from './modules/CuttingPanel.js';
 import { rampAngleFor, entryModeFor } from './modules/CuttingParams.js';
+import { parseProgram, formatDuration } from './modules/sim/GCodeProgram.js';
 
 // ─── Tooltip global (réutilisé dans les modales) ────────────────────────────
 let _tipEl  = null;
@@ -1573,6 +1574,7 @@ function showExportModal(sections, machine = {}) {
   modal.innerHTML = `
     <h3>${t('modal.export_title')}</h3>
     <div class="tabs-section">
+      <p class="modal-sub" id="modal-tool-time" style="margin:0 0 4px"></p>
       <p class="modal-sub" style="margin:0">${escHtml(strategyText)}</p>
       <p class="modal-sub" style="margin:4px 0 0">${escHtml(tabsSummaryText())}</p>
     </div>
@@ -1639,6 +1641,11 @@ function showExportModal(sections, machine = {}) {
     list.querySelectorAll('input[type=checkbox]').forEach(cb => { if (cb.checked) sel.add(Number.parseInt(cb.dataset.idx)); });
     const code = fSections.filter((_, i) => sel.has(i)).map(s => s.lines.join('\n')).join('\n');
     const fl = code.split('\n');
+    // Fraise et temps estimé des sections cochées (même calcul que la simulation : avances du programme, G0 à la vitesse des limites machine)
+    const seconds = parseProgram(code, { rapidRate: machine.rapidRate > 0 ? machine.rapidRate : 3000 }).totalTime;
+    modal.querySelector('#modal-tool-time').textContent = t('modal.tool_time', {
+      d: String(machine.toolDiameter).replace('.', ','), time: formatDuration(seconds),
+    });
     modalStatsEl.innerHTML = `
       <span class="stat-item">${t('stats.lines')}: <span class="stat-value">${fl.length}</span></span>
       <span class="stat-item">${t('stats.lines_exec')}: <span class="stat-value">${fl.filter(l => { const s = l.trim(); return s.length > 0 && !s.startsWith(';') && !s.startsWith('('); }).length}</span></span>

@@ -280,6 +280,30 @@ export class TechnicalView {
     }
     ctx.restore();
 
+    // Dimensions utiles de chaque compartiment (ou de la cavité seule) : longueur × largeur de son
+    // encombrement, au centre. Sur une forme non rectangulaire, c'est la boîte englobante du compartiment.
+    if (boxTypeKey !== 'finger-joint') {
+      ctx.save();
+      ctx.font = '11px monospace';
+      ctx.fillStyle = this.C.text;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const poly of cells ?? [insetPolygon(pts, wt)]) {
+        if (poly.length <= 2) continue;
+        const xs = poly.map(p => p.x), ys = poly.map(p => p.y);
+        const cw = Math.max(...xs) - Math.min(...xs), ch = Math.max(...ys) - Math.min(...ys);
+        // Un peu au-dessus du centre : le plan de coupe A-A passe par le milieu de la boîte
+        const px = toX((Math.min(...xs) + Math.max(...xs)) / 2), py = toY((Math.min(...ys) + Math.max(...ys)) / 2) - 22;
+        const one = `${cw.toFixed(1)} × ${ch.toFixed(1)}`;
+        if (ctx.measureText(one).width + 6 <= cw * sc) ctx.fillText(one, px, py);
+        else {   // compartiment étroit : une valeur par ligne
+          ctx.fillText(cw.toFixed(1), px, py - 7);
+          ctx.fillText(`× ${ch.toFixed(1)}`, px, py + 7);
+        }
+      }
+      ctx.restore();
+    }
+
     // Plan de coupe A-A (horizontal, au milieu) : trait mixte, flèches vers le sens de vue
     {
       const yA = toY((bb.minY + bb.maxY) / 2);

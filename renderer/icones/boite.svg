@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Boîte en carton vue en perspective, sans rabats : icône en couleurs (à afficher en <img>, pas en masque) -->
+  <g stroke="#000" stroke-width="0.5" stroke-linejoin="round" stroke-linecap="round">
+    <!-- Face gauche (claire) -->
+    <path d="M2.8 7.6L12 11.6v9.6L2.8 17.2z" fill="#f4d3a5"/>
+    <!-- Face droite (plus soutenue) -->
+    <path d="M21.2 7.6L12 11.6v9.6l9.2-4z" fill="#ebb872"/>
+    <!-- Dessus -->
+    <path d="M12 3.6l9.2 4L12 11.6 2.8 7.6z" fill="#e4a465"/>
+  </g>
+</svg>

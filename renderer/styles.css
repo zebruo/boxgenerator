@@ -142,7 +142,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   border: 1px dashed var(--border); border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
-.mach-seg > button { flex: 1; height: 26px; padding: 0; }
+.mach-seg > button { flex: 1; height: 20px; padding: 0; }
 .panel-left .mach-seg > button { font-size: 13px; }
 .param-row[hidden] { display: none; }
 .param-row input[type=number]:disabled { opacity: .4; }
@@ -228,7 +228,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .cut-flutes.tb-seg > button:disabled:not(.active) { opacity: .35; cursor: default; }
 .cut-tool-info { margin: -2px 0 0; font-size: 11px; line-height: 1.4; color: var(--text-muted); }
 .cut-tool-info[hidden] { display: none; }
-.cut-flutes.tb-seg > button { flex: 1; height: 24px; padding: 0; font-size: 12px; }
+.cut-flutes.tb-seg > button { flex: 1; height: 18px; padding: 0; font-size: 12px; }
 .cut-state {
   height: 16px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--border); background: transparent;
   color: var(--text-muted); font: inherit; font-size: 10px; font-weight: 600; cursor: default; white-space: nowrap;
@@ -291,16 +291,20 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
    Fond plein = choix exclusif (.tb-seg) ; contour teinté = option affichée ou non (.tb-chip). */
 .tb-grp { display: flex; align-items: center; gap: 6px; }
 .tb-grp-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-right: 2px; }
-.tb-seg { display: inline-flex; }
+/* Sélecteur à choix multiples : cadre arrondi, boutons sans bordure à l'intérieur ; le bouton actif
+   laisse un petit liseret (padding du cadre) entre lui et le bord. Hauteur totale inchangée :
+   hauteur du bouton = hauteur voulue − 2 × (padding + bordure) = − 6 px. */
+.tb-seg {
+  display: inline-flex; gap: 2px; padding: 2px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card);
+}
 .tb-seg > button {
-  height: 28px; padding: 0 12px; margin-left: -1px; border: 1px solid var(--border); border-radius: 0;
-  background: var(--bg-card); color: var(--text-muted); font: inherit; font-size: 13px; font-weight: 600;
+  height: 22px; padding: 0 10px; border: none; border-radius: calc(var(--radius-sm) - 1px);
+  background: transparent; color: var(--text-muted); font: inherit; font-size: 13px; font-weight: 600;
   cursor: pointer; white-space: nowrap;
 }
-.tb-seg > button:first-child { margin-left: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.tb-seg > button:last-child  { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 .tb-seg > button:hover { background: var(--bg-hover); color: var(--text); }
-.tb-seg > button.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); position: relative; z-index: 1; }
+.tb-seg > button.active { background: var(--accent); color: var(--on-accent); }
 .tb-chip, .tb-btn {
   position: relative; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -344,14 +348,14 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
 .pop-cap-c { text-align: center; }
 .pop-row .tb-seg { display: flex; }
 .pop-row .tb-seg > button { flex: 1; }
-.z0-sheet { position: relative; height: 92px; border: 1.5px solid var(--accent2); border-radius: 4px; background: var(--bg-card); }
+.z0-sheet { position: relative; width: 92px; height: 92px; align-self: center; border: 1.5px solid var(--accent2); border-radius: 4px; background: var(--bg-card); }
 .z0-btn {
-  position: absolute; width: 22px; height: 22px; padding: 0; transform: translate(-50%, -50%);
+  position: absolute; width: 16px; height: 16px; padding: 0; transform: translate(-50%, -50%);
   border-radius: 50%; border: 1.5px solid var(--accent2); background: var(--bg-panel); cursor: pointer;
 }
 .z0-btn:hover { border-color: var(--text); }
 .z0-btn.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
-.z0-btn.active::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--on-accent); }
+.z0-btn.active::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--on-accent); }
 .pop-field { display: flex; align-items: center; gap: 8px; }
 .pop-field[hidden] { display: none; }
 .pop-field input.input-warn { color: var(--warn); border-color: var(--warn); border-style: dashed; }
@@ -513,6 +517,7 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;
 }
+.export-modal .tabs-section .modal-sub { font-size: 13px; line-height: 1.45; }
 
 /* ── Boutons icône header (save/load session) ── */
 .btn-icon-header {
@@ -533,6 +538,20 @@ html, body { height: 100%; background: var(--bg-dark); color: var(--text); font-
   -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat;
 }
 .ico-enregistrer-sous { --ico: url(icones/enregistrer-sous.svg); }
+.ico-fleche-droite { --ico: url(icones/fleche-droite.svg); }
+
+/* Hauteur du zéro : boîte dessinée (36 px, centrée dans un bouton de 40 px) + flèche à la hauteur
+   du coin gauche de la boîte : y = 7,6 / 24 (haut) et 17,2 / 24 (bas) de l'image → −6,6 px et +7,8 px du centre. */
+.pop-row .z0-lvl-seg > button { height: 40px; display: flex; align-items: center; justify-content: center; gap: 0; }
+.z0-lvl-btn img { width: 36px; height: 36px; display: block; }
+.z0-lvl-btn .ico { width: 14px; height: 14px; }
+.z0-lvl-btn[data-level="top"] .ico    { transform: translateY(-6.6px); }
+.z0-lvl-btn[data-level="bottom"] .ico { transform: translateY(7.8px); }
+
+/* Surplus de brut : boîte dessinée + trait (le brut ajouté) au-dessus ou en dessous */
+.pop-row .stock-side-seg > button { height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.stock-side-btn img { width: 30px; height: 30px; display: block; }
+.stock-side-btn .stock-line { width: 28px; height: 2px; border-radius: 1px; background: currentColor; }
 
 /* ── Bouton aide ? (header) ── */
 .btn-icon-header.btn-help { font-size: 17px; }

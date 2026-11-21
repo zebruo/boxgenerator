@@ -376,9 +376,14 @@
           </div>
           <div class="pop-row">
             <span class="pop-cap" data-i18n="ui.z0_level_cap">Hauteur du zéro</span>
-            <div class="tb-seg" role="group" data-i18n-title="tip.z0_level" title="Niveau Z0 : bas ou haut de la boîte">
-              <button class="z0-lvl-btn active" aria-pressed="true" data-level="top" data-i18n="tip.z0_top">Haut de la boîte</button>
-              <button class="z0-lvl-btn" aria-pressed="false" data-level="bottom" data-i18n="tip.z0_bottom">Bas de la boîte</button>
+            <div class="tb-seg z0-lvl-seg" role="group" data-i18n-title="tip.z0_level" title="Niveau Z0 : bas ou haut de la boîte">
+              <!-- Boîte dessinée + flèche qui désigne le haut ou le bas (libellé en info-bulle) -->
+              <button class="z0-lvl-btn active" aria-pressed="true" data-level="top" data-i18n-title="tip.z0_top" data-i18n-aria="tip.z0_top" title="Haut de la boîte" aria-label="Haut de la boîte">
+                <span class="ico ico-fleche-droite" aria-hidden="true"></span><img src="icones/boite.svg" alt="">
+              </button>
+              <button class="z0-lvl-btn" aria-pressed="false" data-level="bottom" data-i18n-title="tip.z0_bottom" data-i18n-aria="tip.z0_bottom" title="Bas de la boîte" aria-label="Bas de la boîte">
+                <span class="ico ico-fleche-droite" aria-hidden="true"></span><img src="icones/boite.svg" alt="">
+              </button>
             </div>
           </div>
         </div>
@@ -435,9 +440,14 @@
           </div>
           <div class="pop-row">
             <span class="pop-cap" data-i18n="ui.stock_side_cap">Où ajouter le surplus</span>
-            <div class="tb-seg" role="group" data-i18n-title="tip.stock_offset_lvl" title="Appliquer l'offset en haut ou en bas de la boîte">
-              <button class="stock-side-btn active" aria-pressed="true" data-side="top" data-i18n="ui.stock_above" data-i18n-title="tip.stock_top" title="Offset au-dessus">Au-dessus</button>
-              <button class="stock-side-btn" aria-pressed="false" data-side="bottom" data-i18n="ui.stock_below" data-i18n-title="tip.stock_bottom" title="Offset en dessous">En dessous</button>
+            <div class="tb-seg stock-side-seg" role="group" data-i18n-title="tip.stock_offset_lvl" title="Appliquer l'offset en haut ou en bas de la boîte">
+              <!-- Boîte dessinée + trait de brut au-dessus ou en dessous (libellé en info-bulle) -->
+              <button class="stock-side-btn active" aria-pressed="true" data-side="top" data-i18n-title="tip.stock_top" data-i18n-aria="ui.stock_above" title="Offset au-dessus" aria-label="Au-dessus">
+                <span class="stock-line" aria-hidden="true"></span><img src="icones/boite.svg" alt="">
+              </button>
+              <button class="stock-side-btn" aria-pressed="false" data-side="bottom" data-i18n-title="tip.stock_bottom" data-i18n-aria="ui.stock_below" title="Offset en dessous" aria-label="En dessous">
+                <img src="icones/boite.svg" alt=""><span class="stock-line" aria-hidden="true"></span>
+              </button>
             </div>
           </div>
           <p class="pop-cap" id="lid-gap-note" hidden></p>

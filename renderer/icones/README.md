@@ -9,6 +9,8 @@ remplaceront Font Awesome.
 - Trait seul : `fill="none"`, `stroke-width="1.8"`, extrémités et angles arrondis.
 - Une seule couleur, n'importe laquelle (`#000`) : l'icône est affichée comme un **masque**, la couleur vient du thème.
 - Nom de fichier en français, en minuscules, avec des tirets : `enregistrer-sous.svg`.
+- Exception, les icônes **en couleurs** (ex. `boite.svg`) : faces remplies, trait noir fin (0,5) ; elles
+  s'affichent telles quelles avec `<img src="icones/boite.svg">`, pas comme masque.
 
 ## Utilisation
 
